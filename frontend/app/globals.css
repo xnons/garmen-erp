@@ -1,26 +1,129 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ========================================================= */
+/* 🌟 CUSTOM ANIMATIONS & KEYFRAMES NEXORA ERP               */
+/* ========================================================= */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* 1. Animasi Shake / Getar (Dipakai saat PIN Salah) */
+@keyframes shake {
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20%,
+  60% {
+    transform: translateX(-8px);
+  }
+
+  40%,
+  80% {
+    transform: translateX(8px);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* 2. Animasi Modal Pop-up Spring */
+@keyframes modalPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(15px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 3. Animasi Glow Pendar Gembok Terkunci */
+@keyframes lockPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 15px rgba(244, 63, 94, 0.2), inset 0 0 10px rgba(244, 63, 94, 0.1);
+  }
+
+  50% {
+    box-shadow: 0 0 30px rgba(244, 63, 94, 0.5), inset 0 0 15px rgba(244, 63, 94, 0.25);
+  }
+}
+
+/* 4. Animasi Glow Pendar Indigo (Security Gate) */
+@keyframes indigoPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.25);
+  }
+
+  50% {
+    box-shadow: 0 0 35px rgba(99, 102, 241, 0.55);
+  }
+}
+
+/* 5. Efek Shimmer Loading / Gradient Text Flow */
+@keyframes gradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+
+/* ========================================================= */
+/* 🎨 UTILITY CLASSES UTAMA                                  */
+/* ========================================================= */
+
+/* Class Shake */
+.animate-shake {
+  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Class Modal Pop */
+.animate-modal-pop {
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Class Lock Pulse */
+.animate-lock-pulse {
+  animation: lockPulse 2.5s infinite ease-in-out;
+}
+
+/* Class Indigo Pulse */
+.animate-indigo-pulse {
+  animation: indigoPulse 3s infinite ease-in-out;
+}
+
+/* Glassmorphism Card Base */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* Card Hover Lift & Glow Effect */
+.glass-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-hover:hover {
+  transform: translateY(-4px);
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6), 0 0 20px rgba(99, 102, 241, 0.15);
+}
+
+/* Custom Input PIN Spotting Glow */
+.pin-input-glow:focus {
+  box-shadow: 0 0 25px rgba(99, 102, 241, 0.4);
 }

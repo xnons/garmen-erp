@@ -1,30 +1,135 @@
 "use client";
 
-import React, { useState } from 'react';
-// Jalur diatur menggunakan satu titik karena folder components ada di dalam folder app
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/layout/Sidebar';
 import DashboardContent from './components/dashboard/DashboardContent';
 
 export default function DashboardPage() {
-  // Kita set default ke 'karyawan' agar langsung memuat halaman kelola karyawan
-  const [activeMenu, setActiveMenu] = useState('karyawan');
-  const [activeUser, setActiveUser] = useState<any>({
-    id_karyawan: "KRY-2026-001",
-    nama: "Bapak Owner Nexora",
-    username: "admin.nexora",
-    role: "OWNER", // Ubah ke 'ADMIN' untuk tes hilangnya tombol sanksi
-    total_hadir: 25,
-    total_terlambat: 1,
-    poin_pelanggaran: 0
-  });
+  const [activeMenu, setActiveMenu] = useState('dashboard');
+  
+  // 🟢 1. STATE AWAL USER KITA SET NULL (Artinya status awal: Belum Login)
+  const [activeUser, setActiveUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    window.location.reload();
+  // Form Input Internal untuk Login
+  const [loginInput, setLoginInput] = useState({ username: "", password: "" });
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // 🟢 2. CEK STATUS LOGIN SETIAP KALI WEB DIBUKA
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    const savedUser = localStorage.getItem("user");
+
+    if (token && savedUser) {
+      // Jika token ditemukan di browser, bypass langsung ke dashboard
+      setActiveUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
+  }, []);
+
+  // 🟢 3. FUNGSI UNTUK MENEMBAK API LOGIN BACKEND
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setLoginLoading(true);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loginInput),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Gagal masuk ke sistem.");
+      }
+
+      // Simpan kredensial digital ke memori lokal browser jika sukses
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      // Set state agar aplikasi langsung membuka gerbang dashboard
+      setActiveUser(data.user);
+    } catch (error: any) {
+      setLoginError(error.message);
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
+  // FUNGSI LOGOUT (MENGHAPUS JEJAK TOKEN)
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
+    setActiveUser(null); // Otomatis mengunci layar kembali ke form login
+  };
+
+  // Tampilan buffering saat sistem sedang membaca memori token
+  if (loading) {
+    return (
+      <div className="h-screen w-screen bg-slate-950 flex items-center justify-center text-slate-400 text-xs tracking-widest font-mono">
+        MENYELARASKAN KEAMANAN NEXORA ERP...
+      </div>
+    );
+  }
+
+  //# 🟢 4. JIKA BELUM LOGIN (activeUser == null), TAMPILKAN LAYAR LOGIN ELEGAN INI
+  if (!activeUser) {
+    return (
+      <div className="h-screen w-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-900 border border-white/5 rounded-2xl p-8 shadow-2xl space-y-6">
+          <div className="text-center">
+            <h1 className="text-2xl font-black text-emerald-400 tracking-wider">NEXORA <span className="text-white text-xs px-1.5 py-0.5 bg-slate-950 rounded border border-white/10 ml-0.5">ERP</span></h1>
+            <p className="text-xs text-slate-400 mt-2">Internal Engine & Operational Control Platform</p>
+          </div>
+
+          {loginError && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-semibold text-center">
+              ⚠️ {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
+            <div>
+              <label className="block text-slate-400 font-bold mb-1.5 uppercase tracking-wide">Username Sistem</label>
+              <input 
+                type="text" required placeholder="Masukkan username penjahit/staff"
+                value={loginInput.username}
+                onChange={(e) => setLoginInput({...loginInput, username: e.target.value})}
+                className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 font-bold mb-1.5 uppercase tracking-wide">Kata Sandi (Password)</label>
+              <input 
+                type="password" required placeholder="••••••••"
+                value={loginInput.password}
+                onChange={(e) => setLoginInput({...loginInput, password: e.target.value})}
+                className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
+              />
+            </div>
+            
+            <button 
+              type="submit" disabled={loginLoading}
+              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs tracking-wider uppercase shadow-lg shadow-emerald-500/10 transition-all disabled:opacity-50 mt-2"
+            >
+              {loginLoading ? "Memverifikasi Kredensial..." : "Masuk ke Sistem ERP"}
+            </button>
+          </form>
+
+          <div className="text-[10px] text-center text-slate-600 font-mono">
+            Secured via Bcrypt Hash & HS256 JWT Authorization Standard
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  //# 🟢 5. JIKA SUDAH SUKSES LOGIN, BARU TAMPILKAN DASHBOARD UTAMA
   return (
-    // Pembungkus Utama (Layout dasar Flexbox Horizontal)
     <div className="flex h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden m-0 p-0">
       
       {/* SISI KIRI: Navigasi Menu */}
