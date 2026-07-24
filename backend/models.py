@@ -1,6 +1,18 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from database import Base
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from datetime import datetime
+
+
+class SystemSecurity(Base):
+    __tablename__ = "system_security"
+
+    id = Column(Integer, primary_key=True, index=True, default=1)
+    master_pin_hash = Column(String(255), nullable=False)
+    updated_by = Column(String(100), nullable=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
 class Karyawan(Base):
     __tablename__ = "karyawan"
@@ -48,3 +60,24 @@ class LogPelanggaran(Base):
     tanggal = Column(String, nullable=False)
 
     karyawan = relationship("Karyawan", back_populates="pelanggaran")
+
+class Mesin(Base):
+    __tablename__ = "mesin"
+
+    id = Column(Integer, primary_key=True, index=True)
+    kode_mesin = Column(String(50), unique=True, index=True, nullable=False)  # Contoh: MSN-JHT-001
+    nama_mesin = Column(String(100), nullable=False)                         # Contoh: Mesin Jahit High Speed
+    kategori = Column(String(50), nullable=False)                             # JAHIT, OBRAS, CUTTING, PRESS, EMBROIDERY
+    merk_tipe = Column(String(100), nullable=True)                            # Contoh: Juki DDL-8700
+    lokasi_line = Column(String(50), nullable=False)                          # Line 1, Line 2, Cutting Room, Finishing
+    status = Column(String(30), default="OPERASIONAL")                        # OPERASIONAL, MAINTENANCE, RUSAK
+    
+    # Penanggung Jawab / Operator Mesin (Opsional)
+    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    
+    keterangan = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationship
+    operator = relationship("Karyawan", foreign_keys=[operator_id])

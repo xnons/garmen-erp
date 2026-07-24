@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 
-# 🟢 1. SCHEMA REGISTRASI KARYAWAN BARU
+# 🟢 1. SCHEMA REGISTRASI / TAMBAH KARYAWAN BARU
 class RegisterInput(BaseModel):
     id_karyawan: Optional[str] = None
     nama: str
@@ -13,7 +13,7 @@ class RegisterInput(BaseModel):
     
     # BIODATA & PEKERJAAN
     jabatan: str = "Operator Produksi"
-    tanggal_lahir: Optional[str] = None  # 👈 Menggantikan umur
+    tanggal_lahir: Optional[str] = None
     no_hp: Optional[str] = None
     alamat: Optional[str] = None
     status_karyawan: str = "KONTRAK"
@@ -24,13 +24,16 @@ class RegisterInput(BaseModel):
     gaji_pokok: int = 0
     tarif_borongan_pcs: int = 0
 
+# 🔗 Alias agar router yang memanggil KaryawanCreate tetap berjalan kompatibel
+KaryawanCreate = RegisterInput
+
 
 # 🟢 2. SCHEMA UPDATE BIODATA & GAJI KARYAWAN OLEH ADMIN
 class UpdateKaryawanInput(BaseModel):
     nama: Optional[str] = None
     role: Optional[str] = None
     jabatan: Optional[str] = None
-    tanggal_lahir: Optional[str] = None  # 👈 Menggantikan umur
+    tanggal_lahir: Optional[str] = None
     no_hp: Optional[str] = None
     alamat: Optional[str] = None
     status_karyawan: Optional[str] = None
@@ -61,3 +64,10 @@ class UpdatePinInput(BaseModel):
 # 🟢 6. SCHEMA VERIFIKASI SECURITY GATE (PIN GATE)
 class PinVerifyInput(BaseModel):
     pin: str = Field(..., min_length=4, max_length=4, json_schema_extra={"example": "1234"})
+
+class PinVerifySchema(BaseModel):
+    pin: str = Field(..., min_length=4, max_length=4, description="PIN Security Gate 4 digit")
+
+class PinUpdateSchema(BaseModel):
+    old_pin: str = Field(..., min_length=4, max_length=4, description="PIN Lama 4 digit")
+    new_pin: str = Field(..., min_length=4, max_length=4, description="PIN Baru 4 digit")

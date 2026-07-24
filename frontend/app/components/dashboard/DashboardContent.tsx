@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { KaryawanModule } from '@/app/components/karyawan/KaryawanModule';
 import SettingModule from '@/app/components/karyawan/SettingModule';
 import PinGateModal from '@/app/components/karyawan/PinGateModal';
+import MesinModule from '@/app/components/mesin/MesinModule';
 
 import { Lock, ShieldAlert, TrendingUp, Users, AlertTriangle } from 'lucide-react';
 
@@ -169,7 +170,12 @@ export default function DashboardContent({ activeMenu, activeUser, onLogout }: D
     );
   }
 
-  // 🟢 3. JALUR HALAMAN SETTING
+  // 🟢 3. JALUR HALAMAN MESIN
+  if (activeMenu === 'mesin') {
+    return <MesinModule activeUser={activeUser} />;
+  }
+
+  // 🟢 4. JALUR HALAMAN SETTING
   if (activeMenu === 'setting') {
     return <SettingModule activeUser={activeUser} onLogout={onLogout} />;
   }
@@ -184,3 +190,4 @@ export default function DashboardContent({ activeMenu, activeUser, onLogout }: D
     </main>
   );
 }
+

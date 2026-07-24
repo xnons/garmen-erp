@@ -1,3 +1,4 @@
+import os
 import random
 import string
 from datetime import timedelta
@@ -19,8 +20,6 @@ from core.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
-# 💡 Prefix dilepas dari sini karena sudah dipasang di main.py:
-# app.include_router(auth.router, prefix="/api/auth")
 router = APIRouter(tags=["Autentikasi & Security Gate"])
 
 
@@ -45,20 +44,44 @@ def generate_unique_id_karyawan(db: Session) -> str:
             return candidate_id
 
 
-# routers/auth.py (Di dalam endpoint register_karyawan)
+# 🔒 MATRIKS HIERARKI HAK PEMBUATAN ROLE (BACKEND GUARD)
+ALLOWED_TARGET_ROLES = {
+    "DEVELOPER": ["DEVELOPER", "OWNER", "ADMIN", "FINANCE", "GUDANG", "PRODUKSI", "KARYAWAN"],
+    "OWNER": ["ADMIN", "FINANCE", "GUDANG", "PRODUKSI", "KARYAWAN"],
+    "ADMIN": ["FINANCE", "GUDANG", "PRODUKSI", "KARYAWAN"]
+}
 
+
+# 🟢 1. Registrasi Karyawan (RBAC Hardened)
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_karyawan(
     user_data: RegisterInput, 
     db: Session = Depends(get_db),
-    current_user_role: str = Depends(get_current_user_role)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
-    if current_user_role not in ["ADMIN", "OWNER"]:
-        raise HTTPException(status_code=403, detail="Akses ditolak! Hanya Admin atau Owner.")
+    user_role = getattr(current_user, 'role', '').upper()
 
+    # 1️⃣ Validasi Otoritas Pembuat (Harus Developer, Owner, atau Admin)
+    if user_role not in ALLOWED_TARGET_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Akses ditolak! Anda tidak memiliki wewenang mendaftarkan pengguna."
+        )
+
+    # 2️⃣ 🛡️ VALIDASI HIERARKI ROLE TARGET (Mencegah Admin membuat Owner/Developer via API)
+    target_role = user_data.role.upper()
+    allowed_roles = ALLOWED_TARGET_ROLES[user_role]
+
+    if target_role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Role '{user_role}' tidak diizinkan mendaftarkan pengguna dengan role '{target_role}'!"
+        )
+
+    # 3️⃣ Cek Duplikasi Username
     karyawan_lama = db.query(models.Karyawan).filter(models.Karyawan.username == user_data.username).first()
     if karyawan_lama:
-        raise HTTPException(status_code=400, detail="Username tersebut sudah terdaftar!")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username tersebut sudah terdaftar!")
     
     final_id = user_data.id_karyawan or generate_unique_id_karyawan(db)
     hashed_password = get_password_hash(user_data.password)
@@ -69,18 +92,17 @@ async def register_karyawan(
         username=user_data.username,
         hashed_password=hashed_password,
         pin=user_data.pin or "1234",
-        role=user_data.role.upper(),
+        role=target_role,
         is_active=True,
         
-        # 🟢 SIMPAN FIELD BARU
         jabatan=user_data.jabatan,
-        umur=user_data.umur,
+        umur=getattr(user_data, 'umur', None),
         no_hp=user_data.no_hp,
         alamat=user_data.alamat,
-        status_karyawan=user_data.status_karyawan.upper(),
+        status_karyawan=(user_data.status_karyawan or "KONTRAK").upper(),
         tanggal_masuk=user_data.tanggal_masuk,
         
-        tipe_pay=user_data.tipe_pay.upper(),
+        tipe_pay=(user_data.tipe_pay or "BORONGAN").upper(),
         gaji_pokok=user_data.gaji_pokok,
         tarif_borongan_pcs=user_data.tarif_borongan_pcs,
         
@@ -92,12 +114,13 @@ async def register_karyawan(
     db.refresh(karyawan_baru)
     return {"message": f"Karyawan {user_data.nama} ({final_id}) sukses didaftarkan!"}
 
+
 # 🟢 2. Login Utama
 @router.post("/login")
 async def login(credentials: LoginInput, db: Session = Depends(get_db)):
     user = db.query(models.Karyawan).filter(models.Karyawan.username == credentials.username).first()
     if not user or not verify_password(credentials.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Kombinasi Username atau Password salah!")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kombinasi Username atau Password salah!")
     
     token = create_access_token(
         data={"sub": user.username, "role": user.role},
@@ -117,17 +140,23 @@ async def login(credentials: LoginInput, db: Session = Depends(get_db)):
     }
 
 
-# 🔏 3. Verifikasi PIN Gate
+# 🔏 3. Verifikasi PIN Gate (Mendukung Dev Mode Bypass)
 @router.post("/verify-pin")
 async def verify_security_pin(
     payload: PinVerifyInput,
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    """Memverifikasi PIN Keamanan Gate."""
-    PIN_MASTER = "9999"  # Backup PIN Darurat
+    """Memverifikasi PIN Personal atau Universal PIN Developer."""
+    user_role = getattr(current_user, "role", "").upper()
+    dev_mode = os.getenv("DEV_MODE", "true").lower() == "true"
     
-    # Ambil PIN user dari DB (jika belum di-set fallback ke '1234')
+    # ⚡ 1. Universal PIN '6767' Khusus DEVELOPER dalam Dev Mode
+    if payload.pin == "6767" and user_role == "DEVELOPER" and dev_mode:
+        return {"success": True, "message": "Otorisasi Universal PIN Developer berhasil!"}
+
+    # 🔒 2. Backup PIN Master '9999' / User Personal PIN Check
+    PIN_MASTER = "9999"
     user_pin = getattr(current_user, "pin", "1234") or "1234"
     
     if payload.pin != user_pin and payload.pin != PIN_MASTER:
@@ -139,7 +168,7 @@ async def verify_security_pin(
     return {"success": True, "message": "Otorisasi PIN berhasil!"}
 
 
-# 🔑 4. Ganti PIN Gate (Modal Setting PIN)
+# 🔑 4. Ganti PIN Gate Personal
 @router.post("/change-pin")
 async def change_pin(
     payload: ChangePinInput,

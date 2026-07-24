@@ -3,11 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/layout/Sidebar';
 import DashboardContent from './components/dashboard/DashboardContent';
+// 🟢 1. IMPORT MODAL UBAH PIN GATE (Sesuaikan path jika beda)
+import { UpdatePinModal } from './components/karyawan/UpdatePinModal';
 
 export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('dashboard');
-  
-  // 🟢 1. STATE AWAL USER KITA SET NULL (Artinya status awal: Belum Login)
+
+  // 🔑 2. STATE KONTROL POP-UP MODAL MASTER PIN GATE
+  const [showUpdatePinModal, setShowUpdatePinModal] = useState(false);
+
+  // STATE AWAL USER
   const [activeUser, setActiveUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -16,19 +21,18 @@ export default function DashboardPage() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // 🟢 2. CEK STATUS LOGIN SETIAP KALI WEB DIBUKA
+  // CEK STATUS LOGIN SETIAP KALI WEB DIBUKA
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     const savedUser = localStorage.getItem("user");
 
     if (token && savedUser) {
-      // Jika token ditemukan di browser, bypass langsung ke dashboard
       setActiveUser(JSON.parse(savedUser));
     }
     setLoading(false);
   }, []);
 
-  // 🟢 3. FUNGSI UNTUK MENEMBAK API LOGIN BACKEND
+  // FUNGSI UNTUK MENEMBAK API LOGIN BACKEND
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
@@ -47,11 +51,9 @@ export default function DashboardPage() {
         throw new Error(data.detail || "Gagal masuk ke sistem.");
       }
 
-      // Simpan kredensial digital ke memori lokal browser jika sukses
       localStorage.setItem("access_token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      // Set state agar aplikasi langsung membuka gerbang dashboard
       setActiveUser(data.user);
     } catch (error: any) {
       setLoginError(error.message);
@@ -60,14 +62,14 @@ export default function DashboardPage() {
     }
   };
 
-  // FUNGSI LOGOUT (MENGHAPUS JEJAK TOKEN)
+  // FUNGSI LOGOUT
   const handleLogout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
-    setActiveUser(null); // Otomatis mengunci layar kembali ke form login
+    setActiveUser(null);
   };
 
-  // Tampilan buffering saat sistem sedang membaca memori token
+  // Tampilan buffering
   if (loading) {
     return (
       <div className="h-screen w-screen bg-slate-950 flex items-center justify-center text-slate-400 text-xs tracking-widest font-mono">
@@ -76,13 +78,15 @@ export default function DashboardPage() {
     );
   }
 
-  //# 🟢 4. JIKA BELUM LOGIN (activeUser == null), TAMPILKAN LAYAR LOGIN ELEGAN INI
+  // JIKA BELUM LOGIN
   if (!activeUser) {
     return (
       <div className="h-screen w-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-slate-900 border border-white/5 rounded-2xl p-8 shadow-2xl space-y-6">
           <div className="text-center">
-            <h1 className="text-2xl font-black text-emerald-400 tracking-wider">NEXORA <span className="text-white text-xs px-1.5 py-0.5 bg-slate-950 rounded border border-white/10 ml-0.5">ERP</span></h1>
+            <h1 className="text-2xl font-black text-emerald-400 tracking-wider">
+              NEXORA <span className="text-white text-xs px-1.5 py-0.5 bg-slate-950 rounded border border-white/10 ml-0.5">ERP</span>
+            </h1>
             <p className="text-xs text-slate-400 mt-2">Internal Engine & Operational Control Platform</p>
           </div>
 
@@ -95,24 +99,24 @@ export default function DashboardPage() {
           <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
             <div>
               <label className="block text-slate-400 font-bold mb-1.5 uppercase tracking-wide">Username Sistem</label>
-              <input 
+              <input
                 type="text" required placeholder="Masukkan username penjahit/staff"
                 value={loginInput.username}
-                onChange={(e) => setLoginInput({...loginInput, username: e.target.value})}
+                onChange={(e) => setLoginInput({ ...loginInput, username: e.target.value })}
                 className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
               />
             </div>
             <div>
               <label className="block text-slate-400 font-bold mb-1.5 uppercase tracking-wide">Kata Sandi (Password)</label>
-              <input 
+              <input
                 type="password" required placeholder="••••••••"
                 value={loginInput.password}
-                onChange={(e) => setLoginInput({...loginInput, password: e.target.value})}
+                onChange={(e) => setLoginInput({ ...loginInput, password: e.target.value })}
                 className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
               />
             </div>
-            
-            <button 
+
+            <button
               type="submit" disabled={loginLoading}
               className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs tracking-wider uppercase shadow-lg shadow-emerald-500/10 transition-all disabled:opacity-50 mt-2"
             >
@@ -128,22 +132,30 @@ export default function DashboardPage() {
     );
   }
 
-  //# 🟢 5. JIKA SUDAH SUKSES LOGIN, BARU TAMPILKAN DASHBOARD UTAMA
+  // JIKA SUDAH SUKSES LOGIN
   return (
     <div className="flex h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden m-0 p-0">
-      
+
       {/* SISI KIRI: Navigasi Menu */}
-      <Sidebar 
-        activeMenu={activeMenu} 
-        setActiveMenu={setActiveMenu} 
-        activeUser={activeUser} 
+      <Sidebar
+        activeMenu={activeMenu}
+        setActiveMenu={setActiveMenu}
+        activeUser={activeUser}
+        onOpenPinModal={() => setShowUpdatePinModal(true)} // 👈 3. DIBERIKAN CALLBACK TRIGGER KE SIDEBAR
       />
 
       {/* SISI KANAN: Konten Dinamis */}
-      <DashboardContent 
-        activeMenu={activeMenu} 
-        activeUser={activeUser} 
-        onLogout={handleLogout} 
+      <DashboardContent
+        activeMenu={activeMenu}
+        activeUser={activeUser}
+        onLogout={handleLogout}
+      />
+
+      {/* 🔑 4. POP-UP GLOBAL UBAH MASTER PIN GATE */}
+      <UpdatePinModal
+        isOpen={showUpdatePinModal}
+        onClose={() => setShowUpdatePinModal(false)}
+        activeUser={activeUser}
       />
 
     </div>

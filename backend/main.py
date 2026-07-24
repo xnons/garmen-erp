@@ -3,21 +3,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, get_db
 import models
+
+# 🟢 1. Helper Security dari core
 from core.security import get_password_hash
 
-# Import Routers
-from routers import auth, karyawan
+# 🟢 2. Import Routers secara spesifik (Cegah Bentrok Nama Modul)
+from routers import auth, karyawan, mesin  # 👈 Ditambahkan 'mesin' di sini
+from routers.security import router as security_router
 
-# 1. Buat Tabel Database Otomatis jika belum ada
+# Buat Tabel Database Otomatis jika belum ada
 models.Base.metadata.create_all(bind=engine)
 
 
-# 2. Seeder Startup Menggunakan Lifespan Handler (Standar FastAPI Terbaru)
+# --- LIFESPAN SEEDER ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- PROSES STARTUP ---
     db = next(get_db())
     try:
+        # Seeder Akun Owner Master
         owner_exist = db.query(models.Karyawan).filter(models.Karyawan.username == "admin.nexora").first()
         if not owner_exist:
             user_master = models.Karyawan(
@@ -25,10 +28,9 @@ async def lifespan(app: FastAPI):
                 nama="Bapak Owner Nexora",
                 username="admin.nexora",
                 hashed_password=get_password_hash("masterpassword123"),
-                pin="1234",
                 role="OWNER",
                 jabatan="General Manager / Owner",
-                tanggal_lahir="1991-01-01",  # 🟢 Menggunakan tanggal_lahir sesuai schema baru
+                tanggal_lahir="1991-01-01",
                 no_hp="081234567890",
                 alamat="Head Office Nexora Garment",
                 status_karyawan="TETAP",
@@ -45,28 +47,38 @@ async def lifespan(app: FastAPI):
             )
             db.add(user_master)
             db.commit()
-            print("🟢 Akun Master 'admin.nexora' & PIN Gate '1234' berhasil dibuat!")
+            print("🟢 Akun Master 'admin.nexora' berhasil dibuat!")
+
+        # Seeder Master PIN Security Gate
+        sec_exist = db.query(models.SystemSecurity).filter(models.SystemSecurity.id == 1).first()
+        if not sec_exist:
+            master_pin = models.SystemSecurity(
+                id=1,
+                master_pin_hash=get_password_hash("1234"),
+                updated_by="SYSTEM"
+            )
+            db.add(master_pin)
+            db.commit()
+            print("🔒 Master PIN Security Gate '1234' berhasil diinisialisasi!")
+
     except Exception as e:
         print(f"⚠️ Info Seeder: {e}")
     finally:
         db.close()
     
-    yield  # Server siap melayani request...
-    
-    # --- PROSES SHUTDOWN (Opsional) ---
+    yield
     print("🔴 Engine Nexora ERP dimatikan.")
 
 
-# 3. Inisialisasi Aplikasi FastAPI
+# --- FASTAPI APP ---
 app = FastAPI(
     title="Nexora Garment ERP - Enterprise Engine",
-    description="Sistem autentikasi, manajemen karyawan, dan log kedisiplinan terintegrasi.",
-    version="1.1.0",
+    description="Sistem autentikasi, manajemen karyawan, inventaris mesin, dan log kedisiplinan terintegrasi.",
+    version="1.2.0",
     lifespan=lifespan
 )
 
-
-# 4. Konfigurasi CORS Paling Fleksibel (Localhost & IP Lokal)
+# --- CORS MIDDLEWARE ---
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -77,26 +89,24 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:[0-9]+)?",  # Mengizinkan port berapapun di local
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:[0-9]+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# 5. Registrasi Routers
-# Router Auth dengan prefix /api/auth
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth & PIN Gate"])
+# 🟢 3. REGISTRASI ROUTERS
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(security_router)  # Menggunakan alias security_router
+app.include_router(karyawan.router)
+app.include_router(mesin.router)      # 👈 ROUTER MESIN DIDAFTARKAN DI SINI
 
-# Router Karyawan TANPA prefix tambahan (karena prefix /api sudah diset di routers/karyawan.py)
-app.include_router(karyawan.router) 
 
-
-# 6. Health Check Root Endpoint
 @app.get("/")
 def root_check():
     return {
         "status": "Online",
         "system": "Nexora ERP Engine",
-        "version": "1.1.0"
+        "version": "1.2.0"
     }

@@ -312,6 +312,7 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
                 setFormData={setFormData}
                 onSubmit={handleAddKaryawan}
                 onGeneratePassword={() => setFormData({ ...formData, password: generateRandomPassword() })}
+                activeUser={activeUser} /* 👈 PROP ACTIVEUSER SUDAH DITERUSKAN DI SINI */
             />
 
             <EditKaryawanModal

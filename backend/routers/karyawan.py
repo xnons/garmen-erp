@@ -1,26 +1,88 @@
 from datetime import datetime
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
 import models
-from schemas.karyawan import PelanggaranInput, UpdatePinInput, UpdateKaryawanInput
-from core.security import get_current_user_role, get_current_user
+from schemas.karyawan import (
+    KaryawanCreate,  # Pastikan schema ini ada di schemas/karyawan.py
+    PelanggaranInput, 
+    UpdatePinInput, 
+    UpdateKaryawanInput
+)
+from core.security import get_current_user, get_password_hash
 
 router = APIRouter(prefix="/api", tags=["Karyawan & Pelanggaran"])
 
 
-# 1️⃣ GET ALL KARYAWAN (DENGAN DATA TANGGAL LAHIR & SKEMA GAJI)
+# ---------------------------------------------------------------------------
+# 0️⃣ TAMBAH KARYAWAN BARU -> POST /api/karyawan
+# ---------------------------------------------------------------------------
+@router.post("/karyawan")
+@router.post("/karyawan/")
+async def create_karyawan(
+    input_data: KaryawanCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(get_current_user)
+):
+    # 🔒 Akses awal: Hanya ADMIN, OWNER, dan DEVELOPER
+    if current_user.role not in ["OWNER", "ADMIN", "DEVELOPER"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses ditolak! Anda tidak memiliki wewenang menambah karyawan."
+        )
+
+    target_role = input_data.role.upper()
+
+    # 🔒 PROTEKSI UTAMA: Role OWNER & DEVELOPER HANYA bisa dibuat oleh DEVELOPER
+    if target_role in ["OWNER", "DEVELOPER"] and current_user.role != "DEVELOPER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Akses Ditolak! Admin atau Owner tidak diperbolehkan mendaftarkan akun ber-role '{target_role}'. Fitur ini khusus DEVELOPER."
+        )
+
+    # Cek duplikasi Username / ID Karyawan
+    existing_user = db.query(models.Karyawan).filter(
+        (models.Karyawan.username == input_data.username) | 
+        (models.Karyawan.id_karyawan == input_data.id_karyawan)
+    ).first()
+    
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username atau ID Karyawan sudah terdaftar di sistem!"
+        )
+
+    # Hash password baru
+    data_dict = input_data.model_dump()
+    raw_password = data_dict.pop("password")
+    hashed_pwd = get_password_hash(raw_password)
+
+    new_karyawan = models.Karyawan(
+        **data_dict,
+        hashed_password=hashed_pwd
+    )
+    db.add(new_karyawan)
+    db.commit()
+    db.refresh(new_karyawan)
+
+    return {"message": f"Karyawan {new_karyawan.nama} ({new_karyawan.role}) berhasil ditambahkan!"}
+
+
+# ---------------------------------------------------------------------------
+# 1️⃣ GET ALL KARYAWAN -> GET /api/karyawan
+# ---------------------------------------------------------------------------
 @router.get("/karyawan")
 @router.get("/karyawan/")
 async def get_all_karyawan(
     db: Session = Depends(get_db),
-    current_user_role: str = Depends(get_current_user_role)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
-    if current_user_role not in ["OWNER", "ADMIN"]:
+    if current_user.role not in ["OWNER", "ADMIN", "DEVELOPER"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Akses ditolak! Menu Kelola Karyawan hanya untuk Admin atau Owner."
+            detail="Akses ditolak! Menu Kelola Karyawan hanya untuk Admin, Owner, atau Developer."
         )
         
     daftar_pekerja = db.query(models.Karyawan).all()
@@ -31,7 +93,7 @@ async def get_all_karyawan(
             "username": p.username,
             "role": p.role,
             "jabatan": p.jabatan,
-            "tanggal_lahir": p.tanggal_lahir,  # 👈 Menggantikan umur
+            "tanggal_lahir": p.tanggal_lahir,
             "no_hp": p.no_hp,
             "alamat": p.alamat,
             "status_karyawan": p.status_karyawan,
@@ -46,16 +108,18 @@ async def get_all_karyawan(
     ]
 
 
+# ---------------------------------------------------------------------------
 # 2️⃣ TAMBAH SANKSI PELANGGARAN -> POST /api/karyawan/{id_karyawan}/pelanggaran
+# ---------------------------------------------------------------------------
 @router.post("/karyawan/{id_karyawan}/pelanggaran")
 async def tambah_pelanggaran_karyawan(
     id_karyawan: str,
     input_data: PelanggaranInput,
     db: Session = Depends(get_db),
-    current_user_role: str = Depends(get_current_user_role)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
-    if current_user_role not in ["OWNER", "ADMIN"]:
-        raise HTTPException(status_code=403, detail="Akses ditolak! Hanya Admin atau Owner.")
+    if current_user.role not in ["OWNER", "ADMIN", "DEVELOPER"]:
+        raise HTTPException(status_code=403, detail="Akses ditolak!")
         
     karyawan = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == id_karyawan).first()
     if not karyawan:
@@ -75,14 +139,16 @@ async def tambah_pelanggaran_karyawan(
     return {"message": f"Berhasil mencatat sanksi +{input_data.poin} poin ke {karyawan.nama}."}
 
 
+# ---------------------------------------------------------------------------
 # 3️⃣ AMBIL RIWAYAT LOG PELANGGARAN -> GET /api/karyawan/{id_karyawan}/pelanggaran
+# ---------------------------------------------------------------------------
 @router.get("/karyawan/{id_karyawan}/pelanggaran")
 async def ambil_riwayat_pelanggaran(
     id_karyawan: str,
     db: Session = Depends(get_db),
-    current_user_role: str = Depends(get_current_user_role)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
-    if current_user_role not in ["OWNER", "ADMIN"]:
+    if current_user.role not in ["OWNER", "ADMIN", "DEVELOPER"]:
         raise HTTPException(status_code=403, detail="Akses ditolak!")
         
     logs = db.query(models.LogPelanggaran).filter(models.LogPelanggaran.id_karyawan == id_karyawan).all()
@@ -100,15 +166,17 @@ async def ambil_riwayat_pelanggaran(
     ]
 
 
+# ---------------------------------------------------------------------------
 # 4️⃣ RESET SELURUH POIN SANKSI KARYAWAN KE 0 -> PUT /api/karyawan/{id_karyawan}/reset-sanksi
+# ---------------------------------------------------------------------------
 @router.put("/karyawan/{id_karyawan}/reset-sanksi")
 async def reset_sanksi_karyawan(
     id_karyawan: str,
     db: Session = Depends(get_db),
-    current_user_role: str = Depends(get_current_user_role)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
-    if current_user_role not in ["OWNER", "ADMIN"]:
-        raise HTTPException(status_code=403, detail="Akses ditolak! Hanya Admin atau Owner.")
+    if current_user.role not in ["OWNER", "ADMIN", "DEVELOPER"]:
+        raise HTTPException(status_code=403, detail="Akses ditolak!")
 
     karyawan = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == id_karyawan).first()
     if not karyawan:
@@ -120,15 +188,17 @@ async def reset_sanksi_karyawan(
     return {"message": f"Seluruh poin sanksi untuk {karyawan.nama} ({id_karyawan}) berhasil dibersihkan menjadi 0!"}
 
 
+# ---------------------------------------------------------------------------
 # 5️⃣ PEMUTIHAN / CABUT SATUAN LOG SANKSI -> DELETE /api/pelanggaran/{id_log}
+# ---------------------------------------------------------------------------
 @router.delete("/pelanggaran/{id_log}")
 async def hapus_pelanggaran(
     id_log: int,
     db: Session = Depends(get_db),
-    current_user_role: str = Depends(get_current_user_role)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
-    if current_user_role != "OWNER":
-        raise HTTPException(status_code=403, detail="Akses ditolak! Hanya Owner yang bisa mencabut sanksi spesifik.")
+    if current_user.role not in ["OWNER", "DEVELOPER"]:
+        raise HTTPException(status_code=403, detail="Akses ditolak! Hanya Owner/Developer yang bisa mencabut sanksi spesifik.")
         
     log = db.query(models.LogPelanggaran).filter(models.LogPelanggaran.id == id_log).first()
     if not log:
@@ -144,71 +214,101 @@ async def hapus_pelanggaran(
     return {"message": "Log sanksi berhasil dicabut."}
 
 
+# ---------------------------------------------------------------------------
 # 6️⃣ EDIT BIODATA & GAJI KARYAWAN -> PUT /api/karyawan/{id_karyawan}
+# ---------------------------------------------------------------------------
 @router.put("/karyawan/{id_karyawan}")
 async def edit_data_karyawan(
     id_karyawan: str,
     input_data: UpdateKaryawanInput,
     db: Session = Depends(get_db),
-    current_user_role: str = Depends(get_current_user_role)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
-    if current_user_role not in ["OWNER", "ADMIN"]:
-        raise HTTPException(status_code=403, detail="Akses ditolak! Hanya Admin atau Owner.")
+    if current_user.role not in ["OWNER", "ADMIN", "DEVELOPER"]:
+        raise HTTPException(status_code=403, detail="Akses ditolak!")
         
-    karyawan = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == id_karyawan).first()
-    if not karyawan:
+    target_karyawan = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == id_karyawan).first()
+    if not target_karyawan:
         raise HTTPException(status_code=404, detail="Data karyawan tidak ditemukan.")
+
+    # 🔒 PROTEKSI UTAMA: Admin tidak boleh mengedit data akun OWNER atau DEVELOPER
+    if target_karyawan.role in ["OWNER", "DEVELOPER"] and current_user.role == "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses Ditolak! Admin tidak diizinkan mengubah data akun Owner atau Developer."
+        )
+
+    # 🔒 PROTEKSI UTAMA: Admin tidak boleh menaikkan role siapapun menjadi OWNER/DEVELOPER
+    update_data = input_data.model_dump(exclude_unset=True)
+    if "role" in update_data:
+        new_role = update_data["role"].upper()
+        if new_role in ["OWNER", "DEVELOPER"] and current_user.role != "DEVELOPER":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Akses Ditolak! Hanya DEVELOPER yang bisa mengubah role karyawan menjadi '{new_role}'."
+            )
         
-    # Update field dinamis jika dikirim oleh frontend
-    for field, value in input_data.model_dump(exclude_unset=True).items():
-        setattr(karyawan, field, value)
+    for field, value in update_data.items():
+        setattr(target_karyawan, field, value)
         
     db.commit()
-    return {"message": f"Data karyawan {karyawan.nama} ({id_karyawan}) berhasil diperbarui!"}
+    return {"message": f"Data karyawan {target_karyawan.nama} ({id_karyawan}) berhasil diperbarui!"}
 
 
+# ---------------------------------------------------------------------------
 # 7️⃣ RESET PIN KARYAWAN -> PUT /api/karyawan/{id_karyawan}/reset-pin
+# ---------------------------------------------------------------------------
 @router.put("/karyawan/{id_karyawan}/reset-pin")
 async def reset_pin_karyawan(
     id_karyawan: str,
     input_data: UpdatePinInput,
     db: Session = Depends(get_db),
-    current_user_role: str = Depends(get_current_user_role)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
-    if current_user_role not in ["OWNER", "ADMIN"]:
+    if current_user.role not in ["OWNER", "ADMIN", "DEVELOPER"]:
+        raise HTTPException(status_code=403, detail="Akses ditolak!")
+        
+    target_karyawan = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == id_karyawan).first()
+    if not target_karyawan:
+        raise HTTPException(status_code=404, detail="Data karyawan tidak ditemukan.")
+
+    # 🔒 PROTEKSI: Admin tidak boleh mereset PIN milik Owner/Developer
+    if target_karyawan.role in ["OWNER", "DEVELOPER"] and current_user.role == "ADMIN":
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Akses ditolak! Hanya Admin atau Owner."
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses Ditolak! Admin tidak diperbolehkan mereset PIN milik Owner atau Developer."
         )
         
-    karyawan = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == id_karyawan).first()
-    if not karyawan:
-        raise HTTPException(status_code=404, detail="Data karyawan tidak ditemukan.")
-        
-    karyawan.pin = input_data.pin
+    target_karyawan.pin = input_data.pin
     db.commit()
     
-    return {"message": f"PIN Security Gate untuk {karyawan.nama} ({id_karyawan}) berhasil diperbarui!"}
+    return {"message": f"PIN Security Gate untuk {target_karyawan.nama} ({id_karyawan}) berhasil diperbarui!"}
 
 
+# ---------------------------------------------------------------------------
 # 8️⃣ HAPUS KARYAWAN -> DELETE /api/karyawan/{id_karyawan}
+# ---------------------------------------------------------------------------
 @router.delete("/karyawan/{id_karyawan}")
 async def hapus_karyawan(
     id_karyawan: str,
     db: Session = Depends(get_db),
-    current_user_role: str = Depends(get_current_user_role)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
-    if current_user_role not in ["OWNER", "ADMIN"]:
+    if current_user.role not in ["OWNER", "ADMIN", "DEVELOPER"]:
+        raise HTTPException(status_code=403, detail="Akses ditolak!")
+        
+    target_karyawan = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == id_karyawan).first()
+    if not target_karyawan:
+        raise HTTPException(status_code=404, detail="Data karyawan tidak ditemukan.")
+
+    # 🔒 PROTEKSI: Admin/Owner tidak boleh menghapus akun Owner lain/Developer
+    if target_karyawan.role in ["OWNER", "DEVELOPER"] and current_user.role != "DEVELOPER":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Akses ditolak! Hanya Admin atau Owner."
+            detail="Akses Ditolak! Hanya DEVELOPER yang berhak menghapus akun Owner atau Developer."
         )
         
-    karyawan = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == id_karyawan).first()
-    if not karyawan:
-        raise HTTPException(status_code=404, detail="Data karyawan tidak ditemukan.")
-        
-    db.delete(karyawan)
+    db.delete(target_karyawan)
     db.commit()
     
-    return {"message": f"Karyawan {karyawan.nama} ({id_karyawan}) berhasil dihapus."}
+    return {"message": f"Karyawan {target_karyawan.nama} ({id_karyawan}) berhasil dihapus."}

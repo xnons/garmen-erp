@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { UserPlus, X, RefreshCw } from 'lucide-react';
 
 interface AddKaryawanModalProps {
@@ -8,6 +8,7 @@ interface AddKaryawanModalProps {
     setFormData: React.Dispatch<React.SetStateAction<any>>;
     onSubmit: (e: React.FormEvent) => void;
     onGeneratePassword: () => void;
+    activeUser?: any; // 👈 Prop baru untuk membaca role user yang sedang login
 }
 
 export const AddKaryawanModal: React.FC<AddKaryawanModalProps> = ({
@@ -17,8 +18,38 @@ export const AddKaryawanModal: React.FC<AddKaryawanModalProps> = ({
     setFormData,
     onSubmit,
     onGeneratePassword,
+    activeUser,
 }) => {
     if (!isOpen) return null;
+
+    // 🔒 HIERARKI ROLE BERDASARKAN SIAPA YANG SEDANG LOGIN
+    const getAvailableRoles = (currentRole?: string) => {
+        const role = currentRole?.toUpperCase() || '';
+        switch (role) {
+            case 'DEVELOPER':
+                // Developer bisa membuat semua role
+                return ['DEVELOPER', 'OWNER', 'ADMIN', 'FINANCE', 'GUDANG', 'PRODUKSI', 'KARYAWAN'];
+            case 'OWNER':
+                // Owner bisa membuat Admin dan Staff di bawahnya
+                return ['ADMIN', 'FINANCE', 'GUDANG', 'PRODUKSI', 'KARYAWAN'];
+            case 'ADMIN':
+                // Admin HANYA bisa membuat Staff operasional (TIDAK bisa Owner/Admin)
+                return ['FINANCE', 'GUDANG', 'PRODUKSI', 'KARYAWAN'];
+            default:
+                return ['PRODUKSI', 'GUDANG', 'FINANCE', 'KARYAWAN'];
+        }
+    };
+
+    const availableRoles = getAvailableRoles(activeUser?.role);
+
+    // 🛡️ Otomatis sesuaikan formData.role jika role saat ini tidak diizinkan untuk dikelola
+    useEffect(() => {
+        if (isOpen && availableRoles.length > 0) {
+            if (!availableRoles.includes(formData.role)) {
+                setFormData((prev: any) => ({ ...prev, role: availableRoles[0] }));
+            }
+        }
+    }, [isOpen, activeUser]);
 
     return (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in">
@@ -92,20 +123,23 @@ export const AddKaryawanModal: React.FC<AddKaryawanModalProps> = ({
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white"
                             />
                         </div>
+
+                        {/* DROPDOWN ROLE DINAMIS DENGAN DUKUNGAN RBAC */}
                         <div>
-                            <label className="text-xs text-slate-400 mb-1 block">Role Akses Sistem</label>
+                            <label className="text-xs text-slate-400 mb-1 block">Role Akses Sistem *</label>
                             <select
                                 value={formData.role}
                                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white"
                             >
-                                <option value="PRODUKSI">PRODUKSI</option>
-                                <option value="GUDANG">GUDANG</option>
-                                <option value="FINANCE">FINANCE</option>
-                                <option value="ADMIN">ADMIN</option>
-                                <option value="OWNER">OWNER</option>
+                                {availableRoles.map((role) => (
+                                    <option key={role} value={role}>
+                                        {role}
+                                    </option>
+                                ))}
                             </select>
                         </div>
+
                         <div>
                             <label className="text-xs text-slate-400 mb-1 block">Tipe Penggajian</label>
                             <select

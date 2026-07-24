@@ -41,11 +41,22 @@ export const PinGateModal: React.FC<PinGateModalProps> = ({
         setErrorMsg('');
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/auth/verify-pin', {
+            // Mengambil token JWT (Mendukung key 'token' atau 'access_token')
+            const token = localStorage.getItem('access_token') || localStorage.getItem('token') || '';
+
+            if (!token) {
+                setErrorMsg('Sesi login telah berakhir. Mengalihkan...');
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 1500);
+                return;
+            }
+
+            const response = await fetch('http://127.0.0.1:8000/api/security/verify-pin', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({ pin: pinToVerify })
             });
@@ -53,10 +64,22 @@ export const PinGateModal: React.FC<PinGateModalProps> = ({
             const data = await response.json();
 
             if (!response.ok) {
+                // 🟡 1. Penanganan Sesi Token Expired / Invalid (401 dari JWT)
+                if (response.status === 401 && (data.detail?.toLowerCase().includes('token') || data.detail?.toLowerCase().includes('authenticated'))) {
+                    setErrorMsg('Sesi Anda telah berakhir. Silakan login kembali.');
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('token');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 1500);
+                    return;
+                }
+
+                // 🔴 2. Penanganan PIN Salah / Hak Akses Ditolak (403 / 401 PIN)
                 throw new Error(data.detail || 'PIN yang Anda masukkan salah!');
             }
 
-            // Verifikasi Berhasil
+            // 🟢 Verifikasi Berhasil
             setPin('');
             setErrorMsg('');
             onSuccess();

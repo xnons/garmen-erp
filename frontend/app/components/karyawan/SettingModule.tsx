@@ -8,13 +8,13 @@ interface SettingModuleProps {
 export default function SettingModule({ activeUser, onLogout }: SettingModuleProps) {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const dataAbsensi = { 
-    hadir: activeUser?.total_hadir ?? 0, 
-    izin: activeUser?.total_izin ?? 0, 
-    alpa: activeUser?.total_alpa ?? 0, 
-    terlambat: activeUser?.total_terlambat ?? 0 
+  const dataAbsensi = {
+    hadir: activeUser?.total_hadir ?? 0,
+    izin: activeUser?.total_izin ?? 0,
+    alpa: activeUser?.total_alpa ?? 0,
+    terlambat: activeUser?.total_terlambat ?? 0
   };
-  
+
   const dataPelanggaran = [
     { tanggal: "12-07-2026", jenis: "Terlambat", poin: 5, keterangan: "Terlambat > 15 menit tanpa kabar" },
     { tanggal: "05-07-2026", jenis: "SOP Produksi", poin: 10, keterangan: "Tidak menggunakan masker di ruang cutting" }
