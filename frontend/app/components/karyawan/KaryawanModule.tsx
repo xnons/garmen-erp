@@ -1,10 +1,13 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, ShieldAlert, CheckCircle2 } from 'lucide-react';
-import { Karyawan, LogPelanggaran, KaryawanModuleProps } from './types';
+import { UserPlus, Search, ShieldAlert, CheckCircle2, Archive, Users, UserCheck } from 'lucide-react';
+import { Karyawan, LogPelanggaran, KaryawanModuleProps, ArsipKaryawanInfo } from './types';
 import { KaryawanTable } from './KaryawanTable';
 import { AddKaryawanModal } from './AddKaryawanModal';
 import { EditKaryawanModal } from './EditKaryawanModal';
 import { SanksiModal } from './SanksiModal';
+import { KaryawanArchiveModal } from './KaryawanArchiveModal';
 
 export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) => {
     const [karyawanList, setKaryawanList] = useState<Karyawan[]>([]);
@@ -13,11 +16,17 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
+    // --- TAB FILTER STATE ---
+    const [viewTab, setViewTab] = useState<'AKTIF' | 'ARCHIVED' | 'ALL'>('AKTIF');
+
     // --- MODAL STATES ---
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showSanksiModal, setShowSanksiModal] = useState(false);
+    const [showArchiveModal, setShowArchiveModal] = useState(false);
+
     const [selectedKaryawan, setSelectedKaryawan] = useState<Karyawan | null>(null);
+    const [selectedArchiveKaryawan, setSelectedArchiveKaryawan] = useState<Karyawan | null>(null);
 
     // --- SANKSI TAB & LOG STATES ---
     const [activeSanksiTab, setActiveSanksiTab] = useState<'list' | 'add'>('list');
@@ -117,7 +126,12 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
         fetchSanksiLogs(karyawan.id_karyawan);
     };
 
-    // Handlers
+    const handleOpenArchiveModal = (karyawan: Karyawan) => {
+        setSelectedArchiveKaryawan(karyawan);
+        setShowArchiveModal(true);
+    };
+
+    // --- API HANDLERS ---
     const handleAddKaryawan = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
@@ -152,6 +166,26 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
 
             showToast(`✏️ Data karyawan ${editFormData.nama} berhasil diperbarui`);
             setShowEditModal(false);
+            fetchKaryawan();
+        } catch (err: any) {
+            showToast(err.message, true);
+        }
+    };
+
+    // 📦 Handler Pengarsipan (Offboarding)
+    const handleConfirmArchive = async (id_karyawan: string, archiveData: ArsipKaryawanInfo) => {
+        try {
+            const res = await fetch(`${API_BASE}/karyawan/${id_karyawan}/archive`, {
+                method: 'PUT',
+                headers: getAuthHeader(),
+                body: JSON.stringify(archiveData)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Gagal mengarsipkan karyawan');
+
+            showToast(`📦 Karyawan berhasil diarsipkan (${archiveData.alasan_keluar})`);
+            setShowArchiveModal(false);
+            setSelectedArchiveKaryawan(null);
             fetchKaryawan();
         } catch (err: any) {
             showToast(err.message, true);
@@ -221,7 +255,7 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
     };
 
     const handleDelete = async (id: string, nama: string) => {
-        if (!confirm(`Apakah Anda yakin ingin menghapus karyawan "${nama}"?`)) return;
+        if (!confirm(`Apakah Anda yakin ingin MENGHAPUS PERMANEN data "${nama}"? (Disarankan pilih Arsip)`)) return;
         try {
             const res = await fetch(`${API_BASE}/karyawan/${id}`, {
                 method: 'DELETE',
@@ -237,11 +271,23 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
         }
     };
 
-    const filteredKaryawan = karyawanList.filter(k =>
-        k.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        k.id_karyawan.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        k.jabatan?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // --- FILTER LOGIC ---
+    const filteredKaryawan = karyawanList.filter(k => {
+        // Tab Filter: Aktif vs Terarsip
+        const isArchived = k.status_karyawan === 'ARCHIVED' || k.is_active === false;
+        if (viewTab === 'AKTIF' && isArchived) return false;
+        if (viewTab === 'ARCHIVED' && !isArchived) return false;
+
+        // Search Filter
+        return (
+            k.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            k.id_karyawan.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            k.jabatan?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    });
+
+    const totalAktif = karyawanList.filter(k => k.status_karyawan !== 'ARCHIVED' && k.is_active !== false).length;
+    const totalArchived = karyawanList.filter(k => k.status_karyawan === 'ARCHIVED' || k.is_active === false).length;
 
     return (
         <div className="space-y-6">
@@ -266,11 +312,53 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
                         <span>👥 Kelola Data Karyawan</span>
                     </h2>
                     <p className="text-slate-400 text-sm mt-1">
-                        Manajemen SDM, skema borongan/bulanan, dan log sanksi kedisiplinan pabrik.
+                        Manajemen SDM, skema borongan/bulanan, log sanksi, dan pengarsipan offboarding.
                     </p>
+
+                    {/* Filter Tabs (Aktif / Terarsip / Semua) */}
+                    <div className="flex items-center gap-2 mt-4 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800/80 w-fit">
+                        <button
+                            onClick={() => setViewTab('AKTIF')}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewTab === 'AKTIF'
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                                : 'text-slate-400 hover:text-white'
+                                }`}
+                        >
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span>Karyawan Aktif</span>
+                            <span className="ml-1 px-1.5 py-0.2 bg-slate-900/80 rounded-md text-[10px] border border-slate-700/50">
+                                {totalAktif}
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => setViewTab('ARCHIVED')}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewTab === 'ARCHIVED'
+                                ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                                : 'text-slate-400 hover:text-white'
+                                }`}
+                        >
+                            <Archive className="w-3.5 h-3.5" />
+                            <span>Terarsip / Keluar</span>
+                            <span className="ml-1 px-1.5 py-0.2 bg-slate-900/80 rounded-md text-[10px] border border-slate-700/50">
+                                {totalArchived}
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={() => setViewTab('ALL')}
+                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewTab === 'ALL'
+                                ? 'bg-slate-800 text-white shadow-md'
+                                : 'text-slate-400 hover:text-white'
+                                }`}
+                        >
+                            <Users className="w-3.5 h-3.5" />
+                            <span>Semua ({karyawanList.length})</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 self-end md:self-center">
                     <div className="relative">
                         <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
                         <input
@@ -301,6 +389,7 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
                 karyawanList={filteredKaryawan}
                 onEdit={(k) => { setEditFormData({ ...k }); setShowEditModal(true); }}
                 onSanksi={handleOpenSanksiModal}
+                onArchive={handleOpenArchiveModal}
                 onDelete={handleDelete}
             />
 
@@ -312,7 +401,7 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
                 setFormData={setFormData}
                 onSubmit={handleAddKaryawan}
                 onGeneratePassword={() => setFormData({ ...formData, password: generateRandomPassword() })}
-                activeUser={activeUser} /* 👈 PROP ACTIVEUSER SUDAH DITERUSKAN DI SINI */
+                activeUser={activeUser}
             />
 
             <EditKaryawanModal
@@ -336,6 +425,16 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
                 onAddSanksi={handleAddSanksi}
                 onDeleteSingleSanksi={handleDeleteSingleSanksi}
                 onResetSanksi={handleResetSanksi}
+            />
+
+            {/* Modal Offboarding / Pengarsipan Karyawan */}
+            <KaryawanArchiveModal
+                karyawan={selectedArchiveKaryawan}
+                onClose={() => {
+                    setShowArchiveModal(false);
+                    setSelectedArchiveKaryawan(null);
+                }}
+                onConfirmArchive={handleConfirmArchive}
             />
         </div>
     );

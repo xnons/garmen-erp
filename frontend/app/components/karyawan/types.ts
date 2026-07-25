@@ -1,3 +1,10 @@
+export interface ArsipKaryawanInfo {
+    alasan_keluar: 'RESIGN' | 'DIPECAT' | 'PENSIUN' | 'HABIS_KONTRAK' | 'LAINNYA';
+    tanggal_keluar: string;
+    catatan_keluar?: string;
+    dearsipkan_oleh?: string;
+}
+
 export interface Karyawan {
     id_karyawan: string;
     nama: string;
@@ -7,13 +14,19 @@ export interface Karyawan {
     tanggal_lahir?: string;
     no_hp?: string;
     alamat?: string;
-    status_karyawan: string;
+    status_karyawan: string; // 'AKTIF' | 'NONAKTIF' | 'ARCHIVED'
     tanggal_masuk?: string;
     is_active: boolean;
     tipe_pay: string;
     gaji_pokok: number;
     tarif_borongan_pcs: number;
     poin_pelanggaran: number;
+
+    // 🟢 Field Tambahan Pengarsipan / Offboarding
+    alasan_keluar?: string;
+    tanggal_keluar?: string;
+    catatan_keluar?: string;
+    arsip_info?: ArsipKaryawanInfo;
 }
 
 export interface LogPelanggaran {
