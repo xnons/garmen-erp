@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { PanelLeftClose, PanelLeftOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 interface SidebarProps {
   activeMenu: string;
@@ -32,10 +32,12 @@ export default function Sidebar({
     }
   };
 
+  // 🛡️ Pengaturan daftar menu dan role yang dizinkan (RBAC)
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI'] },
     { id: 'karyawan', label: 'Kelola Karyawan', icon: '👥', roles: ['OWNER', 'ADMIN'] },
-    { id: 'inventaris', label: 'Inventaris & Stok', icon: '📦', roles: ['OWNER', 'ADMIN', 'PRODUKSI'] },
+    // 🔒 Restricted: Inventaris HANYA untuk OWNER, ADMIN, dan DEVELOPER (via bypass logic below)
+    { id: 'inventaris', label: 'Inventaris & Stok', icon: '📦', roles: ['OWNER', 'ADMIN'] },
     { id: 'mesin', label: 'Inventaris Mesin', icon: '⚙️', roles: ['OWNER', 'ADMIN', 'PRODUKSI'] },
     { id: 'produksi', label: 'Produksi Borongan', icon: '🧵', roles: ['OWNER', 'ADMIN', 'PRODUKSI'] },
     { id: 'setting', label: 'Akun Saya', icon: '👤', roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI'] },
@@ -86,7 +88,7 @@ export default function Sidebar({
         {/* LIST NAVIGASI RBAC */}
         <nav className="p-3 space-y-1.5">
           {menuItems.map((item) => {
-            // Bypass akses DEVELOPER
+            // Bypass akses DEVELOPER (otomatis dapat akses ke semua menu)
             const hasAccess = userRole === 'DEVELOPER' || item.roles.includes(userRole);
             if (!hasAccess) return null;
 

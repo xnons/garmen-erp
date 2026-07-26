@@ -7,7 +7,7 @@ interface KaryawanTableProps {
     karyawanList: Karyawan[];
     onEdit: (karyawan: Karyawan) => void;
     onSanksi: (karyawan: Karyawan) => void;
-    onArchive: (karyawan: Karyawan) => void; // 👈 1. Ditambahkan ke Props Interface
+    onArchive: (karyawan: Karyawan) => void;
     onDelete: (id: string, nama: string) => void;
 }
 
@@ -16,24 +16,26 @@ export const KaryawanTable: React.FC<KaryawanTableProps> = ({
     karyawanList,
     onEdit,
     onSanksi,
-    onArchive, // 👈 2. Diterima sebagai Callback Function
+    onArchive,
     onDelete,
 }) => {
     return (
-        <div className="glass-panel border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-300">
-                    <thead className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800 uppercase text-xs tracking-wider">
+        <div className="glass-panel border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-md">
+            {/* 🟢 PEMBUNGKUS SCROLL: Menggunakan custom-scrollbar tipis & scroll-smooth */}
+            <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] custom-scrollbar scroll-smooth">
+                <table className="w-full text-left text-sm text-slate-300 border-collapse">
+                    {/* 🟢 STICKY HEADER: Dilengkapi backdrop-blur agar tidak tembus pandang saat di-scroll */}
+                    <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-md text-slate-400 font-semibold border-b border-slate-800 uppercase text-xs tracking-wider shadow-sm">
                         <tr>
-                            <th className="p-4">Pekerja & ID</th>
-                            <th className="p-4">Jabatan & Role</th>
-                            <th className="p-4">Skema Gaji</th>
-                            <th className="p-4">Sanksi</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4 text-center">Aksi Operasional</th>
+                            <th className="p-4 bg-slate-950/95">Pekerja & ID</th>
+                            <th className="p-4 bg-slate-950/95">Jabatan & Role</th>
+                            <th className="p-4 bg-slate-950/95">Skema Gaji</th>
+                            <th className="p-4 bg-slate-950/95">Sanksi</th>
+                            <th className="p-4 bg-slate-950/95">Status</th>
+                            <th className="p-4 text-center bg-slate-950/95">Aksi Operasional</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-slate-800/50 bg-slate-900/30">
                         {loading ? (
                             <tr>
                                 <td colSpan={6} className="p-8 text-center text-slate-500">Memuat data karyawan...</td>
@@ -47,7 +49,7 @@ export const KaryawanTable: React.FC<KaryawanTableProps> = ({
                                 const isArchived = k.status_karyawan === 'ARCHIVED' || k.is_active === false;
 
                                 return (
-                                    <tr key={k.id_karyawan} className="hover:bg-slate-800/30 transition-all">
+                                    <tr key={k.id_karyawan} className="hover:bg-slate-800/40 transition-all duration-150">
                                         {/* Profil Karyawan */}
                                         <td className="p-4">
                                             <div>
@@ -150,7 +152,7 @@ export const KaryawanTable: React.FC<KaryawanTableProps> = ({
                                                     <span>Sanksi</span>
                                                 </button>
 
-                                                {/* 📦 ARSIP / OFFBOARDING (Hanya Tampil Jika Karyawan Masih Aktif) */}
+                                                {/* 📦 ARSIP */}
                                                 {!isArchived && (
                                                     <button
                                                         onClick={() => onArchive(k)}

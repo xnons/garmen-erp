@@ -31,7 +31,25 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
 
     useEffect(() => {
         if (initialData) {
-            setFormData(initialData);
+            // 🟢 Fallback || '' untuk mencegah undefined pada controlled input
+            setFormData({
+                ...initialData,
+                kode_mesin: initialData.kode_mesin || '',
+                nama_mesin: initialData.nama_mesin || '',
+                kategori: initialData.kategori || 'Sewing',
+                merk_model: initialData.merk_model || '',
+                no_seri: initialData.no_seri || '',
+                vendor_supplier: initialData.vendor_supplier || '',
+                lokasi_line: initialData.lokasi_line || 'Line 01',
+                status: initialData.status || 'AKTIF',
+                harga_beli: initialData.harga_beli ?? 0,
+                nilai_sisa: initialData.nilai_sisa ?? 0,
+                umur_ekonomis_tahun: initialData.umur_ekonomis_tahun ?? 5,
+                tanggal_pembelian: initialData.tanggal_pembelian || new Date().toISOString().split('T')[0],
+                garansi_hingga: initialData.garansi_hingga || '',
+                status_pembayaran: initialData.status_pembayaran || 'LUNAS',
+                jumlah_terbayar: initialData.jumlah_terbayar ?? 0,
+            });
         } else {
             setFormData({
                 kode_mesin: `MSN-${Math.floor(100 + Math.random() * 900)}`,
@@ -121,7 +139,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                                 <input
                                     type="text"
                                     required
-                                    value={formData.kode_mesin}
+                                    value={formData.kode_mesin || ''}
                                     onChange={e => setFormData({ ...formData, kode_mesin: e.target.value })}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none"
                                 />
@@ -132,7 +150,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                                     type="text"
                                     required
                                     placeholder="misal: Juki High Speed Auto Trimmer"
-                                    value={formData.nama_mesin}
+                                    value={formData.nama_mesin || ''}
                                     onChange={e => setFormData({ ...formData, nama_mesin: e.target.value })}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none"
                                 />
@@ -141,7 +159,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                             <div>
                                 <label className="block text-xs font-medium text-slate-400 mb-1">Kategori</label>
                                 <select
-                                    value={formData.kategori}
+                                    value={formData.kategori || 'Sewing'}
                                     onChange={e => setFormData({ ...formData, kategori: e.target.value })}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none"
                                 >
@@ -159,7 +177,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                                 <input
                                     type="text"
                                     placeholder="Juki DDL-9000C"
-                                    value={formData.merk_model}
+                                    value={formData.merk_model || ''}
                                     onChange={e => setFormData({ ...formData, merk_model: e.target.value })}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none"
                                 />
@@ -170,7 +188,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                                 <input
                                     type="text"
                                     placeholder="SN-9823102391"
-                                    value={formData.no_seri}
+                                    value={formData.no_seri || ''}
                                     onChange={e => setFormData({ ...formData, no_seri: e.target.value })}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none font-mono text-xs"
                                 />
@@ -181,7 +199,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                                 <input
                                     type="text"
                                     placeholder="PT. Sinar Mesin Garment"
-                                    value={formData.vendor_supplier}
+                                    value={formData.vendor_supplier || ''}
                                     onChange={e => setFormData({ ...formData, vendor_supplier: e.target.value })}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none"
                                 />
@@ -191,7 +209,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                                 <label className="block text-xs font-medium text-slate-400 mb-1">Lokasi Line Produksi</label>
                                 <input
                                     type="text"
-                                    value={formData.lokasi_line}
+                                    value={formData.lokasi_line || ''}
                                     onChange={e => setFormData({ ...formData, lokasi_line: e.target.value })}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none"
                                 />
@@ -218,7 +236,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                                 <label className="block text-xs font-medium text-slate-400 mb-1">Harga Beli Total (IDR)</label>
                                 <input
                                     type="number"
-                                    value={formData.harga_beli}
+                                    value={formData.harga_beli ?? 0}
                                     onChange={e => setFormData({ ...formData, harga_beli: Number(e.target.value) })}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none"
                                 />
@@ -227,7 +245,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                             <div>
                                 <label className="block text-xs font-medium text-slate-400 mb-1">Status Pembayaran</label>
                                 <select
-                                    value={formData.status_pembayaran}
+                                    value={formData.status_pembayaran || 'LUNAS'}
                                     onChange={e => handleStatusBayarChange(e.target.value as PaymentStatus)}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none"
                                 >
@@ -241,7 +259,7 @@ export default function MesinFormModal({ isOpen, initialData, onClose, onSave }:
                                 <label className="block text-xs font-medium text-slate-400 mb-1">Nominal Terbayar (IDR)</label>
                                 <input
                                     type="number"
-                                    value={formData.jumlah_terbayar}
+                                    value={formData.jumlah_terbayar ?? 0}
                                     onChange={e => setFormData({ ...formData, jumlah_terbayar: Number(e.target.value) })}
                                     disabled={formData.status_pembayaran === 'LUNAS'}
                                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-blue-500 outline-none disabled:opacity-50"

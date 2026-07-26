@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Lock, Loader2 } from 'lucide-react';
+import { Lock, Loader2, RefreshCw } from 'lucide-react';
 import { MesinAsset, FilterState, PaymentRecord } from './types';
 import MesinHeader from '../mesin/MesinHeader';
 import MesinTable from '../mesin/MesinTable';
@@ -12,12 +12,18 @@ import MesinArchiveModal from '../mesin/MesinArchiveModal';
 import PinGateModal from '../karyawan/PinGateModal';
 
 // 🟢 KONFIGURASI REST API FASTAPI
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
-const getAuthHeader = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`
-});
+const getAuthHeader = () => {
+    const token = typeof window !== 'undefined'
+        ? (localStorage.getItem('access_token') || localStorage.getItem('token') || '')
+        : '';
+
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+};
 
 interface MesinPageProps {
     activeUser?: any;
@@ -28,7 +34,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [filter, setFilter] = useState<FilterState>({ search: '', status: 'ALL', kategori: 'ALL', showArchived: false });
 
-    // 🔒 State Security PIN Gate
+    // 🔒 State Security PIN Gate (Minta PIN Kembali Saat Pindah Modul)
     const [isSessionUnlocked, setIsSessionUnlocked] = useState(false);
     const [isPinGateOpen, setIsPinGateOpen] = useState(true);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
@@ -117,7 +123,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
                 kode_mesin: formData.kode_mesin,
                 nama_mesin: formData.nama_mesin,
                 kategori: formData.kategori,
-                merk_tipe: formData.merk_model || formData.merk_model, // Penyesuaian ke schema FastAPI (merk_tipe)
+                merk_tipe: formData.merk_model,
                 lokasi_line: formData.lokasi_line,
                 status: formData.status || 'OPERASIONAL',
                 keterangan: formData.vendor_supplier || ''
@@ -148,6 +154,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
 
             // Reload data dari server setelah simpan berhasil
             fetchMachines();
+            setIsFormOpen(false);
 
         } catch (err: any) {
             console.error('Error saving machine:', err.message);
@@ -174,6 +181,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
             if (!res.ok) throw new Error(data.detail || 'Gagal memperbarui data pembayaran');
 
             fetchMachines();
+            setSelectedPayment(null);
         } catch (err: any) {
             console.error('Error payment:', err.message);
             alert(`Gagal menyimpan pembayaran: ${err.message}`);
@@ -199,6 +207,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
             if (!res.ok) throw new Error(data.detail || 'Gagal mengarsipkan mesin');
 
             fetchMachines();
+            setSelectedArchive(null);
         } catch (err: any) {
             console.error('Error archive:', err.message);
             alert(`Gagal mengarsipkan mesin: ${err.message}`);
@@ -242,15 +251,33 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
     return (
         <main className="flex-1 h-screen overflow-y-auto p-4 sm:p-8 bg-slate-900 text-slate-100">
             <div className="max-w-7xl mx-auto space-y-6 pb-12">
-                <MesinHeader
-                    machines={machines}
-                    filter={filter}
-                    setFilter={setFilter}
-                    onOpenAddModal={() => executeWithPin(() => {
-                        setSelectedEdit(null);
-                        setIsFormOpen(true);
-                    })}
-                />
+                {/* Header & Control Bar */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <MesinHeader
+                            machines={machines}
+                            filter={filter}
+                            setFilter={setFilter}
+                            onOpenAddModal={() => executeWithPin(() => {
+                                setSelectedEdit(null);
+                                setIsFormOpen(true);
+                            })}
+                        />
+                    </div>
+
+                    {/* Quick Refresh Data Action Bar */}
+                    <div className="flex items-center justify-end gap-2">
+                        <button
+                            onClick={fetchMachines}
+                            disabled={isLoading}
+                            title="Refresh Data Mesin dari Server"
+                            className="flex items-center gap-2 px-3 py-2 bg-slate-800/80 hover:bg-slate-700 active:scale-95 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700/60 transition-all disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${isLoading ? 'animate-spin' : ''}`} />
+                            <span>Refresh Data</span>
+                        </button>
+                    </div>
+                </div>
 
                 {isLoading ? (
                     <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">

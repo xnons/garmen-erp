@@ -107,7 +107,7 @@
   background: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(51, 65, 85, 0.6);
 }
 
 /* Card Hover Lift & Glow Effect */
@@ -117,7 +117,7 @@
 
 .glass-hover:hover {
   transform: translateY(-4px);
-  border-color: rgba(99, 102, 241, 0.35);
+  border-color: rgba(99, 102, 241, 0.4);
   box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6), 0 0 20px rgba(99, 102, 241, 0.15);
 }
 
@@ -126,86 +126,43 @@
   box-shadow: 0 0 25px rgba(99, 102, 241, 0.4);
 }
 
-/* ==========================================
-   SECURITY GATE & GLASSMORPHISM STYLES
-   ========================================== */
 
-/* 🌌 Glassmorphism Panel */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(51, 65, 85, 0.6);
+/* ========================================================= */
+/* 🌊 SEAMLESS CUSTOM SCROLLBAR (DARK THEME)                 */
+/* ========================================================= */
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+  /* Slate-700 untuk Firefox */
 }
 
-.glass-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* Lebar & Tinggi Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.glass-hover:hover {
-  transform: translateY(-2px);
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+/* Track / Jalur Scrollbar (Transparan) */
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* 🔒 Animasi Lock Pulse */
-@keyframes lockPulse {
-
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4);
-  }
-
-  50% {
-    box-shadow: 0 0 20px 8px rgba(244, 63, 94, 0.15);
-  }
+/* Thumb / Batang Scrollbar */
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  /* Slate-700 - menyatu halus dengan border tabel */
+  border-radius: 9999px;
+  transition: background-color 0.2s ease-in-out;
 }
 
-.animate-lock-pulse {
-  animation: lockPulse 2s infinite ease-in-out;
+/* Hover Thumb - Menyala Indigo saat disentuh kursor */
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6366f1;
+  /* Indigo-500 */
 }
 
-/* 💥 Animasi Pop-Up Modal */
-@keyframes modalPop {
-  0% {
-    opacity: 0;
-    transform: scale(0.95) translateY(10px);
-  }
-
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.animate-modal-pop {
-  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* 🫨 Animasi Shake saat PIN Salah */
-@keyframes shake {
-
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-
-  20%,
-  60% {
-    transform: translateX(-6px);
-  }
-
-  40%,
-  80% {
-    transform: translateX(6px);
-  }
-}
-
-.animate-shake {
-  animation: shake 0.35s ease-in-out;
-}
-
-/* ✨ Input PIN Glow */
-.pin-input-glow:focus {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+/* Sudut Pertemuan Scrollbar */
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
 }

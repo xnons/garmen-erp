@@ -7,8 +7,8 @@ import models
 # 🟢 1. Helper Security dari core
 from core.security import get_password_hash
 
-# 🟢 2. Import Routers secara spesifik (Cegah Bentrok Nama Modul)
-from routers import auth, karyawan, mesin  # 👈 Ditambahkan 'mesin' di sini
+# 🟢 2. Import Routers secara spesifik
+from routers import auth, karyawan, mesin, inventaris  # 👈 Impor semua router sekaligus
 from routers.security import router as security_router
 
 # Buat Tabel Database Otomatis jika belum ada
@@ -98,9 +98,10 @@ app.add_middleware(
 
 # 🟢 3. REGISTRASI ROUTERS
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-app.include_router(security_router)  # Menggunakan alias security_router
+app.include_router(security_router)
 app.include_router(karyawan.router)
-app.include_router(mesin.router)      # 👈 ROUTER MESIN DIDAFTARKAN DI SINI
+app.include_router(mesin.router)
+app.include_router(inventaris.router)  # 👈 DIDAFTARKAN DI SINI!
 
 
 @app.get("/")

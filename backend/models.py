@@ -1,9 +1,8 @@
-from sqlalchemy.orm import relationship
-from database import Base
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.sql import func
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from datetime import datetime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from database import Base
 
 
 class SystemSecurity(Base):
@@ -13,6 +12,7 @@ class SystemSecurity(Base):
     master_pin_hash = Column(String(255), nullable=False)
     updated_by = Column(String(100), nullable=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
 
 class Karyawan(Base):
     __tablename__ = "karyawan"
@@ -26,12 +26,12 @@ class Karyawan(Base):
     is_active = Column(Boolean, default=True)  # Status Aktif Bekerja
     
     # 🟢 BIODATA & DETAIL PEKERJAAN
-    jabatan = Column(String, default="Operator Produksi") # Operator Sewing, Operator Potong, QC, Mekanik, dll.
-    tanggal_lahir = Column(String, nullable=True)         # YYYY-MM-DD (Menggantikan umur)
+    jabatan = Column(String, default="Operator Produksi") # Operator Sewing, Potong, QC, Mekanik, dll.
+    tanggal_lahir = Column(String, nullable=True)         # YYYY-MM-DD
     no_hp = Column(String, nullable=True)
     alamat = Column(String, nullable=True)
-    status_karyawan = Column(String, default="KONTRAK") # TETAP, KONTRAK, HARIAN_LEPAS
-    tanggal_masuk = Column(String, nullable=True)       # YYYY-MM-DD atau DD-MM-YYYY
+    status_karyawan = Column(String, default="KONTRAK")   # TETAP, KONTRAK, HARIAN_LEPAS
+    tanggal_masuk = Column(String, nullable=True)         # YYYY-MM-DD
 
     # 🟢 SKEMA PENGGAJIAN
     tipe_pay = Column(String, default="BORONGAN")  # BORONGAN / HARIAN / BULANAN
@@ -61,6 +61,7 @@ class LogPelanggaran(Base):
 
     karyawan = relationship("Karyawan", back_populates="pelanggaran")
 
+
 class Mesin(Base):
     __tablename__ = "mesin"
 
@@ -72,12 +73,57 @@ class Mesin(Base):
     lokasi_line = Column(String(50), nullable=False)                          # Line 1, Line 2, Cutting Room, Finishing
     status = Column(String(30), default="OPERASIONAL")                        # OPERASIONAL, MAINTENANCE, RUSAK
     
-    # Penanggung Jawab / Operator Mesin (Opsional)
     operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
     
     keterangan = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationship
     operator = relationship("Karyawan", foreign_keys=[operator_id])
+
+
+# 🟢 MODEL BAHAN BAKU & INVENTARIS GARMENT
+class BahanBaku(Base):
+    __tablename__ = "bahan_baku"
+
+    id = Column(String(50), primary_key=True, index=True) # Menggunakan kode_sku sebagai Primary Key ID
+    kode_sku = Column(String(50), unique=True, index=True, nullable=False)
+    nama_item = Column(String(150), nullable=False)
+    kategori = Column(String(50), nullable=False)
+    satuan = Column(String(20), nullable=False)
+    stok_saat_ini = Column(Float, default=0.0)
+    stok_minimum = Column(Float, default=10.0)
+    harga_per_satuan = Column(Float, default=0.0)
+    lokasi_gudang = Column(String(100), nullable=False)
+    supplier_utama = Column(String(100), default="-")
+    warna_kode = Column(String(20), default="#3b82f6")
+    
+    # Dokumen, Faktur & Transaksi Pembelian
+    no_faktur_po = Column(String(100), default="-")
+    tanggal_masuk = Column(String(20), nullable=True)
+    tipe_pembayaran = Column(String(30), default="CASH")
+    status_pembayaran = Column(String(30), default="LUNAS")
+    jatuh_tempo = Column(String(20), nullable=True)
+    
+    terakhir_diperbarui = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relasi ke Log Mutasi (Otomatis terhapus jika barang dihapus)
+    mutasi_logs = relationship("LogMutasiBahan", back_populates="bahan", cascade="all, delete-orphan")
+
+
+# 🟢 MODEL RIWAYAT MUTASI STOK
+class LogMutasiBahan(Base):
+    __tablename__ = "log_mutasi_bahan"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    bahan_id = Column(String(50), ForeignKey("bahan_baku.id", ondelete="CASCADE"), nullable=False)
+    tanggal = Column(DateTime, default=datetime.utcnow)
+    tipe = Column(String(30), nullable=False) # MASUK, KELUAR_PRODUKSI, PENYESUAIAN, RETUR
+    jumlah = Column(Float, nullable=False)
+    stok_sebelum = Column(Float, nullable=False)
+    stok_sesudah = Column(Float, nullable=False)
+    referensi_po_spk = Column(String(100), default="-")
+    catatan = Column(String(255), nullable=True)
+    petugas = Column(String(100), default="Admin Gudang")
+
+    bahan = relationship("BahanBaku", back_populates="mutasi_logs")

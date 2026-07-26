@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Warehouse, Plus, Lock } from 'lucide-react';
-import { ItemBahanBaku, FilterInventaris, LogTransaksiStok, StatusStok } from './types';
+import { Warehouse, Plus, Lock, Loader2, RefreshCw, ShieldAlert } from 'lucide-react';
+import { ItemBahanBaku, LogTransaksiStok, StatusStok } from './types';
+import { useInventaris } from './useInventaris';
 
 // Import Sub-Komponen & Modal
 import PinGateModal from '../karyawan/PinGateModal';
@@ -12,88 +13,36 @@ import InventarisKpiCards from './InventarisKpiCards';
 import InventarisFilterBar from './InventarisFilterBar';
 import InventarisTable from './InventarisTable';
 
-// Mock Data Awal
-const INITIAL_INVENTORY: ItemBahanBaku[] = [
-    {
-        id: '1',
-        kode_sku: 'MAT-FAB-001',
-        nama_item: 'Kain Cotton Combed 30s - Jet Black',
-        kategori: 'KAIN',
-        satuan: 'KG',
-        stok_saat_ini: 145.5,
-        stok_minimum: 50.0,
-        harga_per_satuan: 115000,
-        lokasi_gudang: 'Gudang Utama - Rak A1',
-        supplier_utama: 'PT Tekstil Nusantara',
-        nomor_vendor: '0812-9876-5432 (Bpk. Agus)',
-        nomor_nota_po: 'PO-2026-088',
-        tanggal_pembelian: '2026-07-20',
-        nomor_lot_batch: 'LOT-992-BLK',
-        warna_kode: '#000000',
-        status_stok: 'AMAN',
-        is_archived: false,
-        terakhir_diperbarui: '2026-07-24',
-        riwayat_transaksi: [
-            { id: 't1', tanggal: '2026-07-20', tipe: 'MASUK', jumlah: 200, stok_sebelum: 0, stok_sesudah: 200, referensi_po_spk: 'PO-2026-088', catatan: 'Pembelian awal' },
-            { id: 't2', tanggal: '2026-07-24', tipe: 'KELUAR_PRODUKSI', jumlah: 54.5, stok_sebelum: 200, stok_sesudah: 145.5, referensi_po_spk: 'SPK-2026-012', catatan: 'Potong T-Shirt Size L' }
-        ]
-    },
-    {
-        id: '2',
-        kode_sku: 'MAT-ACC-004',
-        nama_item: 'Zipper YKK Metal No 5 - 60cm Black',
-        kategori: 'AKSESORIS',
-        satuan: 'PCS',
-        stok_saat_ini: 28,
-        stok_minimum: 100,
-        harga_per_satuan: 8500,
-        lokasi_gudang: 'Gudang B - Aksesoris B2',
-        supplier_utama: 'CV Aksesoris Garment',
-        nomor_vendor: '0856-1122-3344',
-        nomor_nota_po: 'INV-8831',
-        tanggal_pembelian: '2026-07-15',
-        nomor_lot_batch: 'LOT-ACC-11',
-        status_stok: 'MENIPIS',
-        is_archived: false,
-        terakhir_diperbarui: '2026-07-25',
-        riwayat_transaksi: [
-            { id: 't3', tanggal: '2026-07-25', tipe: 'KELUAR_PRODUKSI', jumlah: 120, stok_sebelum: 148, stok_sesudah: 28, referensi_po_spk: 'SPK-2026-015', catatan: 'Produksi Jacket Windbreaker' }
-        ]
-    },
-    {
-        id: '3',
-        kode_sku: 'MAT-THR-002',
-        nama_item: 'Benang Jahit Spun Polyester 40/2 White',
-        kategori: 'BENANG',
-        satuan: 'CONE',
-        stok_saat_ini: 0,
-        stok_minimum: 15,
-        harga_per_satuan: 18500,
-        lokasi_gudang: 'Gudang Utama - Rak C1',
-        supplier_utama: 'PT Sinar Benang',
-        nomor_vendor: '021-555-8900',
-        nomor_nota_po: 'PO-2026-041',
-        tanggal_pembelian: '2026-06-10',
-        status_stok: 'HABIS',
-        is_archived: false,
-        terakhir_diperbarui: '2026-07-22',
-        riwayat_transaksi: []
-    }
-];
+const ALLOWED_ROLES = ['OWNER', 'DEV', 'ADMIN'];
 
-export default function InventarisPage() {
-    // 🟢 1. STATE MANAGEMENT (Seluruh Hook Berada di Dalam Komponen)
-    const [inventory, setInventory] = useState<ItemBahanBaku[]>(INITIAL_INVENTORY);
-    const [filter, setFilter] = useState<FilterInventaris>({
-        search: '',
-        kategori: 'ALL',
-        statusStok: 'ALL',
-        tanggalMulai: '',
-        tanggalSelesai: '',
-        showArchived: false
-    });
+interface InventarisPageProps {
+    activeUser?: {
+        role?: string;
+        nama?: string;
+        [key: string]: any;
+    } | null;
+}
 
-    // Modals & Security Gate State
+export default function InventarisPage({ activeUser }: InventarisPageProps) {
+    // 🛡️ 0. PENGECEKAN HAK AKSES ROLE (OWNER, DEV, ADMIN)
+    const userRole = activeUser?.role?.toUpperCase();
+    const isAccessAllowed = userRole ? ALLOWED_ROLES.includes(userRole) : false;
+
+    // 🟢 1. INTEGRASI FASTAPI BACKEND HOOK
+    const {
+        inventarisList,
+        loading,
+        error,
+        filter,
+        setFilter,
+        fetchInventaris,
+        addBahanBaku,
+        catatMutasi,
+        updateBahanBaku,
+        deleteBahanBaku,
+    } = useInventaris();
+
+    // 🔒 2. STATE SESI PIN
     const [isSessionUnlocked, setIsSessionUnlocked] = useState(false);
     const [isPinGateOpen, setIsPinGateOpen] = useState(true);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
@@ -105,12 +54,32 @@ export default function InventarisPage() {
     const [selectedEditItem, setSelectedEditItem] = useState<ItemBahanBaku | null>(null);
 
     useEffect(() => {
-        if (!isSessionUnlocked) {
+        if (!isSessionUnlocked && isAccessAllowed) {
             setIsPinGateOpen(true);
         }
-    }, [isSessionUnlocked]);
+    }, [isSessionUnlocked, isAccessAllowed]);
 
-    // 🟢 2. ACTION HANDLERS
+    // 🛑 RESPONSE JIKA ROLE TIDAK DIIZINKAN
+    if (!isAccessAllowed) {
+        return (
+            <main className="flex-1 h-screen overflow-y-auto p-8 bg-slate-900 flex items-center justify-center text-slate-100">
+                <div className="text-center max-w-md p-8 glass-panel rounded-3xl border border-rose-500/30 bg-rose-950/10 shadow-2xl">
+                    <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <ShieldAlert className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-2">Akses Ditolak</h3>
+                    <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+                        Modul Inventaris & Stok Bahan Baku bersifat terbatas. Hanya pengguna dengan role <strong className="text-rose-300">Owner</strong>, <strong className="text-rose-300">Developer</strong>, atau <strong className="text-rose-300">Admin</strong> yang memiliki izin untuk mengakses menu ini.
+                    </p>
+                    <div className="px-4 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-[11px] text-slate-400">
+                        Role Anda saat ini: <span className="text-indigo-400 font-semibold">{userRole || 'TIDAK DIKETAHUI'}</span>
+                    </div>
+                </div>
+            </main>
+        );
+    }
+
+    // 🟢 3. ACTION HANDLERS
     const executeWithPin = (action: () => void) => {
         if (isSessionUnlocked) {
             action();
@@ -123,6 +92,7 @@ export default function InventarisPage() {
     const handlePinSuccess = () => {
         setIsPinGateOpen(false);
         setIsSessionUnlocked(true);
+
         if (pendingAction) {
             pendingAction();
             setPendingAction(null);
@@ -150,75 +120,105 @@ export default function InventarisPage() {
         });
     };
 
+    // 📦 ARSIP / SOFT DELETE
     const handleToggleArchive = (targetItem: ItemBahanBaku) => {
-        executeWithPin(() => {
-            setInventory((prev) => prev.map((item) =>
-                item.id === targetItem.id ? { ...item, is_archived: !item.is_archived } : item
-            ));
+        executeWithPin(async () => {
+            const res = await updateBahanBaku(targetItem.id, {
+                is_archived: !targetItem.is_archived,
+            });
+            if (!res.success) {
+                alert(res.message || 'Gagal mengubah status arsip.');
+            }
         });
     };
 
+    // 🗑️ HAPUS PERMANEN DARI DATABASE
     const handleTriggerDelete = (itemId: string) => {
-        executeWithPin(() => {
-            setInventory((prev) => prev.filter((item) => item.id !== itemId));
+        executeWithPin(async () => {
+            if (confirm('Apakah Anda yakin ingin menghapus bahan baku ini secara permanen?')) {
+                const res = await deleteBahanBaku(itemId);
+                if (!res.success) {
+                    alert(res.message || 'Gagal menghapus bahan baku.');
+                }
+            }
         });
     };
 
-    const handleSaveMutasi = (itemId: string, transaction: LogTransaksiStok) => {
-        setInventory((prev) => prev.map((item) => {
-            if (item.id !== itemId) return item;
+    // 🔄 SIMPAN MUTASI STOK KE DATABASE
+    const handleSaveMutasi = async (itemId: string, transaction: LogTransaksiStok) => {
+        const res = await catatMutasi(itemId, {
+            tipe: transaction.tipe,
+            jumlah: transaction.jumlah,
+            referensi_po_spk: transaction.referensi_po_spk,
+            catatan: transaction.catatan,
+            petugas: transaction.petugas,
+        });
 
-            const newStok = transaction.stok_sesudah;
-            let newStatus: StatusStok = 'AMAN';
-            if (newStok === 0) newStatus = 'HABIS';
-            else if (newStok <= item.stok_minimum) newStatus = 'MENIPIS';
-
-            return {
-                ...item,
-                stok_saat_ini: newStok,
-                status_stok: newStatus,
-                terakhir_diperbarui: transaction.tanggal,
-                riwayat_transaksi: [transaction, ...item.riwayat_transaksi]
-            };
-        }));
-    };
-
-    const handleSaveBahan = (data: Partial<ItemBahanBaku>) => {
-        if (selectedEditItem) {
-            setInventory((prev) => prev.map((item) => item.id === selectedEditItem.id ? { ...item, ...data } as ItemBahanBaku : item));
+        if (!res.success) {
+            alert(res.message || 'Gagal menyimpan mutasi stok.');
         } else {
-            const newItem: ItemBahanBaku = {
-                id: Date.now().toString(),
-                kode_sku: data.kode_sku || 'MAT-NEW',
-                nama_item: data.nama_item || 'Bahan Baru',
-                kategori: data.kategori || 'KAIN',
-                satuan: data.satuan || 'KG',
-                stok_saat_ini: data.stok_saat_ini || 0,
-                stok_minimum: data.stok_minimum || 10,
-                harga_per_satuan: data.harga_per_satuan || 0,
-                lokasi_gudang: data.lokasi_gudang || 'Gudang Utama',
-                supplier_utama: data.supplier_utama || '-',
-                nomor_vendor: data.nomor_vendor || '-',
-                nomor_nota_po: data.nomor_nota_po || '-',
-                tanggal_pembelian: data.tanggal_pembelian || new Date().toISOString().split('T')[0],
-                nomor_lot_batch: data.nomor_lot_batch || '-',
-                status_stok: (data.stok_saat_ini || 0) === 0 ? 'HABIS' : (data.stok_saat_ini || 0) <= (data.stok_minimum || 10) ? 'MENIPIS' : 'AMAN',
-                is_archived: false,
-                terakhir_diperbarui: new Date().toISOString().split('T')[0],
-                riwayat_transaksi: []
-            };
-            setInventory((prev) => [newItem, ...prev]);
+            setIsMutasiModalOpen(false);
+            setSelectedMutasiItem(null);
         }
     };
 
-    // 🟢 3. METRICS & LOGIKA MULTI-FILTER
-    const activeInventory = useMemo(() => inventory.filter((i) => !i.is_archived), [inventory]);
-    const totalAsetInventaris = useMemo(() => activeInventory.reduce((acc, item) => acc + (item.stok_saat_ini * item.harga_per_satuan), 0), [activeInventory]);
-    const totalItemMenipis = useMemo(() => activeInventory.filter((i) => i.stok_saat_ini <= i.stok_minimum && i.stok_saat_ini > 0).length, [activeInventory]);
-    const totalItemHabis = useMemo(() => activeInventory.filter((i) => i.stok_saat_ini === 0).length, [activeInventory]);
+    // 💾 SIMPAN ATAU UPDATE MASTER BAHAN BAKU
+    const handleSaveBahan = async (data: Partial<ItemBahanBaku>) => {
+        if (selectedEditItem) {
+            const res = await updateBahanBaku(selectedEditItem.id, data);
+            if (!res.success) {
+                alert(res.message || 'Gagal memperbarui data bahan baku.');
+            } else {
+                setIsBahanModalOpen(false);
+                setSelectedEditItem(null);
+            }
+        } else {
+            const res = await addBahanBaku({
+                kode_sku: data.kode_sku || `SKU-${Date.now()}`,
+                nama_item: data.nama_item || 'Bahan Baru',
+                kategori: data.kategori || 'KAIN',
+                satuan: data.satuan || 'KG',
+                stok_awal: data.stok_saat_ini || 0,
+                stok_minimum: data.stok_minimum || 10,
+                harga_per_satuan: data.harga_per_satuan || 0,
+                lokasi_gudang: data.lokasi_gudang || 'Gudang Utama',
+                supplier_utama: data.supplier_utama,
+                nomor_nota_po: data.nomor_nota_po,
+                tanggal_pembelian: data.tanggal_pembelian,
+                warna_kode: data.warna_kode,
+            });
+
+            if (!res.success) {
+                alert(res.message || 'Gagal menambahkan bahan baku baru.');
+            } else {
+                setIsBahanModalOpen(false);
+            }
+        }
+    };
+
+    // 🟢 4. METRICS & LOGIKA FILTER
+    const activeInventory = useMemo(
+        () => inventarisList.filter((i) => !i.is_archived),
+        [inventarisList]
+    );
+
+    const totalAsetInventaris = useMemo(
+        () => activeInventory.reduce((acc, item) => acc + item.stok_saat_ini * item.harga_per_satuan, 0),
+        [activeInventory]
+    );
+
+    const totalItemMenipis = useMemo(
+        () => activeInventory.filter((i) => i.stok_saat_ini <= i.stok_minimum && i.stok_saat_ini > 0).length,
+        [activeInventory]
+    );
+
+    const totalItemHabis = useMemo(
+        () => activeInventory.filter((i) => i.stok_saat_ini === 0).length,
+        [activeInventory]
+    );
 
     const filteredInventory = useMemo(() => {
-        return inventory.filter((item) => {
+        return inventarisList.filter((item) => {
             if (filter.showArchived) {
                 if (!item.is_archived) return false;
             } else {
@@ -230,8 +230,7 @@ export default function InventarisPage() {
                 item.nama_item.toLowerCase().includes(q) ||
                 item.kode_sku.toLowerCase().includes(q) ||
                 (item.supplier_utama && item.supplier_utama.toLowerCase().includes(q)) ||
-                (item.nomor_nota_po && item.nomor_nota_po.toLowerCase().includes(q)) ||
-                (item.nomor_lot_batch && item.nomor_lot_batch.toLowerCase().includes(q));
+                (item.nomor_nota_po && item.nomor_nota_po.toLowerCase().includes(q));
 
             const matchesKategori = filter.kategori === 'ALL' || item.kategori === filter.kategori;
             const matchesStatus = filter.statusStok === 'ALL' || item.status_stok === filter.statusStok;
@@ -246,7 +245,7 @@ export default function InventarisPage() {
 
             return matchesSearch && matchesKategori && matchesStatus && matchesTanggal;
         });
-    }, [inventory, filter]);
+    }, [inventarisList, filter]);
 
     // 🔒 SCREEN DISPLAY TERKUNCI PIN
     if (!isSessionUnlocked) {
@@ -279,7 +278,7 @@ export default function InventarisPage() {
         );
     }
 
-    // 🟢 UNLOCKED DISPLAY (DENGAN CONTAINER SCROLLING)
+    // 🟢 UNLOCKED DISPLAY
     return (
         <main className="flex-1 h-screen overflow-y-auto p-4 sm:p-8 bg-slate-900 text-slate-100 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6 pb-12">
@@ -289,20 +288,42 @@ export default function InventarisPage() {
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                             <Warehouse className="w-6 h-6 text-indigo-400" />
                             <span>Inventaris & Stok Bahan Baku</span>
+                            {loading && <Loader2 className="w-5 h-5 text-indigo-400 animate-spin ml-2" />}
                         </h2>
                         <p className="text-slate-400 text-sm mt-1">
                             Pencatatan kain, aksesoris, benang, PO vendor, lot dyeing, dan alokasi material SPK.
                         </p>
                     </div>
 
-                    <button
-                        onClick={handleOpenTambahBahan}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition-all active:scale-95"
-                    >
-                        <Plus className="w-4 h-4" />
-                        <span>Tambah Bahan Baku</span>
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {/* 🔄 TOMBOL REFRESH DATA */}
+                        <button
+                            onClick={fetchInventaris}
+                            disabled={loading}
+                            title="Refresh Data dari Server"
+                            className="flex items-center gap-2 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition-all disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-4 h-4 text-indigo-400 ${loading ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">Refresh Data</span>
+                        </button>
+
+                        {/* ➕ TOMBOL TAMBAH BAHAN BAKU */}
+                        <button
+                            onClick={handleOpenTambahBahan}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition-all"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Tambah Bahan Baku</span>
+                        </button>
+                    </div>
                 </div>
+
+                {/* Notification Error dari API */}
+                {error && (
+                    <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-sm flex items-center justify-between">
+                        <span>{error}</span>
+                    </div>
+                )}
 
                 {/* KPI Section */}
                 <InventarisKpiCards

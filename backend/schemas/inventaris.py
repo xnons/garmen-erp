@@ -3,6 +3,8 @@ from typing import Optional, List
 from enum import Enum
 from datetime import date, datetime
 
+
+# --- ENUMS ---
 class KategoriBahan(str, Enum):
     KAIN = "KAIN"
     AKSESORIS = "AKSESORIS"
@@ -30,7 +32,19 @@ class TipeMutasi(str, Enum):
     PENYESUAIAN = "PENYESUAIAN"
     RETUR = "RETUR"
 
-# --- LOG MUTASI ---
+# 🟢 Enum Tambahan Keuangan
+class TipePembayaran(str, Enum):
+    CASH = "CASH"
+    TRANSFER = "TRANSFER"
+    TEMPO = "TEMPO"
+
+class StatusPembayaran(str, Enum):
+    LUNAS = "LUNAS"
+    BELUM_LUNAS = "BELUM_LUNAS"
+    DP = "DP"
+
+
+# --- LOG MUTASI SCHEMAS ---
 class LogMutasiCreate(BaseModel):
     tipe: TipeMutasi
     jumlah: float = Field(..., gt=0, description="Jumlah mutasi bahan")
@@ -39,21 +53,22 @@ class LogMutasiCreate(BaseModel):
     petugas: Optional[str] = "Admin Gudang"
 
 class LogMutasiResponse(BaseModel):
-    id: str
-    item_id: str
+    id: int
+    bahan_id: str
     tanggal: datetime
     tipe: TipeMutasi
     jumlah: float
     stok_sebelum: float
     stok_sesudah: float
     referensi_po_spk: str
-    catatan: str
+    catatan: Optional[str] = None
     petugas: str
 
     class Config:
         from_attributes = True
 
-# --- BAHAN BAKU ---
+
+# --- BAHAN BAKU SCHEMAS ---
 class BahanBakuBase(BaseModel):
     kode_sku: str
     nama_item: str
@@ -64,6 +79,13 @@ class BahanBakuBase(BaseModel):
     lokasi_gudang: str
     supplier_utama: Optional[str] = "-"
     warna_kode: Optional[str] = "#3b82f6"
+    
+    # 🟢 Informasi Transaksi & Pelunasan
+    no_faktur_po: Optional[str] = "-"
+    tanggal_masuk: Optional[str] = None  # YYYY-MM-DD
+    tipe_pembayaran: TipePembayaran = TipePembayaran.CASH
+    status_pembayaran: StatusPembayaran = StatusPembayaran.LUNAS
+    jatuh_tempo: Optional[str] = None     # YYYY-MM-DD
 
 class BahanBakuCreate(BahanBakuBase):
     stok_awal: float = Field(default=0.0, ge=0)
@@ -77,6 +99,11 @@ class BahanBakuUpdate(BaseModel):
     lokasi_gudang: Optional[str] = None
     supplier_utama: Optional[str] = None
     warna_kode: Optional[str] = None
+    no_faktur_po: Optional[str] = None
+    tanggal_masuk: Optional[str] = None
+    tipe_pembayaran: Optional[TipePembayaran] = None
+    status_pembayaran: Optional[StatusPembayaran] = None
+    jatuh_tempo: Optional[str] = None
 
 class BahanBakuResponse(BahanBakuBase):
     id: str

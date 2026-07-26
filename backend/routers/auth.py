@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -25,11 +25,11 @@ router = APIRouter(tags=["Autentikasi & Security Gate"])
 
 # --- Pydantic Schemas Khusus PIN ---
 class PinVerifyInput(BaseModel):
-    pin: str
+    pin: str = Field(..., example="1234")
 
 class ChangePinInput(BaseModel):
-    old_pin: str
-    new_pin: str
+    old_pin: str = Field(..., example="1234")
+    new_pin: str = Field(..., min_length=4, max_length=6, example="5678")
 
 
 # 🟢 Helper Generator ID Karyawan Otomatis (Format: KRY-2026-XXX)
@@ -52,7 +52,7 @@ ALLOWED_TARGET_ROLES = {
 }
 
 
-# 🟢 1. Registrasi Karyawan (RBAC Hardened)
+# 🟢 1. Registrasi Karyawan Baru (RBAC Hardened)
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_karyawan(
     user_data: RegisterInput, 
@@ -83,15 +83,24 @@ async def register_karyawan(
     if karyawan_lama:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username tersebut sudah terdaftar!")
     
+    # 4️⃣ Validasi Format PIN (jika disediakan)
+    raw_pin = user_data.pin or "1234"
+    if not raw_pin.isdigit() or not (4 <= len(raw_pin) <= 6):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PIN Security Gate harus berupa 4 hingga 6 digit angka!"
+        )
+
     final_id = user_data.id_karyawan or generate_unique_id_karyawan(db)
     hashed_password = get_password_hash(user_data.password)
+    hashed_pin = get_password_hash(raw_pin)  # 🔒 Hash PIN untuk disimpan di Database
     
     karyawan_baru = models.Karyawan(
         id_karyawan=final_id,
         nama=user_data.nama,
         username=user_data.username,
         hashed_password=hashed_password,
-        pin=user_data.pin or "1234",
+        pin=hashed_pin,
         role=target_role,
         is_active=True,
         
@@ -122,6 +131,9 @@ async def login(credentials: LoginInput, db: Session = Depends(get_db)):
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kombinasi Username atau Password salah!")
     
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Akun Anda dalam status nonaktif/diarsipkan.")
+
     token = create_access_token(
         data={"sub": user.username, "role": user.role},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -135,12 +147,30 @@ async def login(credentials: LoginInput, db: Session = Depends(get_db)):
             "nama": user.nama,
             "username": user.username,
             "role": user.role,
+            "jabatan": user.jabatan,
             "poin_pelanggaran": user.poin_pelanggaran
         }
     }
 
 
-# 🔏 3. Verifikasi PIN Gate (Mendukung Dev Mode Bypass)
+# 👤 3. Profil Pengguna Aktif (Restore / Revalidate JWT Session)
+@router.get("/me")
+async def get_current_user_profile(
+    current_user: models.Karyawan = Depends(get_current_user)
+):
+    """Mengembalikan data pengguna yang sedang login berdasarkan token JWT."""
+    return {
+        "id_karyawan": current_user.id_karyawan,
+        "nama": current_user.nama,
+        "username": current_user.username,
+        "role": current_user.role,
+        "jabatan": current_user.jabatan,
+        "status_karyawan": current_user.status_karyawan,
+        "poin_pelanggaran": current_user.poin_pelanggaran
+    }
+
+
+# 🔏 4. Verifikasi PIN Gate (Mendukung Hashing & Dev Mode Bypass)
 @router.post("/verify-pin")
 async def verify_security_pin(
     payload: PinVerifyInput,
@@ -155,11 +185,23 @@ async def verify_security_pin(
     if payload.pin == "6767" and user_role == "DEVELOPER" and dev_mode:
         return {"success": True, "message": "Otorisasi Universal PIN Developer berhasil!"}
 
-    # 🔒 2. Backup PIN Master '9999' / User Personal PIN Check
+    # 🔒 2. Backup PIN Master '9999' / Validasi PIN User (Bcrypt atau Plaintext Fallback)
     PIN_MASTER = "9999"
-    user_pin = getattr(current_user, "pin", "1234") or "1234"
-    
-    if payload.pin != user_pin and payload.pin != PIN_MASTER:
+    db_pin = getattr(current_user, "pin", None)
+
+    is_pin_valid = False
+
+    # Cek jika input sama dengan Master PIN '9999'
+    if payload.pin == PIN_MASTER:
+        is_pin_valid = True
+    elif db_pin:
+        # Cek apakah PIN di DB ter-hash atau masih plaintext (karena migrasi)
+        if db_pin.startswith("$2b$") or db_pin.startswith("$2a$"):
+            is_pin_valid = verify_password(payload.pin, db_pin)
+        else:
+            is_pin_valid = (payload.pin == db_pin)
+
+    if not is_pin_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="PIN Access Gate yang Anda masukkan salah!"
@@ -168,7 +210,7 @@ async def verify_security_pin(
     return {"success": True, "message": "Otorisasi PIN berhasil!"}
 
 
-# 🔑 4. Ganti PIN Gate Personal
+# 🔑 5. Ganti PIN Gate Personal
 @router.post("/change-pin")
 async def change_pin(
     payload: ChangePinInput,
@@ -176,10 +218,17 @@ async def change_pin(
     current_user: models.Karyawan = Depends(get_current_user)
 ):
     """Mengubah PIN Access Gate milik user yang sedang login."""
-    user_pin = getattr(current_user, "pin", "1234") or "1234"
+    db_pin = getattr(current_user, "pin", None)
     
     # Validasi PIN lama
-    if payload.old_pin != user_pin:
+    is_old_pin_correct = False
+    if db_pin:
+        if db_pin.startswith("$2b$") or db_pin.startswith("$2a$"):
+            is_old_pin_correct = verify_password(payload.old_pin, db_pin)
+        else:
+            is_old_pin_correct = (payload.old_pin == db_pin)
+
+    if not is_old_pin_correct:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="PIN Lama yang Anda masukkan salah!"
@@ -192,8 +241,8 @@ async def change_pin(
             detail="PIN Baru harus berupa 4 hingga 6 digit angka!"
         )
 
-    # Simpan ke Database
-    current_user.pin = payload.new_pin
+    # Simpan PIN Ter-hash ke Database
+    current_user.pin = get_password_hash(payload.new_pin)
     db.commit()
     
     return {"success": True, "message": "PIN Access Gate berhasil diperbarui!"}
