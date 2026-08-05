@@ -1,0 +1,191 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import func, cast, Date
+from datetime import date, timedelta
+
+from database import get_db
+import models
+
+router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+
+
+@router.get("/overview-stats")
+def get_overview_stats(db: Session = Depends(get_db)):
+    today = date.today()
+
+    # 1. Total Output Produksi Hari Ini
+    total_output_today = 0
+    try:
+        total_output_today = db.query(
+            func.coalesce(func.sum(models.LogOutputBorongan.qty_pass), 0)
+        ).filter(
+            cast(models.LogOutputBorongan.tanggal, Date) == today,
+            models.LogOutputBorongan.is_deleted == False
+        ).scalar() or 0
+    except Exception:
+        total_output_today = 0
+
+    # 2. Total Aset Material Gudang & Count SKU
+    total_aset_material = 0.0
+    total_sku_count = 0
+    try:
+        harga_col = getattr(models.Inventaris, 'harga_per_satuan', getattr(models.Inventaris, 'harga_satuan', 0))
+        stok_col = getattr(models.Inventaris, 'stok_saat_ini', getattr(models.Inventaris, 'stok', 0))
+
+        total_aset_material = db.query(
+            func.coalesce(func.sum(stok_col * harga_col), 0)
+        ).filter(getattr(models.Inventaris, 'is_archived', False) == False).scalar() or 0.0
+
+        total_sku_count = db.query(func.count(models.Inventaris.id)).filter(
+            getattr(models.Inventaris, 'is_archived', False) == False
+        ).scalar() or 0
+    except Exception:
+        pass
+
+    # 3. Status Mesin Jahit
+    mesin_total = 0
+    mesin_siap = 0
+    mesin_perlu_service = 0
+    try:
+        mesin_total = db.query(func.count(models.Mesin.id)).scalar() or 0
+        mesin_siap = db.query(func.count(models.Mesin.id)).filter(
+            func.upper(models.Mesin.status).in_(['OPERASIONAL', 'SIAP'])
+        ).scalar() or 0
+        mesin_perlu_service = mesin_total - mesin_siap
+    except Exception:
+        pass
+
+    # 4. Total Karyawan Aktif
+    total_karyawan = 0
+    try:
+        total_karyawan = db.query(func.count(models.Karyawan.id_karyawan)).filter(
+            models.Karyawan.is_active == True
+        ).scalar() or 0
+    except Exception:
+        pass
+
+    # 5. Upah Borongan Hari Ini
+    upah_hari_ini = 0.0
+    try:
+        upah_hari_ini = db.query(
+            func.coalesce(func.sum(models.LogOutputBorongan.subtotal_rp), 0)
+        ).filter(
+            cast(models.LogOutputBorongan.tanggal, Date) == today,
+            models.LogOutputBorongan.is_deleted == False
+        ).scalar() or 0.0
+    except Exception:
+        pass
+
+    return {
+        "totalOutputToday": int(total_output_today),
+        "targetQuotaToday": 1000,
+        "totalAsetMaterial": float(total_aset_material),
+        "totalSkuCount": int(total_sku_count),
+        "mesinSiap": int(mesin_siap),
+        "mesinTotal": int(mesin_total),
+        "mesinPerluService": int(mesin_perlu_service),
+        "presensiHadir": 0,
+        "presensiTotal": int(total_karyawan),
+        "totalKaryawan": int(total_karyawan),
+        "skorKepatuhan": 100,
+        "upahHariIni": float(upah_hari_ini)
+    }
+
+
+@router.get("/chart-produksi")
+def get_chart_produksi(db: Session = Depends(get_db)):
+    try:
+        nama_hari_map = {
+            'Monday': 'Senin', 'Tuesday': 'Selasa', 'Wednesday': 'Rabu',
+            'Thursday': 'Kamis', 'Friday': 'Jumat', 'Saturday': 'Sabtu', 'Sunday': 'Minggu'
+        }
+        today = date.today()
+        seven_days_ago = today - timedelta(days=6)
+
+        results = db.query(
+            cast(models.LogOutputBorongan.tanggal, Date).label('tgl'),
+            func.sum(models.LogOutputBorongan.qty_pass).label('total_pcs')
+        ).filter(
+            cast(models.LogOutputBorongan.tanggal, Date) >= seven_days_ago,
+            models.LogOutputBorongan.is_deleted == False
+        ).group_by(cast(models.LogOutputBorongan.tanggal, Date))\
+         .order_by(cast(models.LogOutputBorongan.tanggal, Date).asc()).all()
+
+        db_dict = {r.tgl: r.total_pcs for r in results}
+        chart_data = []
+
+        for i in range(7):
+            current_date = seven_days_ago + timedelta(days=i)
+            day_name = nama_hari_map.get(current_date.strftime('%A'), current_date.strftime('%A'))
+            chart_data.append({
+                "hari": day_name,
+                "pcs": int(db_dict.get(current_date, 0)),
+                "target": 1000
+            })
+
+        return chart_data
+    except Exception:
+        return []
+
+
+@router.get("/chart-brand-material")
+def get_chart_brand_material(db: Session = Depends(get_db)):
+    """
+    🟢 Membaca Nama Client / Buyer dari SPKProduksi dan Menghitung Persentase Porsi Project
+    """
+    try:
+        # Ambil SPK yang aktif (tidak dihapus)
+        results = db.query(
+            models.SPKProduksi.nama_pemesan,
+            func.sum(models.SPKProduksi.target_qty).label('total_qty')
+        ).filter(
+            models.SPKProduksi.is_deleted == False
+        ).group_by(models.SPKProduksi.nama_pemesan).all()
+
+        total_qty_semua = sum([r.total_qty or 0 for r in results]) or 1
+
+        chart_data = []
+        for r in results:
+            client_name = r.nama_pemesan.strip() if r.nama_pemesan and r.nama_pemesan.strip() else 'Umum / Tanpa Brand'
+            qty_val = r.total_qty or 0
+            persentase = round((qty_val / total_qty_semua) * 100)
+            chart_data.append({"name": client_name, "value": persentase})
+
+        # Jika belum ada data SPK sama sekali di database, berikan fallback dari Inventaris
+        if not chart_data:
+            inv_results = db.query(
+                models.Inventaris.peruntukan_brand,
+                func.sum(models.Inventaris.stok_saat_ini).label('total_stok')
+            ).group_by(models.Inventaris.peruntukan_brand).all()
+
+            total_stok = sum([r.total_stok or 0 for r in inv_results]) or 1
+            for r in inv_results:
+                b_name = r.peruntukan_brand.strip() if r.peruntukan_brand and r.peruntukan_brand.strip() else 'Stok Umum'
+                chart_data.append({"name": b_name, "value": round(((r.total_stok or 0) / total_stok) * 100)})
+
+        return chart_data
+    except Exception:
+        return []
+
+
+@router.get("/chart-payroll")
+def get_chart_payroll(db: Session = Depends(get_db)):
+    try:
+        total_gaji_pokok = db.query(
+            func.coalesce(func.sum(models.Karyawan.gaji_pokok), 0)
+        ).filter(models.Karyawan.is_active == True).scalar() or 0
+
+        pokok_per_pekan = float(total_gaji_pokok) / 4 if total_gaji_pokok else 0
+
+        upah_borongan_total = db.query(
+            func.coalesce(func.sum(models.LogOutputBorongan.subtotal_rp), 0)
+        ).filter(models.LogOutputBorongan.is_deleted == False).scalar() or 0
+
+        return [
+            {"minggu": "M-1", "borongan": 0.0, "pokok": pokok_per_pekan},
+            {"minggu": "M-2", "borongan": 0.0, "pokok": pokok_per_pekan},
+            {"minggu": "M-3", "borongan": 0.0, "pokok": pokok_per_pekan},
+            {"minggu": "M-4 (Run)", "borongan": float(upah_borongan_total), "pokok": pokok_per_pekan},
+        ]
+    except Exception:
+        return []

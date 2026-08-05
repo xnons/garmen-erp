@@ -8,10 +8,10 @@ import {
     Lock,
     Sparkles,
     Terminal,
-    Smartphone,
     CheckCircle2,
     ShieldAlert,
-    UserCheck
+    UserCheck,
+    Settings
 } from 'lucide-react';
 import { UpdatePinModal } from '@/app/components/karyawan/UpdatePinModal';
 
@@ -58,7 +58,7 @@ export const SettingPage: React.FC<SettingPageProps> = ({ activeUser }) => {
         setLoadingPass(true);
 
         try {
-            const API_BASE = 'http://127.0.0.1:8000/api';
+            const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
             const token = localStorage.getItem('access_token') || '';
 
             const res = await fetch(`${API_BASE}/auth/change-password`, {
@@ -89,14 +89,19 @@ export const SettingPage: React.FC<SettingPageProps> = ({ activeUser }) => {
         <div className="space-y-6 max-w-6xl mx-auto">
 
             {/* HEADER SECTION */}
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800 flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                        ⚙️ Pengaturan & Keamanan Akun
-                    </h2>
-                    <p className="text-slate-400 text-sm mt-1">
-                        Kelola profil personal, kredensial login, dan otoritas Master PIN Security Gate.
-                    </p>
+            <div className="bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 flex items-center justify-between shadow-xl">
+                <div className="flex items-center gap-3.5">
+                    <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-2xl">
+                        <Settings className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-white">
+                            Pengaturan & Keamanan Akun
+                        </h2>
+                        <p className="text-slate-400 text-xs mt-0.5">
+                            Kelola profil personal, kredensial login, dan otoritas Master PIN Security Gate.
+                        </p>
+                    </div>
                 </div>
                 {isDev && (
                     <div className="px-3.5 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-mono font-bold flex items-center gap-2">
@@ -111,7 +116,7 @@ export const SettingPage: React.FC<SettingPageProps> = ({ activeUser }) => {
                 <div className="space-y-6">
 
                     {/* USER CARD */}
-                    <div className="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col items-center text-center">
+                    <div className="bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 flex flex-col items-center text-center shadow-xl">
                         <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 p-0.5 shadow-xl shadow-indigo-500/20 mb-4">
                             <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
                                 <User className="w-10 h-10 text-indigo-400" />
@@ -156,7 +161,7 @@ export const SettingPage: React.FC<SettingPageProps> = ({ activeUser }) => {
                     </div>
 
                     {/* MASTER PIN GATE CONTROL CARD (KHUSUS OWNER & DEV) */}
-                    <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <div className="bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
                         <div className="flex items-center gap-2.5">
                             <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
                                 <ShieldCheck className="w-5 h-5" />
@@ -173,8 +178,9 @@ export const SettingPage: React.FC<SettingPageProps> = ({ activeUser }) => {
                                     PIN ini digunakan untuk membuka verifikasi gate pada fitur sensitif seperti reset gaji, sanksi, dan registrasi pengguna baru.
                                 </p>
                                 <button
+                                    type="button"
                                     onClick={() => setIsPinModalOpen(true)}
-                                    className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+                                    className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                                 >
                                     <KeyRound className="w-4 h-4" />
                                     <span>Ubah Master PIN Gate</span>
@@ -193,7 +199,7 @@ export const SettingPage: React.FC<SettingPageProps> = ({ activeUser }) => {
                 {/* RIGHT COLUMN: FORM UBAH PASSWORD ACCOUNT */}
                 <div className="lg:col-span-2 space-y-6">
 
-                    <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-5">
+                    <div className="bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 space-y-5 shadow-xl">
                         <div className="flex items-center gap-2.5 border-b border-slate-800 pb-4">
                             <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                                 <Lock className="w-5 h-5" />
@@ -267,7 +273,7 @@ export const SettingPage: React.FC<SettingPageProps> = ({ activeUser }) => {
                                 <button
                                     type="submit"
                                     disabled={loadingPass}
-                                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all"
+                                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
                                 >
                                     {loadingPass ? 'Menyimpan...' : 'Simpan Password Baru'}
                                 </button>

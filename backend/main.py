@@ -1,14 +1,15 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine, get_db
+from database import engine, SessionLocal
 import models
 
 # 🟢 1. Helper Security dari core
 from core.security import get_password_hash
 
-# 🟢 2. Import Routers secara spesifik
-from routers import auth, karyawan, mesin, inventaris  # 👈 Impor semua router sekaligus
+# 🟢 2. Import Routers (Tambahkan `dashboard` di sini)
+from routers import auth, karyawan, mesin, inventaris, dashboard
+from routers import produksi_master, produksi_output
 from routers.security import router as security_router
 
 # Buat Tabel Database Otomatis jika belum ada
@@ -18,9 +19,9 @@ models.Base.metadata.create_all(bind=engine)
 # --- LIFESPAN SEEDER ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db = next(get_db())
+    db = SessionLocal()
     try:
-        # Seeder Akun Owner Master
+        # 1. Seeder Akun Owner Master
         owner_exist = db.query(models.Karyawan).filter(models.Karyawan.username == "admin.nexora").first()
         if not owner_exist:
             user_master = models.Karyawan(
@@ -49,17 +50,22 @@ async def lifespan(app: FastAPI):
             db.commit()
             print("🟢 Akun Master 'admin.nexora' berhasil dibuat!")
 
-        # Seeder Master PIN Security Gate
+        # 2. Seeder Security PIN Gate
         sec_exist = db.query(models.SystemSecurity).filter(models.SystemSecurity.id == 1).first()
         if not sec_exist:
             master_pin = models.SystemSecurity(
                 id=1,
-                master_pin_hash=get_password_hash("1234"),
+                master_pin_hash=get_password_hash("1234"),    # Master System Gate (Owner/Dev)
+                pin_qc_hash=get_password_hash("123456"),       # Khusus Modul Produksi & QC
                 updated_by="SYSTEM"
             )
             db.add(master_pin)
             db.commit()
-            print("🔒 Master PIN Security Gate '1234' berhasil diinisialisasi!")
+            print("🔒 Master PIN ('1234') & PIN QC Produksi ('123456') berhasil diinisialisasi!")
+        elif not getattr(sec_exist, 'pin_qc_hash', None):
+            sec_exist.pin_qc_hash = get_password_hash("123456")
+            db.commit()
+            print("🔒 PIN QC Produksi default ('123456') berhasil ditambahkan ke database!")
 
     except Exception as e:
         print(f"⚠️ Info Seeder: {e}")
@@ -79,17 +85,14 @@ app = FastAPI(
 )
 
 # --- CORS MIDDLEWARE ---
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:[0-9]+)?",
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -101,8 +104,14 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(security_router)
 app.include_router(karyawan.router)
 app.include_router(mesin.router)
-app.include_router(inventaris.router)  # 👈 DIDAFTARKAN DI SINI!
+app.include_router(inventaris.router)
 
+# 🟢 Router Dashboard (Executive & Role Overview)
+app.include_router(dashboard.router)
+
+# 🟢 Router Produksi (Terpisah: SPK/Master & Output/QC/Payroll)
+app.include_router(produksi_master.router)
+app.include_router(produksi_output.router)
 
 @app.get("/")
 def root_check():

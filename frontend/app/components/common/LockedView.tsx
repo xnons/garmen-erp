@@ -13,7 +13,8 @@ export const LockedView: React.FC<LockedViewProps> = ({
     onOpenPinModal
 }) => {
     return (
-        <main className="flex-1 p-8 bg-slate-900 flex items-center justify-center text-slate-100 relative">
+        /* 🟢 Perbaikan: Ditambahkan w-full, min-h-[calc(100vh-2rem)] (atau min-h-screen) agar mengisi seluruh tinggi layar */
+        <main className="flex-1 w-full min-h-[calc(104vh-2rem)] p-8 bg-slate-900 flex items-center justify-center text-slate-100 relative">
             <div className="text-center max-w-sm p-8 glass-panel rounded-3xl shadow-2xl animate-modal-pop border border-slate-800 relative z-10">
                 <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-lock-pulse">
                     <Lock className="w-8 h-8" />
@@ -26,7 +27,7 @@ export const LockedView: React.FC<LockedViewProps> = ({
 
                 <button
                     onClick={onOpenPinModal}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all duration-200"
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all duration-200 cursor-pointer"
                 >
                     Masukkan PIN Keamanan
                 </button>

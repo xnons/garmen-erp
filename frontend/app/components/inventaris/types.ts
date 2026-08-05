@@ -26,11 +26,13 @@ export interface ItemBahanBaku {
     lokasi_gudang: string;
     supplier_utama?: string;
 
-    // 🚩 Detail Informasi Vendor & Pembelian
+    // 🚩 Detail Informasi Vendor, Brand & Pembelian
     nomor_vendor?: string;        // Kontak / No WA Supplier
     nomor_nota_po?: string;       // No PO / Invoice Pembelian
     tanggal_pembelian?: string;   // Format YYYY-MM-DD
     nomor_lot_batch?: string;     // Identifikasi Lot Warna Dyeing
+    peruntukan_brand?: string;    // 🟢 Target Brand / PO Customer (misal: Erigo, Roughneck)
+    catatan?: string;             // Catatan Tambahan Spesifikasi
 
     // 🚩 Control & Status Flags
     status_stok: StatusStok;
@@ -47,5 +49,4 @@ export interface FilterInventaris {
     tanggalMulai?: string;
     tanggalSelesai?: string;
     showArchived: boolean;
-
 }

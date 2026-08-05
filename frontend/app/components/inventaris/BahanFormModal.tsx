@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { ItemBahanBaku, KategoriBahan, SatuanBahan } from './types';
 import {
     X, Package, Tag, Layers, MapPin, DollarSign,
-    Truck, Hash, CheckCircle2, AlertTriangle, Palette
+    Truck, Hash, CheckCircle2, AlertTriangle, Palette,
+    Calendar, FileText, Calculator, Shirt
 } from 'lucide-react';
 
 interface BahanFormModalProps {
@@ -32,6 +33,9 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
     const [lokasiGudang, setLokasiGudang] = useState('');
     const [supplierUtama, setSupplierUtama] = useState('');
     const [warnaKode, setWarnaKode] = useState('#3b82f6');
+    const [tanggalPembelian, setTanggalPembelian] = useState('');
+    const [nomorNotaPo, setNomorNotaPo] = useState('');
+    const [peruntukanBrand, setPeruntukanBrand] = useState(''); // 👈 State Baru untuk Brand / PO Customer
     const [errorMsg, setErrorMsg] = useState('');
 
     // Generate SKU Otomatis berdasarkan Kategori jika Tambah Baru
@@ -41,7 +45,7 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
             AKSESORIS: 'MAT-ACC',
             BENANG: 'MAT-THR',
             PACKAGING: 'MAT-PKG',
-            LAINNYA: 'MAT-OTH' // 👈 Tambahkan baris ini
+            LAINNYA: 'MAT-OTH'
         };
         const randomNum = Math.floor(100 + Math.random() * 900);
         return `${prefixMap[cat] || 'MAT'}-${randomNum}`;
@@ -49,16 +53,19 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
 
     useEffect(() => {
         if (initialData) {
-            setNamaItem(initialData.nama_item);
-            setKodeSku(initialData.kode_sku);
-            setKategori(initialData.kategori);
-            setSatuan(initialData.satuan);
-            setStokAwal(initialData.stok_saat_ini);
-            setStokMinimum(initialData.stok_minimum);
-            setHargaPerSatuan(initialData.harga_per_satuan);
-            setLokasiGudang(initialData.lokasi_gudang);
+            setNamaItem(initialData.nama_item || '');
+            setKodeSku(initialData.kode_sku || '');
+            setKategori(initialData.kategori || 'KAIN');
+            setSatuan(initialData.satuan || 'KG');
+            setStokAwal(initialData.stok_saat_ini ?? 0);
+            setStokMinimum(initialData.stok_minimum ?? 10);
+            setHargaPerSatuan(initialData.harga_per_satuan ?? 0);
+            setLokasiGudang(initialData.lokasi_gudang || '');
             setSupplierUtama(initialData.supplier_utama || '');
             setWarnaKode(initialData.warna_kode || '#3b82f6');
+            setTanggalPembelian(initialData.tanggal_pembelian || new Date().toISOString().split('T')[0]);
+            setNomorNotaPo(initialData.nomor_nota_po || '');
+            setPeruntukanBrand(initialData.peruntukan_brand || initialData.catatan || '');
         } else {
             setNamaItem('');
             setKategori('KAIN');
@@ -70,6 +77,9 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
             setLokasiGudang('Gudang Utama');
             setSupplierUtama('');
             setWarnaKode('#3b82f6');
+            setTanggalPembelian(new Date().toISOString().split('T')[0]);
+            setNomorNotaPo('');
+            setPeruntukanBrand('');
         }
         setErrorMsg('');
     }, [initialData, isOpen]);
@@ -82,6 +92,20 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
     };
 
     if (!isOpen) return null;
+
+    // Calculation & Safe Formatting
+    const currentStok = isEditMode ? (initialData?.stok_saat_ini ?? 0) : Number(stokAwal);
+    const totalEstimasiNilai = currentStok * Number(hargaPerSatuan);
+
+    const formatIDR = (val: number) => {
+        const num = Number(val);
+        if (isNaN(num) || num === null || num === undefined) return 'Rp 0';
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            maximumFractionDigits: 0
+        }).format(num);
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -108,15 +132,19 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
             kode_sku: kodeSku,
             kategori,
             satuan,
-            stok_saat_ini: isEditMode ? initialData!.stok_saat_ini : Number(stokAwal),
+            stok_saat_ini: currentStok,
             stok_minimum: Number(stokMinimum),
             harga_per_satuan: Number(hargaPerSatuan),
             lokasi_gudang: lokasiGudang || 'Gudang Utama',
             supplier_utama: supplierUtama || '-',
             warna_kode: warnaKode,
-            status_stok: (isEditMode ? initialData!.stok_saat_ini : Number(stokAwal)) === 0
+            tanggal_pembelian: tanggalPembelian,
+            nomor_nota_po: nomorNotaPo,
+            peruntukan_brand: peruntukanBrand || 'Stok Umum (General)', // 👈 Dikirim ke Backend/Parent
+            catatan: peruntukanBrand,
+            status_stok: currentStok === 0
                 ? 'HABIS'
-                : (isEditMode ? initialData!.stok_saat_ini : Number(stokAwal)) <= Number(stokMinimum)
+                : currentStok <= Number(stokMinimum)
                     ? 'MENIPIS'
                     : 'AMAN',
             terakhir_diperbarui: new Date().toISOString().split('T')[0],
@@ -129,7 +157,7 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 transition-all">
-            <div className="w-full max-w-2xl bg-slate-900/90 border border-indigo-500/30 rounded-3xl p-6 shadow-2xl relative animate-modal-pop backdrop-blur-xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="w-full max-w-3xl bg-slate-900/90 border border-indigo-500/30 rounded-3xl p-6 shadow-2xl relative animate-modal-pop backdrop-blur-xl space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
 
                 {/* Header Modal */}
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -148,7 +176,7 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-all"
+                        className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-all cursor-pointer"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -175,12 +203,13 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
                             <select
                                 value={kategori}
                                 onChange={(e) => handleKategoriChange(e.target.value as KategoriBahan)}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-all"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-all cursor-pointer"
                             >
                                 <option value="KAIN">Kain (Fabric)</option>
                                 <option value="AKSESORIS">Aksesoris (Zipper, Kancing, Label)</option>
                                 <option value="BENANG">Benang Jahit</option>
                                 <option value="PACKAGING">Packaging & Plastik</option>
+                                <option value="LAINNYA">Lain-lain</option>
                             </select>
                         </div>
 
@@ -200,7 +229,7 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Nama Item & Identifikasi Warna */}
+                    {/* Nama Item, Warna, & Peruntukan Brand */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="md:col-span-2">
                             <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
@@ -220,7 +249,7 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
                         <div>
                             <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
                                 <Palette className="w-3.5 h-3.5 text-indigo-400" />
-                                Kode Warna Visil
+                                Kode Warna Visual
                             </label>
                             <div className="flex items-center gap-2">
                                 <input
@@ -233,9 +262,55 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
                                     type="text"
                                     value={warnaKode}
                                     onChange={(e) => setWarnaKode(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-indigo-500 transition-all"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-indigo-500 transition-all uppercase"
                                 />
                             </div>
+                        </div>
+                    </div>
+
+                    {/* 🟢 BARU: Peruntukan Brand / Customer / PO Project */}
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                            <Shirt className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>Peruntukan Brand / PO Customer (Catatan Brand)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={peruntukanBrand}
+                            onChange={(e) => setPeruntukanBrand(e.target.value)}
+                            placeholder="Contoh: Erigo, Roughneck, Executive, atau Stok Umum (General)"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-all"
+                        />
+                    </div>
+
+                    {/* Informasi Tanggal Masuk & Nomor Nota/PO */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                                Tanggal Masuk / Pembelian
+                            </label>
+                            <input
+                                type="date"
+                                value={tanggalPembelian}
+                                onChange={(e) => setTanggalPembelian(e.target.value)}
+                                required
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 transition-all"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                                No. Nota / PO / Faktur Vendor
+                            </label>
+                            <input
+                                type="text"
+                                value={nomorNotaPo}
+                                onChange={(e) => setNomorNotaPo(e.target.value)}
+                                placeholder="Contoh: PO-2026/08/001"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-indigo-500 transition-all"
+                            />
                         </div>
                     </div>
 
@@ -248,7 +323,7 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
                             <select
                                 value={satuan}
                                 onChange={(e) => setSatuan(e.target.value as SatuanBahan)}
-                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 transition-all"
+                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 transition-all cursor-pointer"
                             >
                                 <option value="KG">KG (Kilogram)</option>
                                 <option value="YARD">YARD</option>
@@ -329,20 +404,35 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Lokasi Rak Gudang */}
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-indigo-400" />
-                            Lokasi Rak / Penyimpanan Gudang
-                        </label>
-                        <input
-                            type="text"
-                            value={lokasiGudang}
-                            onChange={(e) => setLokasiGudang(e.target.value)}
-                            placeholder="Contoh: Gudang Utama - Rak A1"
-                            required
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-all"
-                        />
+                    {/* Lokasi Rak Gudang & Estimasi Nilai Aset */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                                Lokasi Rak / Penyimpanan Gudang
+                            </label>
+                            <input
+                                type="text"
+                                value={lokasiGudang}
+                                onChange={(e) => setLokasiGudang(e.target.value)}
+                                placeholder="Contoh: Gudang Utama - Rak A1"
+                                required
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition-all"
+                            />
+                        </div>
+
+                        {/* Live Valuation Card */}
+                        <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <Calculator className="w-4 h-4 text-emerald-400 shrink-0" />
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-semibold">Estimasi Total Aset</p>
+                                    <p className="text-sm font-bold text-emerald-400 font-mono">
+                                        {formatIDR(totalEstimasiNilai)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Action Buttons */}
@@ -350,13 +440,13 @@ export const BahanFormModal: React.FC<BahanFormModalProps> = ({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="w-1/2 py-3 bg-slate-800 hover:bg-slate-700/80 active:scale-95 text-slate-300 font-semibold text-xs rounded-xl transition-all"
+                            className="w-1/2 py-3 bg-slate-800 hover:bg-slate-700/80 active:scale-95 text-slate-300 font-semibold text-xs rounded-xl transition-all cursor-pointer"
                         >
                             Batal
                         </button>
                         <button
                             type="submit"
-                            className="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
+                            className="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
                         >
                             <CheckCircle2 className="w-4 h-4" />
                             <span>{isEditMode ? 'Simpan Perubahan' : 'Tambah Bahan Baku'}</span>
