@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Karyawan, LogPelanggaran, ArsipKaryawanInfo } from './types';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000') + '/api';
 const getAuthHeader = () => ({
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`
@@ -128,7 +128,7 @@ export function useKaryawan() {
                 throw new Error(detailMsg || 'Gagal mendaftarkan karyawan');
             }
 
-            showToast(`🟢 ${data.message || 'Karyawan berhasil ditambahkan!'}`);
+            showToast(data.message || 'Karyawan berhasil ditambahkan!');
             setShowAddModal(false);
             setFormData({
                 id_karyawan: generateIdKaryawan(),
@@ -168,7 +168,7 @@ export function useKaryawan() {
                 throw new Error(detailMsg || 'Gagal memperbarui data karyawan');
             }
 
-            showToast(`✏️ Data karyawan ${editFormData.nama} berhasil diperbarui`);
+            showToast(`Data karyawan ${editFormData.nama} berhasil diperbarui`);
             setShowEditModal(false);
             fetchKaryawan();
         } catch (err: any) {
@@ -186,7 +186,7 @@ export function useKaryawan() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Gagal mengarsipkan karyawan');
 
-            showToast(`📦 Karyawan berhasil diarsipkan (${archiveData.alasan_keluar})`);
+            showToast(`Karyawan berhasil diarsipkan (${archiveData.alasan_keluar})`);
             setShowArchiveModal(false);
             setSelectedArchiveKaryawan(null);
             fetchKaryawan();
@@ -207,7 +207,7 @@ export function useKaryawan() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Gagal mencatat sanksi');
 
-            showToast(`⚠️ ${data.message}`);
+            showToast(data.message || 'Sanksi berhasil dicatat');
             fetchSanksiLogs(selectedKaryawan.id_karyawan);
             fetchKaryawan();
             setActiveSanksiTab('list');
@@ -226,7 +226,7 @@ export function useKaryawan() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Gagal mencabut sanksi');
 
-            showToast(`🧹 Sanksi berhasil dicabut!`);
+            showToast('Sanksi berhasil dicabut!');
             if (selectedKaryawan) fetchSanksiLogs(selectedKaryawan.id_karyawan);
             fetchKaryawan();
         } catch (err: any) {
@@ -245,7 +245,7 @@ export function useKaryawan() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Gagal mereset sanksi');
 
-            showToast(`🧹 Poin sanksi ${selectedKaryawan.nama} berhasil dibersihkan!`);
+            showToast(`Poin sanksi ${selectedKaryawan.nama} berhasil dibersihkan!`);
             fetchSanksiLogs(selectedKaryawan.id_karyawan);
             fetchKaryawan();
         } catch (err: any) {
@@ -263,7 +263,7 @@ export function useKaryawan() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Gagal menghapus data');
 
-            showToast(`🗑️ ${data.message}`);
+            showToast(data.message || 'Data karyawan berhasil dihapus');
             fetchKaryawan();
         } catch (err: any) {
             showToast(err.message, true);

@@ -13,8 +13,6 @@ from schemas.produksi import (
     SPKDetailResponse,
     MasterTarifCreate,
     MasterTarifResponse,
-    PINVerifyRequest,
-    DeleteWithPINRequest,
     ProductionAnalyticsDashboard,
     DailyTrendPoint,
     SPKProgressItem,
@@ -23,78 +21,17 @@ from schemas.produksi import (
     StatusSPK,
     StatusVerifikasiOutput
 )
-from schemas.security import PinUpdateSchema
-from core.security import get_current_user, verify_password, get_password_hash
+from core.security import get_current_user
 
-
-# ===========================================================================
-# HELPER & UTILITIES
-# ===========================================================================
-def get_enum_val(obj):
-    """Mendapatkan nilai string dari Enum atau String secara aman."""
-    if obj is None:
-        return None
-    return obj.value if hasattr(obj, 'value') else str(obj)
-
-
-def require_roles(allowed_roles: List[str]):
-    """Dependency RBAC untuk membatasi endpoint berdasarkan role user."""
-    def role_checker(current_user: models.Karyawan = Depends(get_current_user)):
-        user_role = getattr(current_user, "role", "").upper()
-        allowed_uppercase = [r.upper() for r in allowed_roles]
-        
-        if user_role not in allowed_uppercase:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Akses ditolak! Fitur ini membutuhkan role: {', '.join(allowed_uppercase)}"
-            )
-        return current_user
-    return role_checker
-
-
-def verify_pin_qc(current_user: models.Karyawan, input_pin: str, db: Session):
-    """Validasi PIN Security Khusus Modul Produksi & QC."""
-    if not input_pin or len(input_pin) < 4:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="PIN Otorisasi QC/Produksi wajib diisi (Min. 4 Digit)!"
-        )
-
-    user_role = getattr(current_user, "role", "").upper()
-
-    # 1. Dev Bypass
-    if input_pin == "6767" and user_role == "DEVELOPER":
-        return True
-
-    # 2. Testing Bypass
-    if input_pin == "123456":
-        return True
-
-    # 3. Cek pin_qc_hash di SystemSecurity
-    sys_sec = db.query(models.SystemSecurity).filter(models.SystemSecurity.id == 1).first()
-    current_qc_hash = getattr(sys_sec, 'pin_qc_hash', None) if sys_sec else None
-
-    if current_qc_hash and verify_password(input_pin, current_qc_hash):
-        return True
-    elif not current_qc_hash and input_pin in ["123456", "1234"]:
-        return True
-
-    # 4. Fallback PIN Pribadi Karyawan
-    if getattr(current_user, "pin", None) and current_user.pin == input_pin:
-        return True
-
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="PIN Otorisasi QC / Produksi Salah! Akses ditolak."
-    )
-
+# 🟢 Import Helper dari deps.py (Solusi Circular Import & RBAC Guard)
+from core.deps import require_roles, get_enum_val
 
 # Router Master Produksi
 router = APIRouter(prefix="/api/produksi", tags=["Produksi - Master & SPK"])
 
 
 # ===========================================================================
-# 0️⃣ PEKERJA & CONFIG PIN QC
+# 0️⃣ PEKERJA PRODUKSI
 # ===========================================================================
 
 @router.get("/karyawan-produksi", response_model=List[dict])
@@ -119,52 +56,8 @@ def get_karyawan_produksi(
     ]
 
 
-@router.put("/pin-qc/update")
-def update_pin_qc(
-    payload: PinUpdateSchema,
-    db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER", "ADMIN", "PRODUKSI"]))
-):
-    """Endpoint memperbarui PIN Otorisasi Modul Produksi & QC."""
-    sec_record = db.query(models.SystemSecurity).filter(models.SystemSecurity.id == 1).first()
-    user_role = getattr(current_user, "role", "").upper()
-
-    current_hash = getattr(sec_record, "pin_qc_hash", None) if sec_record else None
-    if not current_hash:
-        current_hash = get_password_hash("123456")
-
-    is_dev_bypass = (user_role == "DEVELOPER" and payload.old_pin == "6767")
-
-    if not is_dev_bypass and not verify_password(payload.old_pin, current_hash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="PIN QC Lama yang Anda masukkan salah!"
-        )
-
-    new_qc_hash = get_password_hash(payload.new_pin)
-
-    if not sec_record:
-        sec_record = models.SystemSecurity(
-            id=1,
-            master_pin_hash=get_password_hash("1234"),
-            pin_qc_hash=new_qc_hash,
-            updated_by=getattr(current_user, "username", "SYSTEM")
-        )
-        db.add(sec_record)
-    else:
-        sec_record.pin_qc_hash = new_qc_hash
-        sec_record.updated_by = getattr(current_user, "username", "SYSTEM")
-
-    db.commit()
-
-    return {
-        "status": "success",
-        "message": "PIN Otorisasi Modul Produksi & QC berhasil diperbarui!"
-    }
-
-
 # ===========================================================================
-# 1️⃣ MANAJEMEN SPK
+# 1️⃣ MANAJEMEN SPK (Dengan Auto-Generate Kode SPK Kombinasi Brand & Artikel)
 # ===========================================================================
 
 @router.post("/spk", response_model=SPKDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -174,16 +67,19 @@ def create_spk(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER", "ADMIN"]))
 ):
-    existing = db.query(models.SPKProduksi).filter(models.SPKProduksi.id == payload.id).first()
+    # 🟢 Auto-Generate ID SPK Kombinasi: [NoUrut]-[CLIENT]-[ARTIKEL]-[TAHUN] jika belum diatur unik
+    spk_id = payload.id
+    if not spk_id or spk_id.startswith("383-") or "ARTIKEL" in spk_id.upper():
+        clean_client = "".join(c for c in (payload.nama_pemesan or "UMUM") if c.isalnum()).upper()[:6]
+        clean_artikel = "".join(c for c in (payload.nama_artikel or "PROD") if c.isalnum()).upper()[:8]
+        random_code = int(datetime.utcnow().timestamp()) % 9000 + 1000
+        spk_id = f"{random_code}-{clean_client}-{clean_artikel}-{datetime.utcnow().strftime('%Y')}"
+
+    existing = db.query(models.SPKProduksi).filter(models.SPKProduksi.id == spk_id).first()
     if existing:
-        if existing.is_deleted:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Kode SPK '{payload.id}' pernah terdaftar dan berstatus terhapus. Gunakan kode baru."
-            )
         raise HTTPException(
             status_code=400,
-            detail=f"SPK dengan Kode '{payload.id}' sudah terdaftar di sistem!"
+            detail=f"SPK dengan Kode '{spk_id}' sudah terdaftar di sistem!"
         )
 
     calculated_qty = payload.target_qty
@@ -193,7 +89,7 @@ def create_spk(
             calculated_qty = matrix_sum
 
     new_spk = models.SPKProduksi(
-        id=payload.id,
+        id=spk_id, 
         nama_pemesan=payload.nama_pemesan,
         kontak_pemesan=payload.kontak_pemesan,
         no_po_buyer=payload.no_po_buyer,
@@ -224,7 +120,7 @@ def create_spk(
     if payload.tarif_initial:
         for t in payload.tarif_initial:
             tarif_item = models.MasterTarifBorongan(
-                spk_id=payload.id,
+                spk_id=spk_id,
                 tahapan_proses=get_enum_val(t.tahapan_proses),
                 tarif_per_pcs=t.tarif_per_pcs,
                 keterangan=t.keterangan
@@ -234,6 +130,31 @@ def create_spk(
     db.commit()
     db.refresh(new_spk)
     return new_spk
+
+
+# 🟢 Endpoint Khusus Owner / Developer: Selesai SPK Paksa (Owner Lock)
+@router.post("/spk/{spk_id}/owner-finish", status_code=status.HTTP_200_OK)
+def owner_finish_spk(
+    spk_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER"]))
+):
+    spk = db.query(models.SPKProduksi).filter(
+        models.SPKProduksi.id == spk_id,
+        models.SPKProduksi.is_deleted == False
+    ).first()
+    
+    if not spk:
+        raise HTTPException(status_code=404, detail=f"SPK ID '{spk_id}' tidak ditemukan.")
+
+    spk.status = StatusSPK.FINISHED.value
+    db.commit()
+
+    return {
+        "message": f"SPK '{spk_id}' berhasil diselesaikan secara eksklusif oleh Owner/Developer.",
+        "spk_id": spk_id,
+        "status": StatusSPK.FINISHED.value
+    }
 
 
 @router.get("/spk", response_model=List[SPKResponse])
@@ -273,8 +194,23 @@ def get_spk_detail(
         models.SPKProduksi.id == spk_id,
         models.SPKProduksi.is_deleted == False
     ).first()
+    
     if not spk:
         raise HTTPException(status_code=404, detail=f"SPK ID '{spk_id}' tidak ditemukan.")
+
+    # 🟢 HITUNG OTOMATIS REALISASI POTONG DARI LOG CUTTING YANG APPROVED
+    total_cutting_approved = db.query(func.coalesce(func.sum(models.LogOutputBorongan.qty_pass), 0)).filter(
+        models.LogOutputBorongan.spk_id == spk.id,
+        models.LogOutputBorongan.tahapan_proses == "CUTTING",
+        models.LogOutputBorongan.status_verifikasi == "APPROVED",
+        models.LogOutputBorongan.is_deleted == False
+    ).scalar()
+
+    # Perbarui nilai realisasi potong pada objek SPK
+    spk.realisasi_potong = total_cutting_approved
+    db.commit()
+    db.refresh(spk)
+
     return spk
 
 
@@ -310,12 +246,9 @@ def update_spk(
 @router.post("/spk/{spk_id}/archive")
 def archive_spk(
     spk_id: str,
-    payload: PINVerifyRequest,
     db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER"]))
+    current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER", "ADMIN"]))
 ):
-    verify_pin_qc(current_user, payload.pin, db)
-
     spk = db.query(models.SPKProduksi).filter(
         models.SPKProduksi.id == spk_id,
         models.SPKProduksi.is_deleted == False
@@ -332,12 +265,9 @@ def archive_spk(
 @router.post("/spk/{spk_id}/delete")
 def delete_spk(
     spk_id: str,
-    payload: DeleteWithPINRequest,
     db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER"]))
+    current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER", "ADMIN"]))
 ):
-    verify_pin_qc(current_user, payload.pin, db)
-
     spk = db.query(models.SPKProduksi).filter(
         models.SPKProduksi.id == spk_id,
         models.SPKProduksi.is_deleted == False
@@ -347,7 +277,7 @@ def delete_spk(
 
     spk.is_deleted = True
     spk.deleted_at = datetime.utcnow()
-    spk.deleted_by = current_user.nama or current_user.id_karyawan
+    spk.deleted_by = getattr(current_user, "nama", None) or current_user.id_karyawan
     db.commit()
 
     return {"message": f"SPK '{spk_id}' berhasil dihapus dari sistem.", "spk_id": spk_id}

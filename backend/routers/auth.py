@@ -1,10 +1,10 @@
 import os
 import random
 import string
-from datetime import timedelta
+from datetime import timedelta, datetime, time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -50,6 +50,33 @@ ALLOWED_TARGET_ROLES = {
     "OWNER": ["ADMIN", "FINANCE", "GUDANG", "PRODUKSI", "KARYAWAN"],
     "ADMIN": ["FINANCE", "GUDANG", "PRODUKSI", "KARYAWAN"]
 }
+
+
+# ⏰ Helper Cek Jam Kerja WIB (07:00 - 20:00 WIB)
+def is_working_hours() -> bool:
+    # Menggunakan timezone WIB (UTC+7) agar konsisten meskipun server cloud berjalan di UTC
+    wib_tz = timezone(timedelta(hours=7))
+    now_wib_time = datetime.now(wib_tz).time()
+    start_work = time(7, 0)
+    end_work = time(20, 0)
+    return start_work <= now_wib_time <= end_work
+
+
+# 📝 Helper Rekam Log Login & Security Attempt
+def record_login_log(db: Session, karyawan_id: Optional[str], username: str, status_login: str, ip_address: Optional[str], ket: Optional[str] = None):
+    try:
+        log_entry = models.LogLogin(
+            karyawan_id=karyawan_id,
+            username=username,
+            status=status_login,
+            ip_address=ip_address,
+            keterangan=ket
+        )
+        db.add(log_entry)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Gagal mencatat log login: {e}")
 
 
 # 🟢 1. Registrasi Karyawan Baru (RBAC Hardened)
@@ -105,7 +132,7 @@ async def register_karyawan(
         is_active=True,
         
         jabatan=user_data.jabatan,
-        umur=getattr(user_data, 'umur', None),
+        tanggal_lahir=user_data.tanggal_lahir,
         no_hp=user_data.no_hp,
         alamat=user_data.alamat,
         status_karyawan=(user_data.status_karyawan or "KONTRAK").upper(),
@@ -124,21 +151,40 @@ async def register_karyawan(
     return {"message": f"Karyawan {user_data.nama} ({final_id}) sukses didaftarkan!"}
 
 
-# 🟢 2. Login Utama
+# 🟢 2. Login Utama (Dilengkapi Login Time Guard & Audit Log)
 @router.post("/login")
-async def login(credentials: LoginInput, db: Session = Depends(get_db)):
+async def login(credentials: LoginInput, request: Request, db: Session = Depends(get_db)):
+    client_ip = request.client.host if request.client else "Unknown"
     user = db.query(models.Karyawan).filter(models.Karyawan.username == credentials.username).first()
+    
+    # 1️⃣ Validasi Kredensial Password
     if not user or not verify_password(credentials.password, user.hashed_password):
+        record_login_log(db, user.id_karyawan if user else None, credentials.username, "FAILED_PASSWORD", client_ip, "Kombinasi Username atau Password salah")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kombinasi Username atau Password salah!")
     
+    # 2️⃣ Validasi Status Aktif Akun
     if not user.is_active:
+        record_login_log(db, user.id_karyawan, credentials.username, "BLOCKED_INACTIVE", client_ip, "Akun nonaktif/diarsipkan")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Akun Anda dalam status nonaktif/diarsipkan.")
 
+    # 3️⃣ 🛡️ Login Time Guard (Blokir Akses di Luar Jam Kerja, Kecuali Owner/Developer)
+    user_role_upper = str(user.role or "").upper()
+    if user_role_upper not in ["OWNER", "DEVELOPER"]:
+        if not is_working_hours():
+            record_login_log(db, user.id_karyawan, credentials.username, "BLOCKED_OFF_HOURS", client_ip, "Upaya login di luar jam operasional (07:00 - 20:00)")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Akses Ditolak: Sistem dibatasi di luar jam operasional (07:00 - 20:00). Hubungi Owner untuk pengecualian."
+            )
+
+    # 4️⃣ Sukses: Terbitkan Token JWT & Rekam Log Sukses
     token = create_access_token(
         data={"sub": user.username, "role": user.role},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     
+    record_login_log(db, user.id_karyawan, credentials.username, "SUCCESS", client_ip, "Login berhasil")
+
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -170,36 +216,33 @@ async def get_current_user_profile(
     }
 
 
-# 🔏 4. Verifikasi PIN Gate (Mendukung Hashing & Dev Mode Bypass)
+# 🔏 4. Verifikasi PIN Gate (Mendukung Bcrypt Hash & System Security PIN)
 @router.post("/verify-pin")
 async def verify_security_pin(
     payload: PinVerifyInput,
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    """Memverifikasi PIN Personal atau Universal PIN Developer."""
+    """Memverifikasi PIN Personal Karyawan atau Master PIN Sistem."""
     user_role = getattr(current_user, "role", "").upper()
-    dev_mode = os.getenv("DEV_MODE", "true").lower() == "true"
-    
-    # ⚡ 1. Universal PIN '6767' Khusus DEVELOPER dalam Dev Mode
-    if payload.pin == "6767" and user_role == "DEVELOPER" and dev_mode:
-        return {"success": True, "message": "Otorisasi Universal PIN Developer berhasil!"}
-
-    # 🔒 2. Backup PIN Master '9999' / Validasi PIN User (Bcrypt atau Plaintext Fallback)
-    PIN_MASTER = "9999"
     db_pin = getattr(current_user, "pin", None)
-
     is_pin_valid = False
 
-    # Cek jika input sama dengan Master PIN '9999'
-    if payload.pin == PIN_MASTER:
-        is_pin_valid = True
-    elif db_pin:
-        # Cek apakah PIN di DB ter-hash atau masih plaintext (karena migrasi)
+    # 1. Validasi PIN Personal User
+    if db_pin:
         if db_pin.startswith("$2b$") or db_pin.startswith("$2a$"):
             is_pin_valid = verify_password(payload.pin, db_pin)
         else:
             is_pin_valid = (payload.pin == db_pin)
+
+    # 2. Jika user adalah OWNER/DEVELOPER, izinkan juga jika cocok dengan Master PIN Sistem ter-hash di DB
+    if not is_pin_valid and user_role in ["OWNER", "DEVELOPER"]:
+        sec = db.query(models.SystemSecurity).filter(models.SystemSecurity.id == 1).first()
+        if sec and sec.master_pin_hash:
+            if sec.master_pin_hash.startswith("$2b$") or sec.master_pin_hash.startswith("$2a$"):
+                is_pin_valid = verify_password(payload.pin, sec.master_pin_hash)
+            else:
+                is_pin_valid = (payload.pin == sec.master_pin_hash)
 
     if not is_pin_valid:
         raise HTTPException(

@@ -10,14 +10,14 @@ import {
   Cpu,
   Scissors,
   User,
-  KeyRound
+  ShieldAlert,
+  Wallet // 🟢 Ditambahkan untuk ikon Payroll & Penggajian
 } from 'lucide-react';
 
 interface SidebarProps {
   activeMenu: string;
   setActiveMenu: (menu: string) => void;
   activeUser: any;
-  onOpenPinModal?: () => void;
   isCollapsed?: boolean;
   setIsCollapsed?: (collapsed: boolean) => void;
 }
@@ -26,7 +26,6 @@ export default function Sidebar({
   activeMenu,
   setActiveMenu,
   activeUser,
-  onOpenPinModal,
   isCollapsed: externalCollapsed,
   setIsCollapsed: externalSetIsCollapsed
 }: SidebarProps) {
@@ -42,19 +41,20 @@ export default function Sidebar({
     }
   };
 
-  // 🛡️ RBAC & Lucide Icons Navigation
+  // 🛡️ RBAC & Lucide Icons Navigation (Menu Payroll & Log Keamanan diatur hak aksesnya)
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI'] },
     { id: 'karyawan', label: 'Kelola Karyawan', icon: Users, roles: ['OWNER', 'ADMIN'] },
     { id: 'inventaris', label: 'Inventaris & Stok', icon: Package, roles: ['OWNER', 'ADMIN'] },
     { id: 'mesin', label: 'Inventaris Mesin', icon: Cpu, roles: ['OWNER', 'ADMIN', 'PRODUKSI'] },
     { id: 'produksi', label: 'Produksi Borongan', icon: Scissors, roles: ['OWNER', 'ADMIN', 'PRODUKSI'] },
+    { id: 'payroll', label: 'Payroll & Penggajian', icon: Wallet, roles: ['OWNER', 'FINANCE'] }, // 👈 Menu baru khusus Owner & Finance
+    { id: 'audit-log', label: 'Log Keamanan', icon: ShieldAlert, roles: ['OWNER'] },
     { id: 'setting', label: 'Akun Saya', icon: User, roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI'] },
   ];
 
   // Normalisasi string role ke UPPERCASE
   const userRole = activeUser?.role?.toUpperCase() || 'GUEST';
-  const isOwnerOrDev = ['OWNER', 'DEVELOPER'].includes(userRole);
 
   return (
     <aside
@@ -111,7 +111,7 @@ export default function Sidebar({
           {/* LIST NAVIGASI RBAC */}
           <nav className="p-3 space-y-1.5">
             {menuItems.map((item) => {
-              // Bypass akses DEVELOPER
+              // Bypass akses DEVELOPER atau cek role di dalam array roles
               const hasAccess = userRole === 'DEVELOPER' || item.roles.includes(userRole);
               if (!hasAccess) return null;
 
@@ -153,35 +153,8 @@ export default function Sidebar({
           </nav>
         </div>
 
-        {/* USER PROFILE INFO & MASTER PIN GATE ACCESS */}
+        {/* USER PROFILE INFO */}
         <div className="p-3 border-t border-slate-800/80 bg-slate-900/40 text-xs space-y-2.5">
-
-          {/* QUICK ACTION MASTER PIN GATE */}
-          {isOwnerOrDev && (
-            <button
-              onClick={() => {
-                if (onOpenPinModal) {
-                  onOpenPinModal();
-                } else {
-                  setActiveMenu('setting');
-                }
-              }}
-              title={isCollapsed ? "Master PIN Gate" : undefined}
-              className={`w-full p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 font-bold text-[11px] transition-all flex items-center justify-between group cursor-pointer shadow-sm active:scale-95 ${isCollapsed ? 'justify-center' : ''
-                }`}
-            >
-              <span className="flex items-center gap-2">
-                <KeyRound className="w-4 h-4 shrink-0 text-amber-400 group-hover:rotate-12 transition-transform duration-300" />
-                {!isCollapsed && <span>Master PIN Gate</span>}
-              </span>
-              {!isCollapsed && userRole === 'DEVELOPER' && (
-                <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded font-mono font-bold">
-                  DEV
-                </span>
-              )}
-            </button>
-          )}
-
           {/* KARTU PROFIL USER (WITH ONLINE STATUS DOT) */}
           <div
             title={isCollapsed ? `${activeUser?.nama || "User"} (${userRole})` : undefined}

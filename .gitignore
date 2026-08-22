@@ -16,4 +16,11 @@ backend/env/
 *.db-journal
 *.sqlite3
 .env
+*.env
+backend/.env
+frontend/.env
 .DS_Store
+
+# Output bundle & tooling logs
+repomix-output.xml
+*.log

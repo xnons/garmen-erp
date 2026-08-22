@@ -11,7 +11,6 @@ from schemas.produksi import (
     LogOutputVerifikasi,
     LogOutputResponse,
     BulkVerifyRequest,
-    DeleteWithPINRequest,
     MarkPayrollPaidRequest,
     RekapGajiPekerjaResponse,
     PayrollLogItem,
@@ -19,10 +18,7 @@ from schemas.produksi import (
     StatusVerifikasiOutput
 )
 from core.security import get_current_user
-
-# 🟢 Import Helper dari produksi_master agar konsisten
-from routers.produksi_master import require_roles, verify_pin_qc, get_enum_val
-
+from core.deps import require_roles, get_enum_val
 
 # Router Output & QC Produksi
 router = APIRouter(prefix="/api/produksi", tags=["Produksi - Output, QC & Payroll"])
@@ -41,11 +37,19 @@ def record_worker_output(
 ):
     tahapan_str = get_enum_val(payload.tahapan_proses)
 
-    # 1. Validasi Matematika Setoran
-    if (payload.qty_pass + payload.qty_reject) != payload.qty_disetor:
+    # 1. Validasi Matematika Setoran (Pass + Rework + Scrap == Disetor)
+    rework_val = getattr(payload, 'qty_rework', 0) or 0
+    scrap_val = getattr(payload, 'qty_scrap', 0) or 0
+    legacy_reject = getattr(payload, 'qty_reject', 0) or 0
+    
+    total_defect = (rework_val + scrap_val) if (rework_val > 0 or scrap_val > 0) else legacy_reject
+    if rework_val == 0 and scrap_val == 0 and legacy_reject > 0:
+        rework_val = legacy_reject
+
+    if (payload.qty_pass + total_defect) != payload.qty_disetor:
         raise HTTPException(
             status_code=400,
-            detail="Validasi Gagal: Jumlah QTY Pass + QTY Reject harus persis sama dengan QTY Disetor!"
+            detail="Validasi Gagal: Jumlah QTY Pass + Rework + Scrap harus persis sama dengan Total Disetor!"
         )
 
     # 2. Validasi Role Produksi
@@ -128,14 +132,17 @@ def record_worker_output(
         karyawan_id=payload.karyawan_id,
         spk_id=payload.spk_id,
         tahapan_proses=tahapan_str,
+        nomor_tiket=getattr(payload, 'nomor_tiket', None),
         qty_disetor=payload.qty_disetor,
         qty_pass=payload.qty_pass,
-        qty_reject=payload.qty_reject,
+        qty_rework=rework_val,
+        qty_scrap=scrap_val,
+        qty_reject=total_defect,
         tarif_per_pcs=tarif_snapshot,
         subtotal_rp=subtotal,
         status_verifikasi=StatusVerifikasiOutput.PENDING.value,
         catatan=payload.catatan,
-        petugas_input=current_user.nama or current_user.id_karyawan,
+        petugas_input=getattr(current_user, "nama", None) or current_user.id_karyawan,
         foto_bukti_setoran=payload.foto_bukti_setoran,
         verifier_id=None,
         is_paid=False,
@@ -158,6 +165,8 @@ def record_worker_output(
 @router.get("/output/", response_model=List[LogOutputResponse])
 def get_output_logs(
     tanggal: Optional[date] = Query(None, description="Filter tanggal spesifik"),
+    start_date: Optional[date] = Query(None, description="Filter rentang tanggal awal"),
+    end_date: Optional[date] = Query(None, description="Filter rentang tanggal akhir"),
     karyawan_id: Optional[str] = Query(None, description="Filter per karyawan"),
     spk_id: Optional[str] = Query(None, description="Filter per SPK"),
     status_verifikasi: Optional[StatusVerifikasiOutput] = Query(None, description="Filter status QC"),
@@ -166,8 +175,16 @@ def get_output_logs(
 ):
     query = db.query(models.LogOutputBorongan).filter(models.LogOutputBorongan.is_deleted == False)
 
-    if tanggal:
+    # 🟢 Filter Rentang Tanggal (Start & End Date) atau Tanggal Tunggal
+    if start_date and end_date:
+        query = query.filter(models.LogOutputBorongan.tanggal >= start_date, models.LogOutputBorongan.tanggal <= end_date)
+    elif start_date:
+        query = query.filter(models.LogOutputBorongan.tanggal >= start_date)
+    elif end_date:
+        query = query.filter(models.LogOutputBorongan.tanggal <= end_date)
+    elif tanggal:
         query = query.filter(models.LogOutputBorongan.tanggal == tanggal)
+
     if karyawan_id:
         query = query.filter(models.LogOutputBorongan.karyawan_id == karyawan_id)
     if spk_id:
@@ -175,7 +192,8 @@ def get_output_logs(
     if status_verifikasi:
         query = query.filter(models.LogOutputBorongan.status_verifikasi == get_enum_val(status_verifikasi))
 
-    logs = query.order_by(models.LogOutputBorongan.created_at.desc()).all()
+    # 🟢 Urutkan dari yang terbaru (tanggal terbaru & waktu dibuat terbaru)
+    logs = query.order_by(models.LogOutputBorongan.tanggal.desc(), models.LogOutputBorongan.created_at.desc()).all()
 
     for log in logs:
         log.nama_karyawan = log.karyawan.nama if log.karyawan else log.karyawan_id
@@ -187,12 +205,10 @@ def get_output_logs(
 @router.post("/output/{log_id}/delete")
 def delete_output_log(
     log_id: int,
-    payload: DeleteWithPINRequest,
+    alasan_hapus: Optional[str] = Query("Kesalahan Input Data", description="Alasan pembatalan/penghapusan"),
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER", "ADMIN"]))
 ):
-    verify_pin_qc(current_user, payload.pin, db)
-
     log = db.query(models.LogOutputBorongan).filter(
         models.LogOutputBorongan.id == log_id,
         models.LogOutputBorongan.is_deleted == False
@@ -208,8 +224,8 @@ def delete_output_log(
 
     log.is_deleted = True
     log.deleted_at = datetime.utcnow()
-    log.deleted_by = current_user.nama or current_user.id_karyawan
-    log.alasan_hapus = payload.alasan_hapus
+    log.deleted_by = getattr(current_user, "nama", None) or current_user.id_karyawan
+    log.alasan_hapus = alasan_hapus
 
     if log.tahapan_proses == "CUTTING" and log.spk:
         log.spk.realisasi_potong = max(0, log.spk.realisasi_potong - log.qty_pass)
@@ -237,7 +253,6 @@ def verify_output_log(
     if not log:
         raise HTTPException(status_code=404, detail="Log output tidak ditemukan.")
 
-    # 🛑 STRICT 4-EYES PRINCIPLE
     user_role = getattr(current_user, "role", "").upper()
     is_dev_or_owner = user_role in ["DEVELOPER", "OWNER"]
 
@@ -259,19 +274,18 @@ def verify_output_log(
     status_lama = log.status_verifikasi
     status_baru = get_enum_val(payload.status_verifikasi)
 
-    # 📝 CATAT AUDIT LOG JIKA REVISI STATUS
     if status_lama in ["APPROVED", "REJECTED"] and status_baru != status_lama:
         audit_entry = models.LogAuditVerifikasiQC(
             log_output_id=log.id,
             status_lama=status_lama,
             status_baru=status_baru,
             alasan_revisi=payload.catatan or "Revisi status verifikasi QC oleh supervisor",
-            dieksekusi_oleh=current_user.nama or current_user.id_karyawan
+            dieksekusi_oleh=getattr(current_user, "nama", None) or current_user.id_karyawan
         )
         db.add(audit_entry)
 
     log.status_verifikasi = status_baru
-    log.verifier_id = current_user.nama or current_user.id_karyawan
+    log.verifier_id = getattr(current_user, "nama", None) or current_user.id_karyawan
     if payload.catatan:
         log.catatan = f"{log.catatan or ''} | QC: {payload.catatan}"
     if payload.foto_bukti_defect:
@@ -313,7 +327,7 @@ def bulk_verify_output_logs(
             continue
 
         log.status_verifikasi = get_enum_val(payload.status_verifikasi)
-        log.verifier_id = current_user.nama or current_user.id_karyawan
+        log.verifier_id = getattr(current_user, "nama", None) or current_user.id_karyawan
         if payload.catatan:
             log.catatan = f"{log.catatan or ''} | Bulk QC: {payload.catatan}"
 
@@ -382,10 +396,8 @@ def get_rekap_gaji_unpaid(
 def mark_payroll_as_paid(
     payload: MarkPayrollPaidRequest,
     db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER", "FINANCE"]))
+    current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER", "ADMIN", "FINANCE"]))
 ):
-    verify_pin_qc(current_user, payload.pin, db)
-
     logs_to_pay = db.query(models.LogOutputBorongan).filter(
         models.LogOutputBorongan.karyawan_id.in_(payload.karyawan_ids),
         models.LogOutputBorongan.status_verifikasi == StatusVerifikasiOutput.APPROVED.value,
@@ -415,4 +427,4 @@ def mark_payroll_as_paid(
         "payroll_id": payload.payroll_id,
         "total_transaksi_paid": len(logs_to_pay),
         "total_nominal_cair_rp": total_nominal_cair
-    }
+    }   

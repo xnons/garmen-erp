@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Lock, Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { MesinAsset, FilterState, PaymentRecord } from './types';
 import MesinHeader from '../mesin/MesinHeader';
 import MesinTable from '../mesin/MesinTable';
@@ -9,10 +9,10 @@ import MesinFormModal from '../mesin/MesinFormModal';
 import MesinDetailModal from '../mesin/MesinDetailModal';
 import MesinPaymentModal from '../mesin/MesinPaymentModal';
 import MesinArchiveModal from '../mesin/MesinArchiveModal';
-import PinGateModal from '../karyawan/PinGateModal';
 
 // 🟢 KONFIGURASI REST API FASTAPI
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+const rawBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
 
 const getAuthHeader = () => {
     const token = typeof window !== 'undefined'
@@ -34,23 +34,12 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [filter, setFilter] = useState<FilterState>({ search: '', status: 'ALL', kategori: 'ALL', showArchived: false });
 
-    // 🔒 State Security PIN Gate (Minta PIN Kembali Saat Pindah Modul)
-    const [isSessionUnlocked, setIsSessionUnlocked] = useState(false);
-    const [isPinGateOpen, setIsPinGateOpen] = useState(true);
-    const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-
     // Modal States
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedEdit, setSelectedEdit] = useState<MesinAsset | null>(null);
     const [selectedDetail, setSelectedDetail] = useState<MesinAsset | null>(null);
     const [selectedPayment, setSelectedPayment] = useState<MesinAsset | null>(null);
     const [selectedArchive, setSelectedArchive] = useState<MesinAsset | null>(null);
-
-    useEffect(() => {
-        if (!isSessionUnlocked) {
-            setIsPinGateOpen(true);
-        }
-    }, [isSessionUnlocked]);
 
     // 🟢 1. FETCH DATA MESIN DARI FASTAPI BACKEND
     const fetchMachines = async () => {
@@ -75,29 +64,8 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
     };
 
     useEffect(() => {
-        if (isSessionUnlocked) {
-            fetchMachines();
-        }
-    }, [isSessionUnlocked]);
-
-    // 🛡️ Guard Aksi Terproteksi PIN
-    const executeWithPin = (action: () => void) => {
-        if (isSessionUnlocked) {
-            action();
-        } else {
-            setPendingAction(() => action);
-            setIsPinGateOpen(true);
-        }
-    };
-
-    const handlePinSuccess = () => {
-        setIsPinGateOpen(false);
-        setIsSessionUnlocked(true);
-        if (pendingAction) {
-            pendingAction();
-            setPendingAction(null);
-        }
-    };
+        fetchMachines();
+    }, []);
 
     const filteredMachines = machines.filter((m) => {
         if (filter.showArchived) {
@@ -214,40 +182,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
         }
     };
 
-    // 🔴 1. SCREEN TERKUNCI PIN
-    if (!isSessionUnlocked) {
-        return (
-            <main className="flex-1 h-screen overflow-y-auto p-8 bg-slate-900 flex items-center justify-center text-slate-100 relative">
-                <div className="text-center max-w-sm p-8 glass-panel rounded-3xl shadow-2xl animate-modal-pop border border-slate-800 relative z-10">
-                    <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-lock-pulse">
-                        <Lock className="w-8 h-8" />
-                    </div>
-
-                    <h3 className="text-lg font-bold text-white mb-2">Akses Kelola Mesin Terkunci</h3>
-                    <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-                        Akses ke modul sensitif ini membutuhkan verifikasi PIN Security Gate 4-Digit setiap kali dibuka.
-                    </p>
-
-                    <button
-                        onClick={() => setIsPinGateOpen(true)}
-                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all duration-200"
-                    >
-                        Masukkan PIN Keamanan
-                    </button>
-                </div>
-
-                <PinGateModal
-                    isOpen={isPinGateOpen}
-                    onClose={() => setIsPinGateOpen(false)}
-                    onSuccess={handlePinSuccess}
-                    title="Akses Terkunci"
-                    description="Masukkan 4 Digit PIN Security Gate untuk mengakses menu ini."
-                />
-            </main>
-        );
-    }
-
-    // 🟢 2. SCREEN UTAMA DASHBOARD MESIN
+    // 🟢 SCREEN UTAMA DASHBOARD MESIN (Tanpa PIN Gate)
     return (
         <main className="flex-1 h-screen overflow-y-auto p-4 sm:p-8 bg-slate-900 text-slate-100">
             <div className="max-w-7xl mx-auto space-y-6 pb-12">
@@ -258,10 +193,10 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
                             machines={machines}
                             filter={filter}
                             setFilter={setFilter}
-                            onOpenAddModal={() => executeWithPin(() => {
+                            onOpenAddModal={() => {
                                 setSelectedEdit(null);
                                 setIsFormOpen(true);
-                            })}
+                            }}
                         />
                     </div>
 
@@ -288,12 +223,12 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
                     <MesinTable
                         machines={filteredMachines}
                         onSelectDetail={(m) => setSelectedDetail(m)}
-                        onEdit={(m) => executeWithPin(() => {
+                        onEdit={(m) => {
                             setSelectedEdit(m);
                             setIsFormOpen(true);
-                        })}
-                        onOpenPaymentModal={(m) => executeWithPin(() => setSelectedPayment(m))}
-                        onOpenArchiveModal={(m) => executeWithPin(() => setSelectedArchive(m))}
+                        }}
+                        onOpenPaymentModal={(m) => setSelectedPayment(m)}
+                        onOpenArchiveModal={(m) => setSelectedArchive(m)}
                     />
                 )}
 
@@ -320,15 +255,6 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
                     machine={selectedArchive}
                     onClose={() => setSelectedArchive(null)}
                     onConfirmArchive={handleConfirmArchive}
-                />
-
-                {/* Modal Verification PIN */}
-                <PinGateModal
-                    isOpen={isPinGateOpen}
-                    onClose={() => setIsPinGateOpen(false)}
-                    onSuccess={handlePinSuccess}
-                    title="Akses Terkunci"
-                    description="Masukkan 4 Digit PIN Security Gate untuk mengakses menu ini."
                 />
             </div>
         </main>

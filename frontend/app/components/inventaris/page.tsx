@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Warehouse, Plus, Lock, Loader2, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Warehouse, Plus, Loader2, RefreshCw, ShieldAlert } from 'lucide-react';
 import { ItemBahanBaku, LogTransaksiStok } from './types';
 import { useInventaris } from './useInventaris';
 
-// Import Sub-Komponen & Modal
-import PinGateModal from '../karyawan/PinGateModal';
+// Import Sub-Komponen & Modal (Tanpa PinGateModal)
 import StokMutasiModal from './StokMutasiModal';
 import BahanFormModal from './BahanFormModal';
 import InventarisKpiCards from './InventarisKpiCards';
@@ -24,7 +23,7 @@ interface InventarisPageProps {
 }
 
 export default function InventarisPage({ activeUser }: InventarisPageProps) {
-    // 🟢 1. ALL HOOKS - STATE & EFFECT (Selalu dipanggil di paling atas)
+    // 🟢 1. ALL HOOKS - STATE & EFFECT
     const [currentUser, setCurrentUser] = useState<any>(activeUser || null);
 
     useEffect(() => {
@@ -65,24 +64,14 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
         deleteBahanBaku,
     } = useInventaris();
 
-    // State Modals & Session
-    const [isSessionUnlocked, setIsSessionUnlocked] = useState(false);
-    const [isPinGateOpen, setIsPinGateOpen] = useState(true);
-    const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-
+    // State Modals (Tanpa PIN Gate)
     const [selectedMutasiItem, setSelectedMutasiItem] = useState<ItemBahanBaku | null>(null);
     const [isMutasiModalOpen, setIsMutasiModalOpen] = useState(false);
 
     const [isBahanModalOpen, setIsBahanModalOpen] = useState(false);
     const [selectedEditItem, setSelectedEditItem] = useState<ItemBahanBaku | null>(null);
 
-    useEffect(() => {
-        if (!isSessionUnlocked && isAccessAllowed) {
-            setIsPinGateOpen(true);
-        }
-    }, [isSessionUnlocked, isAccessAllowed]);
-
-    // 🟢 2. ALL HOOKS - MEMOIZATIONS (Wajib dipanggil SEBELUM statement return)
+    // 🟢 2. ALL HOOKS - MEMOIZATIONS
     const activeInventory = useMemo(
         () => (inventarisList || []).filter((i) => !i.is_archived),
         [inventarisList]
@@ -133,67 +122,38 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
         });
     }, [inventarisList, filter]);
 
-    // 🟢 3. ACTION HANDLERS
-    const executeWithPin = (action: () => void) => {
-        if (isSessionUnlocked) {
-            action();
-        } else {
-            setPendingAction(() => action);
-            setIsPinGateOpen(true);
-        }
-    };
-
-    const handlePinSuccess = () => {
-        setIsPinGateOpen(false);
-        setIsSessionUnlocked(true);
-
-        if (pendingAction) {
-            pendingAction();
-            setPendingAction(null);
-        }
-    };
-
+    // 🟢 3. ACTION HANDLERS (Langsung Eksekusi Berdasarkan Role Login)
     const handleOpenMutasi = (item: ItemBahanBaku) => {
-        executeWithPin(() => {
-            setSelectedMutasiItem(item);
-            setIsMutasiModalOpen(true);
-        });
+        setSelectedMutasiItem(item);
+        setIsMutasiModalOpen(true);
     };
 
     const handleOpenEditBahan = (item: ItemBahanBaku) => {
-        executeWithPin(() => {
-            setSelectedEditItem(item);
-            setIsBahanModalOpen(true);
-        });
+        setSelectedEditItem(item);
+        setIsBahanModalOpen(true);
     };
 
     const handleOpenTambahBahan = () => {
-        executeWithPin(() => {
-            setSelectedEditItem(null);
-            setIsBahanModalOpen(true);
-        });
+        setSelectedEditItem(null);
+        setIsBahanModalOpen(true);
     };
 
-    const handleToggleArchive = (targetItem: ItemBahanBaku) => {
-        executeWithPin(async () => {
-            const res = await updateBahanBaku(targetItem.id, {
-                is_archived: !targetItem.is_archived,
-            });
+    const handleToggleArchive = async (targetItem: ItemBahanBaku) => {
+        const res = await updateBahanBaku(targetItem.id, {
+            is_archived: !targetItem.is_archived,
+        });
+        if (!res.success) {
+            alert(res.message || 'Gagal mengubah status arsip.');
+        }
+    };
+
+    const handleTriggerDelete = async (itemId: string) => {
+        if (confirm('Apakah Anda yakin ingin menghapus bahan baku ini secara permanen?')) {
+            const res = await deleteBahanBaku(itemId);
             if (!res.success) {
-                alert(res.message || 'Gagal mengubah status arsip.');
+                alert(res.message || 'Gagal menghapus bahan baku.');
             }
-        });
-    };
-
-    const handleTriggerDelete = (itemId: string) => {
-        executeWithPin(async () => {
-            if (confirm('Apakah Anda yakin ingin menghapus bahan baku ini secara permanen?')) {
-                const res = await deleteBahanBaku(itemId);
-                if (!res.success) {
-                    alert(res.message || 'Gagal menghapus bahan baku.');
-                }
-            }
-        });
+        }
     };
 
     const handleSaveMutasi = async (itemId: string, transaction: LogTransaksiStok) => {
@@ -246,7 +206,7 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
         }
     };
 
-    // 🛑 4. CONDITIONAL RENDERING / EARLY RETURNS (BARU BOLEH DITARUH DI SINI)
+    // 🛑 4. CONDITIONAL RENDERING / EARLY RETURNS
 
     // A. Role Tidak Diizinkan
     if (!isAccessAllowed) {
@@ -268,38 +228,7 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
         );
     }
 
-    // B. Sesi PIN Terkunci
-    if (!isSessionUnlocked) {
-        return (
-            <main className="flex-1 h-screen overflow-y-auto p-8 bg-slate-900 flex items-center justify-center text-slate-100 relative">
-                <div className="text-center max-w-sm p-8 glass-panel rounded-3xl shadow-2xl border border-slate-800 relative z-10">
-                    <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <Lock className="w-8 h-8" />
-                    </div>
-                    <h3 className="text-lg font-bold text-white mb-2">Akses Inventaris Terkunci</h3>
-                    <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-                        Verifikasi PIN Security Gate 4-Digit untuk mengelola stok kain, aksesoris, HPP bahan, dan transaksi gudang.
-                    </p>
-                    <button
-                        onClick={() => setIsPinGateOpen(true)}
-                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
-                    >
-                        Masukkan PIN Keamanan
-                    </button>
-                </div>
-
-                <PinGateModal
-                    isOpen={isPinGateOpen}
-                    onClose={() => setIsPinGateOpen(false)}
-                    onSuccess={handlePinSuccess}
-                    title="Akses Terkunci"
-                    description="Masukkan 4 Digit PIN Security Gate untuk mengakses menu ini."
-                />
-            </main>
-        );
-    }
-
-    // C. Tampilan Utama Saat Unlocked
+    // B. Tampilan Utama (Tanpa PIN Gate)
     return (
         <main className="flex-1 h-screen overflow-y-auto p-4 sm:p-8 bg-slate-900 text-slate-100 space-y-6">
             <div className="max-w-7xl mx-auto space-y-6 pb-12">
@@ -380,14 +309,6 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
                     }}
                     onSave={handleSaveBahan}
                     initialData={selectedEditItem}
-                />
-
-                <PinGateModal
-                    isOpen={isPinGateOpen}
-                    onClose={() => setIsPinGateOpen(false)}
-                    onSuccess={handlePinSuccess}
-                    title="Akses Terkunci"
-                    description="Masukkan 4 Digit PIN Security Gate untuk mengakses menu ini."
                 />
             </div>
         </main>

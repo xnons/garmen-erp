@@ -16,7 +16,6 @@ import {
     CheckCircle2,
     RefreshCw,
     Lock,
-    KeyRound,
     AlertTriangle
 } from 'lucide-react';
 import { LogOutput, StatusVerifikasiOutput } from '../services/produksiService';
@@ -27,7 +26,6 @@ interface TabVerifikasiQCProps {
         logId: number,
         statusQC: StatusVerifikasiOutput,
         fotoDefect?: string,
-        pin?: string,
         alasan?: string
     ) => void;
     handleBulkVerify?: (logIds: number[], statusQC: StatusVerifikasiOutput) => Promise<void> | void;
@@ -55,19 +53,17 @@ export default function TabVerifikasiQC({
     const [filterSPK, setFilterSPK] = useState<string>('');
     const [filterStatus, setFilterStatus] = useState<string>('APPROVED');
 
-    // 🛡️ State Modal Koreksi Status / Guard PIN
+    // Modal Koreksi Status (Tanpa PIN)
     const [koreksiModal, setKoreksiModal] = useState<{
         isOpen: boolean;
         log: LogOutput | null;
         targetStatus: StatusVerifikasiOutput;
-        pin: string;
         alasan: string;
         error: string;
     }>({
         isOpen: false,
         log: null,
         targetStatus: 'APPROVED',
-        pin: '',
         alasan: '',
         error: ''
     });
@@ -154,7 +150,7 @@ export default function TabVerifikasiQC({
         }
     };
 
-    // 🔒 Trigger Buka Modal Otorisasi PIN untuk Revisi Riwayat
+    // Trigger Buka Modal Koreksi untuk Revisi Riwayat
     const handleOpenKoreksiModal = (log: LogOutput) => {
         if (log.is_paid) return; // Guard: Tidak bisa diubah jika sudah paid
         const newStatus: StatusVerifikasiOutput = log.status_verifikasi === 'APPROVED' ? 'REJECTED' : 'APPROVED';
@@ -162,19 +158,14 @@ export default function TabVerifikasiQC({
             isOpen: true,
             log,
             targetStatus: newStatus,
-            pin: '',
             alasan: '',
             error: ''
         });
     };
 
-    // 🔒 Submit Koreksi setelah Masukkan PIN Supervisor
+    // Submit Koreksi Langsung Tanpa PIN
     const handleConfirmKoreksi = () => {
         if (!koreksiModal.log) return;
-        if (!koreksiModal.pin || koreksiModal.pin.trim().length < 4) {
-            setKoreksiModal((prev) => ({ ...prev, error: 'Masukkan PIN Otorisasi Supervisor (Min. 4 Digit)' }));
-            return;
-        }
         if (!koreksiModal.alasan || koreksiModal.alasan.trim().length < 3) {
             setKoreksiModal((prev) => ({ ...prev, error: 'Wajib mengisikan alasan perubahan status' }));
             return;
@@ -184,11 +175,10 @@ export default function TabVerifikasiQC({
             koreksiModal.log.id,
             koreksiModal.targetStatus,
             undefined,
-            koreksiModal.pin,
             koreksiModal.alasan
         );
 
-        setKoreksiModal({ isOpen: false, log: null, targetStatus: 'APPROVED', pin: '', alasan: '', error: '' });
+        setKoreksiModal({ isOpen: false, log: null, targetStatus: 'APPROVED', alasan: '', error: '' });
     };
 
     return (
@@ -468,7 +458,7 @@ export default function TabVerifikasiQC({
                                                     </button>
                                                 </div>
                                             ) : (
-                                                /* 🟢 RIWAYAT VERIFIKASI (TERPROTEKSI HIGH SECURITY) */
+                                                /* RIWAYAT VERIFIKASI */
                                                 <div className="flex items-center justify-center gap-2">
                                                     <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border inline-flex items-center justify-center gap-1 ${log.status_verifikasi === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30'}`}>
                                                         {log.status_verifikasi === 'APPROVED' ? <CheckCircle2 className="w-3 h-3 stroke-[2.5]" /> : <XCircle className="w-3 h-3" />}
@@ -482,13 +472,13 @@ export default function TabVerifikasiQC({
                                                             <span>Paid</span>
                                                         </span>
                                                     ) : (
-                                                        /* JIKA BELUM PAID: BISA KOREKSI DENGAN PIN SUPERVISOR */
+                                                        /* JIKA BELUM PAID: BISA KOREKSI STATUS */
                                                         <button
                                                             type="button"
                                                             onClick={() => handleOpenKoreksiModal(log)}
                                                             disabled={isSelf}
                                                             className="px-2 py-1 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 rounded-lg text-[10px] font-medium transition flex items-center gap-1"
-                                                            title={isSelf ? 'Dilarang memverifikasi pengerjaan sendiri' : 'Revisi Status (Membutuhkan PIN Mandor)'}
+                                                            title={isSelf ? 'Dilarang memverifikasi pengerjaan sendiri' : 'Revisi Status Verifikasi'}
                                                         >
                                                             <RefreshCw className="w-3 h-3" />
                                                             <span>Koreksi</span>
@@ -505,17 +495,17 @@ export default function TabVerifikasiQC({
                 </table>
             </div>
 
-            {/* 🛡️ MODAL OTORISASI PIN & ALASAN KOREKSI */}
+            {/* MODAL REVISI KOREKSI STATUS (TANPA PIN) */}
             {koreksiModal.isOpen && koreksiModal.log && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
                         <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
                             <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
-                                <KeyRound className="w-5 h-5" />
+                                <RefreshCw className="w-5 h-5" />
                             </div>
                             <div>
-                                <h3 className="text-sm font-bold text-white">Otorisasi Revisi Verifikasi QC</h3>
-                                <p className="text-xs text-slate-400">Konfirmasi perubahan status setoran lama</p>
+                                <h3 className="text-sm font-bold text-white">Revisi Verifikasi QC</h3>
+                                <p className="text-xs text-slate-400">Konfirmasi perubahan status setoran</p>
                             </div>
                         </div>
 
@@ -560,26 +550,12 @@ export default function TabVerifikasiQC({
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
                                 />
                             </div>
-
-                            <div>
-                                <label className="block text-slate-300 font-semibold mb-1">
-                                    PIN Otorisasi Mandor / Supervisor <span className="text-rose-400">*</span>
-                                </label>
-                                <input
-                                    type="password"
-                                    maxLength={6}
-                                    placeholder="••••••"
-                                    value={koreksiModal.pin}
-                                    onChange={(e) => setKoreksiModal((prev) => ({ ...prev, pin: e.target.value }))}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-center font-mono text-base tracking-widest focus:outline-none focus:border-amber-500"
-                                />
-                            </div>
                         </div>
 
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
                             <button
                                 type="button"
-                                onClick={() => setKoreksiModal({ isOpen: false, log: null, targetStatus: 'APPROVED', pin: '', alasan: '', error: '' })}
+                                onClick={() => setKoreksiModal({ isOpen: false, log: null, targetStatus: 'APPROVED', alasan: '', error: '' })}
                                 className="px-4 py-2 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 rounded-xl text-xs font-semibold transition"
                             >
                                 Batal

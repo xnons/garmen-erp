@@ -116,8 +116,9 @@ export default function InventarisTable({
                                         {/* Status */}
                                         <td className="p-4">
                                             {item.is_archived ? (
-                                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
-                                                    📦 TERARSIP
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                                                    <Archive className="w-3 h-3" />
+                                                    <span>TERARSIP</span>
                                                 </span>
                                             ) : item.stok_saat_ini === 0 ? (
                                                 <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">

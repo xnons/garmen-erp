@@ -1,20 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
 // Sub-Modul & Komponen
 import DashboardOverview from '@/app/components/dashboard/DashboardOverview';
 import { KaryawanModule } from '@/app/components/karyawan/KaryawanModule';
 import SettingModule from '@/app/components/karyawan/SettingModule';
-import PinGateModal from '@/app/components/karyawan/PinGateModal';
 import MesinModule from '@/app/components/mesin/page';
 import InventarisPage from '@/app/components/inventaris/page';
 import ProduksiPage from '@/app/components/produksi/ProduksiPage';
-import LockedView from '@/app/components/common/LockedView';
+import TabAuditLog from '@/app/components/audit/TabAuditLog';
+import PayrollModule from '@/app/components/payroll/PayrollModule';
 
 interface DashboardContentProps {
   activeMenu: string;
-  setActiveMenu?: (menu: string) => void; // 🟢 Prop opsional agar DashboardOverview bisa berpindah tab
+  setActiveMenu?: (menu: string) => void;
   activeUser: any;
   onLogout: () => void;
 }
@@ -25,22 +25,11 @@ export default function DashboardContent({
   activeUser,
   onLogout
 }: DashboardContentProps) {
-  const [isPinVerified, setIsPinVerified] = useState(false);
-  const [showPinModal, setShowPinModal] = useState(false);
+  const userRole = activeUser?.role?.toUpperCase() || 'GUEST';
 
-  // Reset status verifikasi PIN saat berpindah menu
-  useEffect(() => {
-    if (activeMenu === 'karyawan') {
-      setShowPinModal(true);
-    } else {
-      setIsPinVerified(false);
-      setShowPinModal(false);
-    }
-  }, [activeMenu]);
-
-  // Helper untuk memilih modul yang ditampilkan
+  // Helper untuk memilih modul yang ditampilkan berdasarkan RBAC
   const renderActiveModule = () => {
-    // 1. Dashboard Ringkasan (🟢 FIX: oper activeUser & onNavigate callback)
+    // 1. Dashboard Ringkasan
     if (activeMenu === 'dashboard') {
       return (
         <DashboardOverview
@@ -59,26 +48,7 @@ export default function DashboardContent({
 
     // 3. Kelola Karyawan
     if (activeMenu === 'karyawan') {
-      if (isPinVerified) {
-        return <KaryawanModule activeUser={activeUser} />;
-      }
-
-      return (
-        <>
-          <LockedView
-            title="Akses Kelola Karyawan Terkunci"
-            onOpenPinModal={() => setShowPinModal(true)}
-          />
-          <PinGateModal
-            isOpen={showPinModal}
-            onClose={() => setShowPinModal(false)}
-            onSuccess={() => {
-              setIsPinVerified(true);
-              setShowPinModal(false);
-            }}
-          />
-        </>
-      );
+      return <KaryawanModule activeUser={activeUser} />;
     }
 
     // 4. Inventaris Mesin
@@ -88,10 +58,44 @@ export default function DashboardContent({
 
     // 5. Inventaris & Stok Bahan Baku
     if (activeMenu === 'inventaris') {
-      return <InventarisPage />;
+      return <InventarisPage activeUser={activeUser} />;
     }
 
-    // 6. Pengaturan & Akun
+    // 6. Payroll & Penggajian (🔒 Dibatasi hanya untuk OWNER, FINANCE, DEVELOPER)
+    if (activeMenu === 'payroll') {
+      if (userRole !== 'OWNER' && userRole !== 'FINANCE' && userRole !== 'DEVELOPER') {
+        return (
+          <div className="flex items-center justify-center h-full p-8 text-slate-100">
+            <div className="text-center bg-slate-900 p-6 rounded-2xl border border-rose-500/30 shadow-xl max-w-md">
+              <h2 className="text-base font-bold mb-1 text-rose-400">Akses Ditolak (Unauthorized)</h2>
+              <p className="text-xs text-slate-400">
+                Modul Payroll & Penggajian bersifat rahasia dan hanya dapat diakses oleh hak akses Owner dan Finance.
+              </p>
+            </div>
+          </div>
+        );
+      }
+      return <PayrollModule />;
+    }
+
+    // 7. Log Keamanan & Audit Trail (🔒 Dibatasi hanya untuk OWNER & DEVELOPER)
+    if (activeMenu === 'audit-log') {
+      if (userRole !== 'OWNER' && userRole !== 'DEVELOPER') {
+        return (
+          <div className="flex items-center justify-center h-full p-8 text-slate-100">
+            <div className="text-center bg-slate-900 p-6 rounded-2xl border border-rose-500/30 shadow-xl max-w-md">
+              <h2 className="text-base font-bold mb-1 text-rose-400">Akses Ditolak (Unauthorized)</h2>
+              <p className="text-xs text-slate-400">
+                Log Keamanan sistem hanya dapat diakses oleh Administrator Utama / Owner.
+              </p>
+            </div>
+          </div>
+        );
+      }
+      return <TabAuditLog />;
+    }
+
+    // 8. Pengaturan & Akun
     if (activeMenu === 'setting') {
       return <SettingModule activeUser={activeUser} onLogout={onLogout} />;
     }
@@ -112,7 +116,7 @@ export default function DashboardContent({
   };
 
   return (
-    <main className="flex-1 h-full overflow-y-auto min-h-0 bg-slate-950 text-slate-100 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+    <main className="flex-1 h-full overflow-y-auto min-h-0 bg-slate-950 text-slate-100 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent p-6">
       {renderActiveModule()}
     </main>
   );

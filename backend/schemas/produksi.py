@@ -48,19 +48,7 @@ class StatusAccSampel(str, Enum):
 
 
 # ===========================================================================
-# 1. SECURITY & PIN VERIFICATION SCHEMAS (PERBAIKAN MIN LENGTH 4)
-# ===========================================================================
-class PINVerifyRequest(BaseModel):
-    pin: str = Field(..., min_length=4, max_length=6, description="4-6 Digit Supervisor PIN Security")
-
-
-class DeleteWithPINRequest(BaseModel):
-    pin: str = Field(..., min_length=4, max_length=6, description="PIN Otorisasi Modul")
-    alasan_hapus: Optional[str] = Field(default="Kesalahan Input Data", description="Alasan pembatalan/penghapusan")
-
-
-# ===========================================================================
-# 2. MASTER TARIF BORONGAN SCHEMAS
+# 1. MASTER TARIF BORONGAN SCHEMAS
 # ===========================================================================
 class MasterTarifBase(BaseModel):
     tahapan_proses: TahapanProses
@@ -88,7 +76,7 @@ class MasterTarifResponse(BaseModel):
 
 
 # ===========================================================================
-# 3. SPK PRODUKSI SCHEMAS
+# 2. SPK PRODUKSI SCHEMAS
 # ===========================================================================
 class SPKBase(BaseModel):
     id: str = Field(..., description="Kode/Nomor SPK")
@@ -191,15 +179,18 @@ class SPKDetailResponse(SPKResponse):
 
 
 # ===========================================================================
-# 4. LOG OUTPUT HARIAN SCHEMAS
+# 3. LOG OUTPUT HARIAN SCHEMAS
 # ===========================================================================
 class LogOutputBase(BaseModel):
     tanggal: Optional[date] = None
     karyawan_id: str
     spk_id: str
     tahapan_proses: Optional[str] = "SEWING"
+    nomor_tiket: Optional[str] = None      # 🟢 Tambahkan field nomor tiket
     qty_disetor: Optional[int] = Field(default=0, ge=0)
     qty_pass: Optional[int] = Field(default=0, ge=0)
+    qty_rework: Optional[int] = Field(default=0, ge=0)  # 🟢 Tambahkan rework
+    qty_scrap: Optional[int] = Field(default=0, ge=0)   # 🟢 Tambahkan scrap/BS
     qty_reject: Optional[int] = Field(default=0, ge=0)
     catatan: Optional[str] = None
 
@@ -254,7 +245,7 @@ class LogOutputResponse(LogOutputBase):
 
 
 # ===========================================================================
-# 5. PAYROLL & UPAH BORONGAN SCHEMAS
+# 4. PAYROLL & UPAH BORONGAN SCHEMAS
 # ===========================================================================
 class PayrollLogItem(BaseModel):
     log_id: int
@@ -283,11 +274,10 @@ class RekapGajiPekerjaResponse(BaseModel):
 class MarkPayrollPaidRequest(BaseModel):
     karyawan_ids: List[str]
     payroll_id: str
-    pin: str = Field(..., min_length=4, max_length=6)
 
 
 # ===========================================================================
-# 6. ANALYTICS SCHEMAS
+# 5. ANALYTICS SCHEMAS
 # ===========================================================================
 class DailyTrendPoint(BaseModel):
     tanggal: str

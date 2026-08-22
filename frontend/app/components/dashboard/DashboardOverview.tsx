@@ -26,6 +26,8 @@ import {
     Cell
 } from 'recharts';
 import api from '../services/api';
+import { produksiService, SPK } from '../services/produksiService';
+import DeadlineAlertBanner from '@/app/components/dashboard/DeadlineAlertBanner';
 
 interface DashboardOverviewProps {
     activeUser: any;
@@ -54,6 +56,7 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
     const isProduksi = ['PRODUKSI', 'KARYAWAN'].includes(userRole);
 
     const [loading, setLoading] = useState(false);
+    const [spkList, setSpkList] = useState<SPK[]>([]);
 
     const [summaryMetrics, setSummaryMetrics] = useState({
         totalOutputToday: 0,
@@ -73,10 +76,11 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
     const fetchDashboardData = useCallback(async () => {
         setLoading(true);
         try {
-            const [resStats, resProduksi, resBrand] = await Promise.all([
+            const [resStats, resProduksi, resBrand, resSPK] = await Promise.all([
                 api.get('/api/dashboard/overview-stats').catch(() => null),
                 api.get('/api/dashboard/chart-produksi').catch(() => null),
-                api.get('/api/dashboard/chart-brand-material').catch(() => null)
+                api.get('/api/dashboard/chart-brand-material').catch(() => null),
+                produksiService.getAllSPK().catch(() => [])
             ]);
 
             if (resStats && resStats.data) {
@@ -97,6 +101,10 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                         color: BRAND_COLORS[idx % BRAND_COLORS.length]
                     }))
                 );
+            }
+
+            if (Array.isArray(resSPK)) {
+                setSpkList(resSPK);
             }
         } catch (err) {
             console.error('Gagal mengambil data dashboard:', err);
@@ -143,6 +151,14 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
 
     return (
         <main className="flex-1 p-6 md:p-8 overflow-y-auto bg-slate-950 text-slate-100 space-y-6 custom-scrollbar">
+
+            {/* 🟢 BANNER PERINGATAN DEADLINE OTOMATIS */}
+            <DeadlineAlertBanner
+                spkList={spkList}
+                onNavigateToSPK={() => {
+                    if (onNavigate) onNavigate('produksi');
+                }}
+            />
 
             {/* Header Module */}
             <div className="bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">

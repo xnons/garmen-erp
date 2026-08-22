@@ -186,13 +186,13 @@ class SPKProduksi(Base):
 
     # C. Size Breakdown Matrix (JSON: {"S": 100, "M": 200, "L": 200, "XL": 100})
     size_matrix = Column(JSON, nullable=True, default={})
-    target_qty = Column(Integer, nullable=False, default=0)        # Auto-calculated Total Qty Size
+    target_qty = Column(Integer, nullable=False, default=0)         # Auto-calculated Total Qty Size
     realisasi_potong = Column(Integer, nullable=False, default=0)  # Qty riil dari Cutting (Hard-Cap)
 
     # D. Spesifikasi Bahan & Material
     jenis_kain = Column(String(150), nullable=True)     # e.g. American Drill Unione #328
     warna_kain = Column(String(100), nullable=True)
-    aksesoris = Column(Text, nullable=True)            # Kancing, Resleting, Label Brand
+    aksesoris = Column(Text, nullable=True)             # Kancing, Resleting, Label Brand
     spesifikasi_sablon_bordir = Column(Text, nullable=True)
     toleransi_defect_pct = Column(Float, default=2.0)  # Max defect toleransi (%)
 
@@ -240,9 +240,13 @@ class LogOutputBorongan(Base):
     spk_id = Column(String(50), ForeignKey("spk_produksi.id", ondelete="CASCADE"), nullable=False)
     
     tahapan_proses = Column(String(50), nullable=False)
+    nomor_tiket = Column(String(100), nullable=True)     # 🟢 Standar Pabrik: Nomor Tiket Bundle / Lot Fisik
+    
     qty_disetor = Column(Integer, nullable=False, default=0)
-    qty_pass = Column(Integer, nullable=False, default=0)    # Lolos QC (Dasar Hitung Gaji)
-    qty_reject = Column(Integer, nullable=False, default=0)  # Cacat/Rework
+    qty_pass = Column(Integer, nullable=False, default=0)       # Lolos QC (Dasar Hitung Gaji)
+    qty_rework = Column(Integer, nullable=False, default=0)     # 🟢 Cacat tapi bisa diperbaiki (masuk line rework)
+    qty_scrap = Column(Integer, nullable=False, default=0)      # 🟢 Cacat permanen / BS (Bahan Sisa / Buang)
+    qty_reject = Column(Integer, nullable=False, default=0)     # Total Defect (Rework + Scrap)
     
     tarif_per_pcs = Column(Float, nullable=False, default=0.0) # Snapshot tarif borongan
     subtotal_rp = Column(Float, nullable=False, default=0.0)   # qty_pass * tarif_per_pcs
@@ -258,8 +262,8 @@ class LogOutputBorongan(Base):
     foto_bukti_defect = Column(String(500), nullable=True)   # URL foto bukti bagian cacat/sobek dari QC
 
     # Jembatan Ke Modul Payroll / Penggajian
-    is_paid = Column(Boolean, default=False)                  # True jika sudah masuk slip & dibayar
-    payroll_id = Column(String(100), nullable=True)           # ID Slip / Periode Gaji
+    is_paid = Column(Boolean, default=False)                    # True jika sudah masuk slip & dibayar
+    payroll_id = Column(String(100), nullable=True)             # ID Slip / Periode Gaji
     paid_at = Column(DateTime, nullable=True)
 
     # Soft Delete Audit Trail (Diperlukan untuk penghapusan ber-PIN)
@@ -274,7 +278,8 @@ class LogOutputBorongan(Base):
     spk = relationship("SPKProduksi", back_populates="output_logs")
     karyawan = relationship("Karyawan", back_populates="output_borongan")
 
-    # ===========================================================================
+
+# ===========================================================================
 # 6. AUDIT LOG REVISI QC & PAYROLL MODELS
 # ===========================================================================
 class LogAuditVerifikasiQC(Base):
@@ -320,4 +325,34 @@ class LogPayrollProduksi(Base):
     # Relasi
     karyawan = relationship("Karyawan")
 
-    
+
+# ===========================================================================
+# 7. ENTERPRISE AUDIT TRAIL & LOGIN SECURITY GUARD
+# ===========================================================================
+class LogAudit(Base):
+    """
+    Mencatat setiap aksi destruktif atau sensitif (DELETE, RE-OPEN, FORCE-FINISH, CHANGE-PRICE).
+    """
+    __tablename__ = "log_audit"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    actor_id = Column(String(50), nullable=False)  # ID Karyawan / Username yang bertindak
+    aksi = Column(String(100), nullable=False)     # Contoh: "DELETE_SPK", "FORCE_FINISH_SPK", "REOPEN_QC"
+    target_id = Column(String(100), nullable=True) # ID Objek yang dikenai aksi (SPK ID, Log ID, dll)
+    catatan = Column(Text, nullable=True)          # Alasan / Keterangan tambahan
+
+
+class LogLogin(Base):
+    """
+    Mencatat riwayat percobaan login ke sistem, mendeteksi dan merekam upaya login di luar jam kerja.
+    """
+    __tablename__ = "log_login"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    karyawan_id = Column(String(50), nullable=True)
+    username = Column(String(100), nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    status = Column(String(50), nullable=False)    # "SUCCESS", "BLOCKED_OFF_HOURS", "FAILED_PASSWORD"
+    ip_address = Column(String(50), nullable=True)
+    keterangan = Column(String(255), nullable=True)

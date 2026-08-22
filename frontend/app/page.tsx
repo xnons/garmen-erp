@@ -1,16 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import Sidebar from './components/layout/Sidebar';
 import DashboardContent from './components/dashboard/DashboardContent';
-// 🟢 1. IMPORT MODAL UBAH PIN GATE (Sesuaikan path jika beda)
-import { UpdatePinModal } from './components/karyawan/UpdatePinModal';
+import api from './components/services/api';
 
 export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('dashboard');
-
-  // 🔑 2. STATE KONTROL POP-UP MODAL MASTER PIN GATE
-  const [showUpdatePinModal, setShowUpdatePinModal] = useState(false);
 
   // STATE AWAL USER
   const [activeUser, setActiveUser] = useState<any>(null);
@@ -39,24 +36,17 @@ export default function DashboardPage() {
     setLoginLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(loginInput),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Gagal masuk ke sistem.");
-      }
+      const response = await api.post("/api/auth/login", loginInput);
+      const data = response.data;
 
       localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("token", data.access_token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
       setActiveUser(data.user);
     } catch (error: any) {
-      setLoginError(error.message);
+      const errMsg = error.response?.data?.detail || error.message || "Gagal masuk ke sistem.";
+      setLoginError(errMsg);
     } finally {
       setLoginLoading(false);
     }
@@ -91,8 +81,9 @@ export default function DashboardPage() {
           </div>
 
           {loginError && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-semibold text-center">
-              ⚠️ {loginError}
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>{loginError}</span>
             </div>
           )}
 
@@ -141,7 +132,6 @@ export default function DashboardPage() {
         activeMenu={activeMenu}
         setActiveMenu={setActiveMenu}
         activeUser={activeUser}
-        onOpenPinModal={() => setShowUpdatePinModal(true)} // 👈 3. DIBERIKAN CALLBACK TRIGGER KE SIDEBAR
       />
 
       {/* SISI KANAN: Konten Dinamis */}
@@ -149,13 +139,6 @@ export default function DashboardPage() {
         activeMenu={activeMenu}
         activeUser={activeUser}
         onLogout={handleLogout}
-      />
-
-      {/* 🔑 4. POP-UP GLOBAL UBAH MASTER PIN GATE */}
-      <UpdatePinModal
-        isOpen={showUpdatePinModal}
-        onClose={() => setShowUpdatePinModal(false)}
-        activeUser={activeUser}
       />
 
     </div>

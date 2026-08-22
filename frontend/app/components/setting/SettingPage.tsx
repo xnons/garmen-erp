@@ -13,7 +13,7 @@ import {
     UserCheck,
     Settings
 } from 'lucide-react';
-import { UpdatePinModal } from '@/app/components/karyawan/UpdatePinModal';
+import { UpdatePinModal } from './UpdatePinModal';
 
 interface SettingPageProps {
     activeUser: {
@@ -58,7 +58,8 @@ export const SettingPage: React.FC<SettingPageProps> = ({ activeUser }) => {
         setLoadingPass(true);
 
         try {
-            const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+            const rawBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+            const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
             const token = localStorage.getItem('access_token') || '';
 
             const res = await fetch(`${API_BASE}/auth/change-password`, {

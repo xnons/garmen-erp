@@ -7,7 +7,8 @@ import {
     SatuanBahan
 } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const rawBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
 
 export const useInventaris = () => {
     const [inventarisList, setInventarisList] = useState<ItemBahanBaku[]>([]);

@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 
-SECRET_KEY = "NEXORA_SECRET_KEY_KAMU"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 480
+SECRET_KEY = os.getenv("SECRET_KEY", "NEXORA_ENTERPRISE_SECRET_KEY_PROD_REPLACE_ME")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
@@ -78,3 +78,22 @@ def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Sesi masuk telah berakhir, silakan login ulang."
         )
+    # --- RBAC ROLE GUARD DEPENDENCY ---
+def require_role(allowed_roles: list[str]):
+    """
+    Dependency builder untuk membatasi akses endpoint berdasarkan Role Karyawan.
+    Contoh Penggunaan di Router:
+    current_user: models.Karyawan = Depends(require_role(["OWNER", "DEVELOPER"]))
+    """
+    def role_checker(current_user: models.Karyawan = Depends(get_current_user)):
+        # Ambil role dari objek user (pastikan atribut kolom di models.Karyawan sesuai, misal: role)
+        user_role = str(getattr(current_user, "role", "")).upper()
+        
+        if user_role not in [r.upper() for r in allowed_roles]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Akses ditolak! Peran '{user_role}' tidak memiliki izin untuk melakukan aksi ini."
+            )
+        return current_user
+        
+    return role_checker

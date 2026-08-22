@@ -16,9 +16,12 @@ import {
     X,
     AlertCircle,
     Loader2,
-    ArchiveRestore
+    ArchiveRestore,
+    Clock,
+    Download
 } from 'lucide-react';
 import { produksiService, SPK, StatusSPK, PrioritasSPK } from '../services/produksiService';
+import { exportToExcel } from '@/app/utils/exportUtils';
 
 interface TabSPKTarifProps {
     spkList: SPK[];
@@ -32,7 +35,7 @@ interface TabSPKTarifProps {
     onRefresh?: () => void;
 }
 
-type TabCategory = 'ALL' | StatusSPK;
+type TabCategory = 'ALL' | StatusSPK | 'REMINDER';
 
 export default function TabSPKTarif({
     spkList,
@@ -57,7 +60,6 @@ export default function TabSPKTarif({
                 }
             }
         }
-        // Fallback default dev agar tombol tidak terkunci saat testing
         return 'developer';
     }, [currentUser]);
 
@@ -69,46 +71,65 @@ export default function TabSPKTarif({
     const [kategoriFilter, setKategoriFilter] = useState<string>('ALL');
     const [sortOrder, setSortOrder] = useState<'DATE_ASC' | 'DATE_DESC' | 'DEADLINE_ASC'>('DATE_ASC');
 
-    // 🔑 Modal PIN Hapus State
+    // Modal Hapus State
     const [deleteModal, setDeleteModal] = useState<{
         isOpen: boolean;
         spkId: string;
         namaArtikel: string;
     }>({ isOpen: false, spkId: '', namaArtikel: '' });
 
-    const [pinInput, setPinInput] = useState('');
     const [alasanHapus, setAlasanHapus] = useState('Kesalahan Input Data');
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState('');
 
-    // 🧹 Helper untuk Menutup Modal Hapus & Reset Form Clean
     const closeDeleteModal = () => {
         setDeleteModal({ isOpen: false, spkId: '', namaArtikel: '' });
-        setPinInput('');
         setActionError('');
         setAlasanHapus('Kesalahan Input Data');
     };
 
-    // Hitung statistik SPK berdasarkan status lifecycle
-    const counts = {
-        ALL: spkList.length,
-        ON_PROGRESS: spkList.filter((s) => s.status === 'ON_PROGRESS').length,
-        DRAFT: spkList.filter((s) => s.status === 'DRAFT').length,
-        FINISHED: spkList.filter((s) => s.status === 'FINISHED').length,
-        ARCHIVED: spkList.filter((s) => s.status === 'ARCHIVED').length,
-    };
+    // Hitung statistik SPK berdasarkan status lifecycle + Pengingat Deadline
+    const counts = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    // 🔀 Filter & Sorting Engine
+        const reminderCount = spkList.filter((s) => {
+            if (!s.deadline || s.status === 'FINISHED' || s.status === 'ARCHIVED') return false;
+            const deadlineDate = new Date(s.deadline);
+            deadlineDate.setHours(0, 0, 0, 0);
+            const diffDays = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            return diffDays <= 7;
+        }).length;
+
+        return {
+            ALL: spkList.length,
+            ON_PROGRESS: spkList.filter((s) => s.status === 'ON_PROGRESS').length,
+            DRAFT: spkList.filter((s) => s.status === 'DRAFT').length,
+            FINISHED: spkList.filter((s) => s.status === 'FINISHED').length,
+            ARCHIVED: spkList.filter((s) => s.status === 'ARCHIVED').length,
+            REMINDER: reminderCount,
+        };
+    }, [spkList]);
+
+    // 🔀 Filter & Sorting Engine dengan Logika Tab Pengingat Deadline
     const filteredAndSortedSPK = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         return spkList
             .filter((spk) => {
-                // Filter Tab Status
-                const matchesTab = activeTab === 'ALL' || spk.status === activeTab;
+                if (activeTab === 'REMINDER') {
+                    if (!spk.deadline || spk.status === 'FINISHED' || spk.status === 'ARCHIVED') return false;
+                    const deadlineDate = new Date(spk.deadline);
+                    deadlineDate.setHours(0, 0, 0, 0);
+                    const diffDays = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays > 7) return false;
+                } else if (activeTab !== 'ALL') {
+                    if (spk.status !== activeTab) return false;
+                }
 
-                // Filter Kategori Jenis Produk
                 const matchesKategori = kategoriFilter === 'ALL' || (spk.kategori_produk || 'Kemeja') === kategoriFilter;
 
-                // Search Query Filter
                 const q = searchQuery.toLowerCase().trim();
                 const matchesSearch =
                     !q ||
@@ -117,7 +138,7 @@ export default function TabSPKTarif({
                     (spk.nama_pemesan && spk.nama_pemesan.toLowerCase().includes(q)) ||
                     (spk.no_po_buyer && spk.no_po_buyer.toLowerCase().includes(q));
 
-                return matchesTab && matchesKategori && matchesSearch;
+                return matchesKategori && matchesSearch;
             })
             .sort((a, b) => {
                 if (sortOrder === 'DATE_ASC') {
@@ -139,6 +160,34 @@ export default function TabSPKTarif({
             });
     }, [spkList, activeTab, kategoriFilter, searchQuery, sortOrder]);
 
+    // 🟢 Handler Ekspor Data ke Excel (.xlsx)
+    const handleExportExcel = () => {
+        if (filteredAndSortedSPK.length === 0) {
+            alert("Tidak ada data SPK untuk diekspor!");
+            return;
+        }
+
+        const dataToExport = filteredAndSortedSPK.map((spk, index) => ({
+            "No": index + 1,
+            "Kode SPK": spk.id,
+            "Nama Buyer / Pemesan": spk.nama_pemesan || "-",
+            "No PO Buyer": spk.no_po_buyer || "-",
+            "Nama Artikel": spk.nama_artikel,
+            "Kategori Produk": spk.kategori_produk || "Kemeja",
+            "Target Qty (Pcs)": spk.target_qty || 0,
+            "Realisasi Potong (Pcs)": spk.realisasi_potong || 0,
+            "Progress Potong (%)": spk.target_qty > 0
+                ? `${Math.min(100, Math.round(((spk.realisasi_potong || 0) / spk.target_qty) * 100))}%`
+                : "0%",
+            "Deadline": spk.deadline || "-",
+            "Prioritas": spk.prioritas || "NORMAL",
+            "Status SPK": spk.status
+        }));
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        exportToExcel(dataToExport, `Rekap_SPK_Produksi_${dateStr}`, "Daftar SPK");
+    };
+
     // 📦 Handler Arsip / Un-Arsip SPK
     const handleArchiveSPK = async (e: React.MouseEvent, spkId: string, currentStatus?: string) => {
         e.stopPropagation();
@@ -158,35 +207,41 @@ export default function TabSPKTarif({
         }
     };
 
-    // 🗑️ Handler Hapus SPK Dengan PIN Security
-    const handleConfirmDeleteWithPIN = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setActionError('');
-
-        if (pinInput.length !== 6) {
-            setActionError('PIN Otorisasi harus 6 digit angka.');
-            return;
-        }
+    // 🔒 Handler Selesai SPK Paksa Khusus Owner / Dev
+    const handleOwnerFinishSPK = async (e: React.MouseEvent, spkId: string) => {
+        e.stopPropagation();
+        if (!confirm(`Selesaikan SPK '${spkId}' secara paksa (Owner Lock)?`)) return;
 
         try {
             setActionLoading(true);
-            await produksiService.deleteSPK(
-                deleteModal.spkId,
-                pinInput,
-                alasanHapus
-            );
-
-            closeDeleteModal();
+            await produksiService.ownerFinishSPK(spkId);
             if (onRefresh) onRefresh();
         } catch (err: any) {
-            const msg = err.response?.data?.detail;
-            setActionError(typeof msg === 'string' ? msg : 'PIN Salah atau gagal menghapus SPK.');
+            alert(err.response?.data?.detail || 'Gagal menyelesaikan SPK.');
         } finally {
             setActionLoading(false);
         }
     };
 
-    // Helper Badge Style
+    // 🗑️ Handler Hapus SPK
+    const handleConfirmDelete = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setActionError('');
+
+        try {
+            setActionLoading(true);
+            await produksiService.deleteSPK(deleteModal.spkId, alasanHapus);
+
+            closeDeleteModal();
+            if (onRefresh) onRefresh();
+        } catch (err: any) {
+            const msg = err.response?.data?.detail;
+            setActionError(typeof msg === 'string' ? msg : 'Gagal menghapus SPK.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const renderStatusBadge = (status: StatusSPK) => {
         switch (status) {
             case 'ON_PROGRESS':
@@ -241,6 +296,37 @@ export default function TabSPKTarif({
         return null;
     };
 
+    const renderDeadlineBadge = (deadlineStr?: string, statusSPK?: StatusSPK) => {
+        if (!deadlineStr || statusSPK === 'FINISHED' || statusSPK === 'ARCHIVED') {
+            return <span className="text-slate-400 font-mono text-xs">{deadlineStr || '-'}</span>;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const deadlineDate = new Date(deadlineStr);
+        deadlineDate.setHours(0, 0, 0, 0);
+
+        const diffDays = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-500/20 text-rose-400 border border-rose-500/40 rounded-lg text-[10px] font-bold font-mono">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>Terlambat {Math.abs(diffDays)} Hari</span>
+                </span>
+            );
+        } else if (diffDays <= 3) {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded-lg text-[10px] font-bold font-mono animate-pulse">
+                    <Clock className="w-3 h-3 shrink-0" />
+                    <span>{diffDays === 0 ? 'Hari Ini' : `${diffDays} Hari Lagi`}</span>
+                </span>
+            );
+        }
+
+        return <span className="text-slate-300 font-mono text-xs">{deadlineStr}</span>;
+    };
+
     return (
         <div className="bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-800/50 space-y-5">
             {/* HEADER & RILIS BUTTON */}
@@ -253,14 +339,28 @@ export default function TabSPKTarif({
                         Manajemen Surat Perintah Kerja & kuota potong kain (hard-cap limit)
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={onOpenModal}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] hover:shadow-[0_0_25px_rgba(16,185,129,0.45)]"
-                >
-                    <Plus className="w-4 h-4 stroke-[3]" />
-                    Rilis SPK Baru
-                </button>
+
+                <div className="flex items-center gap-2">
+                    {/* 🟢 TOMBOL EXPORT EXCEL */}
+                    <button
+                        type="button"
+                        onClick={handleExportExcel}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all border border-slate-700 hover:border-slate-600"
+                        title="Unduh Rekap SPK ke Excel (.xlsx)"
+                    >
+                        <Download className="w-4 h-4 text-emerald-400" />
+                        <span>Export Excel</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onOpenModal}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] hover:shadow-[0_0_25px_rgba(16,185,129,0.45)]"
+                    >
+                        <Plus className="w-4 h-4 stroke-[3]" />
+                        Rilis SPK Baru
+                    </button>
+                </div>
             </div>
 
             {/* LIFECYCLE TABS & SEARCH BAR */}
@@ -325,6 +425,18 @@ export default function TabSPKTarif({
                         <Archive className="w-3.5 h-3.5 text-slate-400" />
                         Arsip ({counts.ARCHIVED})
                     </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('REMINDER')}
+                        className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-all whitespace-nowrap ${activeTab === 'REMINDER'
+                            ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20'
+                            : 'text-rose-400 bg-slate-900 border border-rose-500/30 hover:bg-rose-500/10'
+                            }`}
+                    >
+                        <Clock className="w-3.5 h-3.5" />
+                        Pengingat Deadline ({counts.REMINDER})
+                    </button>
                 </div>
 
                 <div className="relative w-full md:w-64 shrink-0">
@@ -367,9 +479,9 @@ export default function TabSPKTarif({
                         onChange={(e) => setSortOrder(e.target.value as any)}
                         className="bg-transparent text-white font-bold outline-none cursor-pointer"
                     >
-                        <option value="DATE_ASC" className="bg-slate-900">📅 Tanggal Mulai: Terawal → Terbaru</option>
-                        <option value="DATE_DESC" className="bg-slate-900">📅 Tanggal Mulai: Terbaru → Terawal</option>
-                        <option value="DEADLINE_ASC" className="bg-slate-900">⏳ Deadline Terdekat</option>
+                        <option value="DATE_ASC" className="bg-slate-900">Tanggal Mulai: Terawal → Terbaru</option>
+                        <option value="DATE_DESC" className="bg-slate-900">Tanggal Mulai: Terbaru → Terawal</option>
+                        <option value="DEADLINE_ASC" className="bg-slate-900">Deadline Terdekat</option>
                     </select>
                 </div>
 
@@ -454,8 +566,8 @@ export default function TabSPKTarif({
                                             </div>
                                         </td>
 
-                                        <td className="py-3.5 px-3.5 text-xs text-slate-400 font-mono">
-                                            {spk.deadline || '-'}
+                                        <td className="py-3.5 px-3.5 text-xs font-mono">
+                                            {renderDeadlineBadge(spk.deadline, spk.status)}
                                         </td>
 
                                         <td className="py-3.5 px-3.5 text-center">
@@ -465,6 +577,20 @@ export default function TabSPKTarif({
                                         {isOwnerOrDev && (
                                             <td className="py-3.5 px-3.5 text-center">
                                                 <div className="flex items-center justify-center gap-1.5">
+                                                    {/* 🟢 TOMBOL SELESAI SPK KHUSUS OWNER/DEV (Tanpa Emote) */}
+                                                    {spk.status !== 'FINISHED' && spk.status !== 'ARCHIVED' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => handleOwnerFinishSPK(e, spk.id)}
+                                                            disabled={actionLoading}
+                                                            className="px-2.5 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5"
+                                                            title="Selesaikan SPK Secara Paksa (Owner Lock)"
+                                                        >
+                                                            <Lock className="w-3 h-3" />
+                                                            <span>Selesai SPK</span>
+                                                        </button>
+                                                    )}
+
                                                     <button
                                                         type="button"
                                                         onClick={(e) => handleArchiveSPK(e, spk.id, spk.status)}
@@ -505,14 +631,14 @@ export default function TabSPKTarif({
                 </table>
             </div>
 
-            {/* MODAL OTORISASI PIN UNTUK HAPUS SPK */}
+            {/* MODAL KONFIRMASI HAPUS SPK */}
             {deleteModal.isOpen && (
                 <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-slate-100 animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-start border-b border-slate-800 pb-3">
                             <div className="flex items-center gap-2 text-rose-400">
-                                <Lock className="w-5 h-5" />
-                                <h3 className="font-bold text-base text-white">Otorisasi Hapus SPK (Owner/Dev)</h3>
+                                <Trash2 className="w-5 h-5" />
+                                <h3 className="font-bold text-base text-white">Konfirmasi Hapus SPK</h3>
                             </div>
                             <button
                                 type="button"
@@ -530,26 +656,11 @@ export default function TabSPKTarif({
                             </div>
                         )}
 
-                        <p className="text-xs text-slate-300">
-                            Anda akan menghapus SPK <span className="font-mono font-bold text-emerald-400">{deleteModal.spkId}</span> ({deleteModal.namaArtikel}).
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                            Apakah Anda yakin ingin menghapus SPK <span className="font-mono font-bold text-emerald-400">{deleteModal.spkId}</span> ({deleteModal.namaArtikel})? Aksi ini tidak dapat dibatalkan.
                         </p>
 
-                        <form onSubmit={handleConfirmDeleteWithPIN} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-400 mb-1">
-                                    Masukkan 6-Digit PIN Keamanan *
-                                </label>
-                                <input
-                                    type="password"
-                                    maxLength={6}
-                                    required
-                                    placeholder="••••••"
-                                    value={pinInput}
-                                    onChange={(e) => setPinInput(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 text-center text-lg font-mono tracking-widest text-emerald-400 rounded-xl p-2.5 focus:ring-2 focus:ring-rose-500 outline-none"
-                                />
-                            </div>
-
+                        <form onSubmit={handleConfirmDelete} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-semibold text-slate-400 mb-1">
                                     Alasan Penghapusan
@@ -575,7 +686,7 @@ export default function TabSPKTarif({
                                     disabled={actionLoading}
                                     className="px-4 py-2 bg-rose-500 hover:bg-rose-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2"
                                 >
-                                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Konfirmasi Hapus'}
+                                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ya, Hapus SPK'}
                                 </button>
                             </div>
                         </form>

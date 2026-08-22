@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Archive, X } from 'lucide-react';
 import { MesinAsset, ArchiveReason } from './types';
 
 interface MesinArchiveModalProps {
@@ -33,9 +34,16 @@ export default function MesinArchiveModal({ machine, onClose, onConfirmArchive }
             <div className="w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <h3 className="text-base font-bold text-rose-400 flex items-center gap-2">
-                        <span>📦</span> Arsipkan / Buang Mesin
+                        <Archive className="w-5 h-5 text-rose-400" />
+                        <span>Arsipkan / Buang Mesin</span>
                     </h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
                 </div>
 
                 <p className="text-xs text-slate-300">

@@ -63,9 +63,9 @@ export default function InventarisFilterBar({ filter, setFilter }: InventarisFil
                         className="w-full bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500"
                     >
                         <option value="ALL">Semua Status</option>
-                        <option value="AMAN">🟢 Stok Aman</option>
-                        <option value="MENIPIS">🟡 Stok Menipis</option>
-                        <option value="HABIS">🔴 Stok Habis</option>
+                        <option value="AMAN">Stok Aman</option>
+                        <option value="MENIPIS">Stok Menipis (Reorder)</option>
+                        <option value="HABIS">Stok Habis</option>
                     </select>
                 </div>
 

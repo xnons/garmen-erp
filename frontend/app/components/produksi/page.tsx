@@ -7,15 +7,14 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-    // 🟢 PASS DATA USER LOGIN DI SINI
+    // 🟢 Meneruskan data user login dengan hak akses eksklusif (RBAC Compliant)
     const currentUser = {
         id_karyawan: 'DEV-001',
         nama: 'Developer Utama',
-        role: 'developer'
+        role: 'DEVELOPER'
     };
 
     return (
-        /* 🟢 Cukup gunakan min-h-screen agar container memanjang bebas mengikuti isi konten */
         <main className="w-full min-h-screen bg-slate-950 text-slate-100">
             <ProduksiPage currentUser={currentUser} />
         </main>

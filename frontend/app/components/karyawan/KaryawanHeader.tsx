@@ -23,8 +23,9 @@ export const KaryawanHeader: React.FC<KaryawanHeaderProps> = ({
     return (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-2xl border border-slate-800">
             <div>
-                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <span>👥 Kelola Data Karyawan</span>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2.5">
+                    <Users className="w-6 h-6 text-indigo-400" />
+                    <span>Kelola Data Karyawan</span>
                 </h2>
                 <p className="text-slate-400 text-sm mt-1">
                     Manajemen SDM, skema borongan/bulanan, log sanksi, dan pengarsipan offboarding.

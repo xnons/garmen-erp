@@ -74,8 +74,11 @@ export interface LogOutput {
     karyawan_id: string;
     spk_id: string;
     tahapan_proses: TahapanProses;
+    nomor_tiket?: string;      // 🟢 Standar Pabrik: Nomor Bundle / Lot Tiket
     qty_disetor: number;
     qty_pass: number;
+    qty_rework?: number;     // 🟢 Standar Pabrik: Barang cacat bisa diperbaiki
+    qty_scrap?: number;      // 🟢 Standar Pabrik: BS / Cacat permanen
     qty_reject: number;
     tarif_per_pcs: number;
     subtotal_rp: number;
@@ -102,15 +105,20 @@ export interface RecordOutputPayload {
     karyawan_id: string;
     spk_id: string;
     tahapan_proses: TahapanProses;
+    nomor_tiket?: string;     // 🟢 Nomor Tiket Bundle/Lot Fisik
     qty_disetor: number;
     qty_pass: number;
-    qty_reject: number;
+    qty_rework?: number;    // 🟢 Rework
+    qty_scrap?: number;     // 🟢 Scrap / BS
+    qty_reject?: number;
     catatan?: string;
     foto_bukti_setoran?: string;
 }
 
 export interface LogOutputFilters {
     tanggal?: string;
+    start_date?: string; // 🟢 Tambahan rentang awal
+    end_date?: string;   // 🟢 Tambahan rentang akhir
     karyawan_id?: string;
     spk_id?: string;
     status_verifikasi?: StatusVerifikasiOutput;
@@ -217,7 +225,7 @@ export const produksiService = {
         return response.data;
     },
 
-    // 1️⃣ SPK Management & Lifecycle (With PIN Guard)
+    // 1️⃣ SPK Management & Lifecycle
     getAllSPK: async (search = '', status = ''): Promise<SPK[]> => {
         const response = await api.get('/api/produksi/spk', {
             params: cleanQueryParams({ search, status_filter: status }),
@@ -240,20 +248,24 @@ export const produksiService = {
         return response.data;
     },
 
-    archiveSPK: async (spkId: string, pin: string): Promise<{ message: string; spk_id: string }> => {
-        const response = await api.post(`/api/produksi/spk/${spkId}/archive`, { pin });
+    archiveSPK: async (spkId: string): Promise<{ message: string; spk_id: string }> => {
+        const response = await api.post(`/api/produksi/spk/${spkId}/archive`);
         return response.data;
     },
 
     deleteSPK: async (
         spkId: string,
-        pin: string,
         alasan_hapus = 'Pembatalan SPK'
     ): Promise<{ message: string; spk_id: string }> => {
         const response = await api.post(`/api/produksi/spk/${spkId}/delete`, {
-            pin,
             alasan_hapus,
         });
+        return response.data;
+    },
+
+    // 🟢 SISIPKAN DI SINI
+    ownerFinishSPK: async (spkId: string): Promise<{ message: string; spk_id: string; status: string }> => {
+        const response = await api.post(`/api/produksi/spk/${spkId}/owner-finish`);
         return response.data;
     },
 
@@ -263,7 +275,7 @@ export const produksiService = {
         return response.data;
     },
 
-    // 3️⃣ Log Output Borongan Worker (Setor & Soft Delete with PIN)
+    // 3️⃣ Log Output Borongan Worker
     recordOutput: async (payload: RecordOutputPayload): Promise<LogOutput> => {
         const response = await api.post('/api/produksi/output', payload);
         return response.data;
@@ -278,12 +290,10 @@ export const produksiService = {
 
     deleteOutputLog: async (
         logId: number,
-        pin: string,
         alasan_hapus = 'Kesalahan Input Data'
     ): Promise<{ message: string; log_id: number }> => {
-        const response = await api.post(`/api/produksi/output/${logId}/delete`, {
-            pin,
-            alasan_hapus,
+        const response = await api.post(`/api/produksi/output/${logId}/delete`, null, {
+            params: { alasan_hapus }
         });
         return response.data;
     },
@@ -322,8 +332,7 @@ export const produksiService = {
 
     markPayrollPaid: async (
         karyawanIds: string[],
-        payrollId: string,
-        pin: string
+        payrollId: string
     ): Promise<{
         message: string;
         payroll_id: string;
@@ -333,12 +342,11 @@ export const produksiService = {
         const response = await api.post('/api/produksi/payroll/mark-paid', {
             karyawan_ids: karyawanIds,
             payroll_id: payrollId,
-            pin,
         });
         return response.data;
     },
 
-    // 6️⃣ Analytics Dashboard Data (🟢 UPGRADED: Mendukung Parameter spkId)
+    // 6️⃣ Analytics Dashboard Data
     getAnalytics: async (
         startDate?: string,
         endDate?: string,

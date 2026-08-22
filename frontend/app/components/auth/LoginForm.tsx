@@ -1,5 +1,8 @@
 "use client";
 
+import React from 'react';
+import { Lock } from 'lucide-react';
+
 interface LoginFormProps {
   onLogin: (e: React.FormEvent) => void;
   setLoginUsername: (value: string) => void;
@@ -50,14 +53,15 @@ export default function LoginForm({
         <button 
           type="submit" 
           disabled={loading}
-          className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-slate-950 font-bold rounded-xl transition-all text-sm shadow-lg shadow-emerald-500/15 disabled:opacity-50"
+          className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-slate-950 font-bold rounded-xl transition-all text-sm shadow-lg shadow-emerald-500/15 disabled:opacity-50 cursor-pointer"
         >
           {loading ? "Memproses Verifikasi..." : "Masuk ke Sistem"}
         </button>
       </form>
 
-      <div className="mt-6 text-center text-xs text-slate-500">
-        🔒 Koneksi terenkripsi. Hak Akses Terbatas Internal.
+      <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-slate-500">
+        <Lock className="w-3.5 h-3.5 text-slate-500" />
+        <span>Koneksi terenkripsi. Hak Akses Terbatas Internal.</span>
       </div>
     </div>
   );

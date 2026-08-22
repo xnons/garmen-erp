@@ -25,22 +25,18 @@ def get_overview_stats(db: Session = Depends(get_db)):
     except Exception:
         total_output_today = 0
 
-    # 2. Total Aset Material Gudang & Count SKU
+    # 2. Total Aset Material Gudang & Count SKU (Menggunakan model BahanBaku)
     total_aset_material = 0.0
     total_sku_count = 0
     try:
-        harga_col = getattr(models.Inventaris, 'harga_per_satuan', getattr(models.Inventaris, 'harga_satuan', 0))
-        stok_col = getattr(models.Inventaris, 'stok_saat_ini', getattr(models.Inventaris, 'stok', 0))
-
         total_aset_material = db.query(
-            func.coalesce(func.sum(stok_col * harga_col), 0)
-        ).filter(getattr(models.Inventaris, 'is_archived', False) == False).scalar() or 0.0
+            func.coalesce(func.sum(models.BahanBaku.stok_saat_ini * models.BahanBaku.harga_per_satuan), 0.0)
+        ).scalar() or 0.0
 
-        total_sku_count = db.query(func.count(models.Inventaris.id)).filter(
-            getattr(models.Inventaris, 'is_archived', False) == False
-        ).scalar() or 0
+        total_sku_count = db.query(func.count(models.BahanBaku.id)).scalar() or 0
     except Exception:
-        pass
+        total_aset_material = 0.0
+        total_sku_count = 0
 
     # 3. Status Mesin Jahit
     mesin_total = 0
@@ -68,7 +64,7 @@ def get_overview_stats(db: Session = Depends(get_db)):
     upah_hari_ini = 0.0
     try:
         upah_hari_ini = db.query(
-            func.coalesce(func.sum(models.LogOutputBorongan.subtotal_rp), 0)
+            func.coalesce(func.sum(models.LogOutputBorongan.subtotal_rp), 0.0)
         ).filter(
             cast(models.LogOutputBorongan.tanggal, Date) == today,
             models.LogOutputBorongan.is_deleted == False
@@ -151,16 +147,16 @@ def get_chart_brand_material(db: Session = Depends(get_db)):
             persentase = round((qty_val / total_qty_semua) * 100)
             chart_data.append({"name": client_name, "value": persentase})
 
-        # Jika belum ada data SPK sama sekali di database, berikan fallback dari Inventaris
+        # Jika belum ada data SPK di database, fallback ke Kategori Bahan Baku
         if not chart_data:
             inv_results = db.query(
-                models.Inventaris.peruntukan_brand,
-                func.sum(models.Inventaris.stok_saat_ini).label('total_stok')
-            ).group_by(models.Inventaris.peruntukan_brand).all()
+                models.BahanBaku.kategori,
+                func.sum(models.BahanBaku.stok_saat_ini).label('total_stok')
+            ).group_by(models.BahanBaku.kategori).all()
 
             total_stok = sum([r.total_stok or 0 for r in inv_results]) or 1
             for r in inv_results:
-                b_name = r.peruntukan_brand.strip() if r.peruntukan_brand and r.peruntukan_brand.strip() else 'Stok Umum'
+                b_name = str(r.kategori).strip() if r.kategori else 'Bahan Baku Lainnya'
                 chart_data.append({"name": b_name, "value": round(((r.total_stok or 0) / total_stok) * 100)})
 
         return chart_data
@@ -179,7 +175,10 @@ def get_chart_payroll(db: Session = Depends(get_db)):
 
         upah_borongan_total = db.query(
             func.coalesce(func.sum(models.LogOutputBorongan.subtotal_rp), 0)
-        ).filter(models.LogOutputBorongan.is_deleted == False).scalar() or 0
+        ).filter(
+            models.LogOutputBorongan.is_deleted == False,
+            models.LogOutputBorongan.status_verifikasi == "APPROVED"
+        ).scalar() or 0
 
         return [
             {"minggu": "M-1", "borongan": 0.0, "pokok": pokok_per_pekan},

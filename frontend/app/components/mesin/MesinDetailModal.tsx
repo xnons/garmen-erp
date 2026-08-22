@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { X } from 'lucide-react';
 import { MesinAsset } from './types';
 
 interface MesinDetailModalProps {
@@ -27,7 +28,13 @@ export default function MesinDetailModal({ machine, onClose }: MesinDetailModalP
                         <h2 className="text-xl font-extrabold text-white mt-0.5">{machine.nama_mesin}</h2>
                         <p className="text-xs text-slate-400 mt-0.5">{machine.merk_model} • Vendor: {machine.vendor_supplier || '-'}</p>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
                 </div>
 
                 {/* Navigation Tabs */}

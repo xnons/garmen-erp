@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, ChangeEvent, FormEvent } from 'react';
-import { ClipboardList, CheckCircle2, Settings, AlertCircle, FileCheck, RefreshCw, BarChart2, KeyRound } from 'lucide-react';
+import { ClipboardList, CheckCircle2, Settings, AlertCircle, FileCheck, RefreshCw, BarChart2, BookOpen, X } from 'lucide-react';
 import {
     produksiService,
     SPK,
@@ -19,9 +19,9 @@ import TabSPKTarif from './TabSPKTarif';
 import SPKModal from './SPKModal';
 import TabAnalitik from './TabAnalitik';
 import LightboxModal from './LightboxModal';
-import { UpdatePinQCModal } from './UpdatePinQCModal'; // 🟢 1. Import Modal PIN QC Khusus
+import TabTutorial from './TabTutorial';
 
-type TabType = 'input' | 'qc' | 'spk' | 'analitik';
+type TabType = 'input' | 'qc' | 'spk' | 'analitik' | 'tutorial';
 
 interface ProduksiPageProps {
     currentUser?: {
@@ -31,9 +31,6 @@ interface ProduksiPageProps {
     };
 }
 
-// ===========================================================================
-// HELPER: UTILITY UNTUK MENGEKSTRAK ERROR PYDANTIC / FASTAPI MENJADI STRING
-// ===========================================================================
 export const extractErrorMessage = (err: any): string => {
     if (!err) return 'Terjadi kesalahan tidak diketahui.';
 
@@ -75,9 +72,6 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
     const [successMessage, setSuccessMessage] = useState<string>('');
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
-    // 🟢 2. State Khusus Modal Ubah PIN QC
-    const [isPinQCModalOpen, setIsPinQCModalOpen] = useState<boolean>(false);
-
     // Lightbox State
     const [lightboxData, setLightboxData] = useState<{
         isOpen: boolean;
@@ -92,8 +86,11 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         karyawan_id: '',
         spk_id: '',
         tahapan_proses: 'SEWING',
+        nomor_tiket: '',
         qty_disetor: '',
         qty_pass: '',
+        qty_rework: '0',
+        qty_scrap: '0',
         qty_reject: '0',
         catatan: ''
     });
@@ -103,7 +100,6 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         setFormInput((prev) => ({ ...prev, tanggal: todayStr }));
     }, []);
 
-    // 1️⃣ Fetch Master Data Awal (SPK & Pekerja Produksi)
     const loadInitialData = useCallback(async () => {
         try {
             setLoading(true);
@@ -121,7 +117,6 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         }
     }, []);
 
-    // 2️⃣ Fetch Logs Setoran Borongan
     const fetchOutputLogs = useCallback(async (filters?: LogOutputFilters) => {
         try {
             setLoading(true);
@@ -146,10 +141,9 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         }
     }, [activeTab, fetchOutputLogs]);
 
-    // 3️⃣ Auto Calculation QTY Pass saat QTY Disetor diubah
     const handleQtyDisetorChange = (e: ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
-        const rejectVal = parseInt(formInput.qty_reject, 10) || 0;
+        const rejectVal = parseInt(formInput.qty_reject || '0', 10) || 0;
         const disetorVal = parseInt(val, 10) || 0;
         const passVal = Math.max(0, disetorVal - rejectVal);
 
@@ -160,7 +154,6 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         }));
     };
 
-    // 4️⃣ Handler Submit Output Pekerja Harian
     const handleSubmitOutput = async (e: FormEvent) => {
         e.preventDefault();
         setErrorMessage('');
@@ -173,8 +166,11 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                 karyawan_id: formInput.karyawan_id,
                 spk_id: formInput.spk_id,
                 tahapan_proses: formInput.tahapan_proses as TahapanProses,
+                nomor_tiket: formInput.nomor_tiket || '',
                 qty_disetor: parseInt(formInput.qty_disetor || '0', 10),
                 qty_pass: parseInt(formInput.qty_pass || '0', 10),
+                qty_rework: parseInt(formInput.qty_rework || '0', 10),
+                qty_scrap: parseInt(formInput.qty_scrap || '0', 10),
                 qty_reject: parseInt(formInput.qty_reject || '0', 10),
                 catatan: formInput.catatan.trim() || undefined
             });
@@ -183,8 +179,11 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
 
             setFormInput((prev) => ({
                 ...prev,
+                nomor_tiket: '',
                 qty_disetor: '',
                 qty_pass: '',
+                qty_rework: '0',
+                qty_scrap: '0',
                 qty_reject: '0',
                 catatan: ''
             }));
@@ -197,7 +196,6 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         }
     };
 
-    // 5️⃣ Handler Single Verification QC
     const handleVerify = async (logId: number, statusQC: StatusVerifikasiOutput) => {
         try {
             await produksiService.verifyOutput(logId, {
@@ -211,7 +209,6 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         }
     };
 
-    // 6️⃣ Handler Bulk Verification QC
     const handleBulkVerify = async (logIds: number[], statusQC: StatusVerifikasiOutput) => {
         try {
             const res = await produksiService.bulkVerifyOutput(logIds, statusQC);
@@ -227,11 +224,13 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         }
     };
 
-    const handleOpenLightbox = (url: string, title: string, caption?: string) => {
+    // 🟢 Menerima type `string | undefined` untuk mencegah error TS2345
+    const handleOpenLightbox = (url?: string, title?: string, caption?: string) => {
+        if (!url) return;
         setLightboxData({
             isOpen: true,
             url,
-            title,
+            title: title || 'Dokumen Bukti Foto',
             caption
         });
     };
@@ -248,17 +247,6 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {/* 🟢 3. Tombol Ubah PIN QC Khusus Modul Produksi */}
-                    <button
-                        type="button"
-                        onClick={() => setIsPinQCModalOpen(true)}
-                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
-                        title="Ubah PIN Otorisasi QC"
-                    >
-                        <KeyRound className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span className="hidden sm:inline">PIN QC</span>
-                    </button>
-
                     <button
                         type="button"
                         onClick={() => {
@@ -320,6 +308,18 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                             <BarChart2 className="w-4 h-4" />
                             Dashboard Analitik
                         </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('tutorial')}
+                            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'tutorial'
+                                ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                                }`}
+                        >
+                            <BookOpen className="w-4 h-4" />
+                            Tutorial
+                        </button>
                     </div>
                 </div>
             </div>
@@ -334,9 +334,9 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                     <button
                         type="button"
                         onClick={() => setErrorMessage('')}
-                        className="font-bold hover:text-white transition"
+                        className="p-1 text-rose-400 hover:text-white rounded-lg hover:bg-rose-500/20 transition-colors cursor-pointer"
                     >
-                        ✕
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
             )}
@@ -350,9 +350,9 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                     <button
                         type="button"
                         onClick={() => setSuccessMessage('')}
-                        className="font-bold hover:text-white transition"
+                        className="p-1 text-emerald-400 hover:text-white rounded-lg hover:bg-emerald-500/20 transition-colors cursor-pointer"
                     >
-                        ✕
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
             )}
@@ -404,6 +404,9 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
             {/* TAB CONTENT 4: DASHBOARD ANALITIK */}
             {activeTab === 'analitik' && <TabAnalitik />}
 
+            {/* TAB CONTENT 5: PANDUAN TUTORIAL */}
+            {activeTab === 'tutorial' && <TabTutorial />}
+
             {/* MODAL RILIS SPK BARU */}
             <SPKModal
                 isOpen={isModalOpen}
@@ -418,13 +421,6 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                 title={lightboxData.title}
                 caption={lightboxData.caption}
                 onClose={() => setLightboxData({ isOpen: false })}
-            />
-
-            {/* 🟢 4. MODAL KHUSUS UBAH PIN QC */}
-            <UpdatePinQCModal
-                isOpen={isPinQCModalOpen}
-                onClose={() => setIsPinQCModalOpen(false)}
-                activeUser={currentUser}
             />
         </div>
     );

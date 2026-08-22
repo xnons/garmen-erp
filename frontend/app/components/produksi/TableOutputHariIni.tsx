@@ -16,7 +16,6 @@ import {
     RefreshCw
 } from 'lucide-react';
 
-// 🟢 1. Import LogOutputFilters langsung dari produksiService
 import { LogOutput, StatusVerifikasiOutput, LogOutputFilters } from '../services/produksiService';
 
 interface TableOutputHariIniProps {
@@ -24,7 +23,6 @@ interface TableOutputHariIniProps {
     onOpenLightbox?: (url: string, title: string, caption?: string) => void;
     karyawanList?: { id_karyawan: string; nama: string }[];
     spkList?: { id: string; nama_artikel: string }[];
-    // 🟢 2. Gunakan tipe LogOutputFilters agar sinkron dengan ProduksiPage.tsx
     onFetchLogs?: (filters?: LogOutputFilters) => void;
     isLoading?: boolean;
 }
@@ -40,13 +38,12 @@ export default function TableOutputHariIni({
     // 🗓️ Helper Tanggal Hari Ini (YYYY-MM-DD)
     const getTodayString = () => new Date().toISOString().split('T')[0];
 
-    // 🎛️ State Mode & Filter Local
+    // 🎛️ State Mode & Filter Local (Mengganti tanggal tunggal dengan rentang startDate & endDate)
     const [viewMode, setViewMode] = useState<'today' | 'history'>('today');
-    const [filterTanggal, setFilterTanggal] = useState<string>(getTodayString());
+    const [startDate, setStartDate] = useState<string>(getTodayString());
+    const [endDate, setEndDate] = useState<string>(getTodayString());
     const [filterKaryawan, setFilterKaryawan] = useState<string>('');
     const [filterSPK, setFilterSPK] = useState<string>('');
-
-    // 🟢 3. Typecast State status QC ke StatusVerifikasiOutput | ''
     const [filterStatus, setFilterStatus] = useState<StatusVerifikasiOutput | ''>('');
 
     // 🔄 Panggil Refetch Backend saat Mode / Filter Berubah
@@ -57,29 +54,35 @@ export default function TableOutputHariIni({
             onFetchLogs({ tanggal: getTodayString() });
         } else {
             onFetchLogs({
-                tanggal: filterTanggal || undefined,
+                start_date: startDate || undefined,
+                end_date: endDate || undefined,
                 karyawan_id: filterKaryawan || undefined,
                 spk_id: filterSPK || undefined,
                 status_verifikasi: filterStatus ? (filterStatus as StatusVerifikasiOutput) : undefined,
             });
         }
-    }, [viewMode, filterTanggal, filterKaryawan, filterSPK, filterStatus, onFetchLogs]);
+    }, [viewMode, startDate, endDate, filterKaryawan, filterSPK, filterStatus, onFetchLogs]);
 
-    // 🔍 Fallback Filter Client-Side (Jika backend fetch tidak digunakan)
+    // 🔍 Fallback Filter Client-Side Berdasarkan Rentang Tanggal
     const displayedLogs = useMemo(() => {
-        if (onFetchLogs) return outputLogs;
-
         return outputLogs.filter((log) => {
+            const logDateOnly = log.tanggal ? String(log.tanggal).split('T')[0] : '';
+
             if (viewMode === 'today') {
-                return log.tanggal === getTodayString();
+                return logDateOnly === getTodayString();
             }
-            if (filterTanggal && log.tanggal !== filterTanggal) return false;
+
+            // Validasi Rentang Tanggal (Start s/d End Date)
+            if (startDate && logDateOnly < startDate) return false;
+            if (endDate && logDateOnly > endDate) return false;
+
             if (filterKaryawan && log.karyawan_id !== filterKaryawan) return false;
             if (filterSPK && log.spk_id !== filterSPK) return false;
             if (filterStatus && log.status_verifikasi !== filterStatus) return false;
+
             return true;
         });
-    }, [outputLogs, viewMode, filterTanggal, filterKaryawan, filterSPK, filterStatus, onFetchLogs]);
+    }, [outputLogs, viewMode, startDate, endDate, filterKaryawan, filterSPK, filterStatus]);
 
     // 📊 Kalkulasi Agregat Ringkasan (KPI Metrics)
     const statsToday = useMemo(() => {
@@ -92,7 +95,8 @@ export default function TableOutputHariIni({
 
     // Reset Filter Form
     const handleResetFilter = () => {
-        setFilterTanggal('');
+        setStartDate(getTodayString());
+        setEndDate(getTodayString());
         setFilterKaryawan('');
         setFilterSPK('');
         setFilterStatus('');
@@ -197,7 +201,8 @@ export default function TableOutputHariIni({
                             type="button"
                             onClick={() => {
                                 setViewMode('today');
-                                setFilterTanggal(getTodayString());
+                                setStartDate(getTodayString());
+                                setEndDate(getTodayString());
                             }}
                             className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${viewMode === 'today'
                                 ? 'bg-emerald-500 text-slate-950 font-bold shadow-md'
@@ -222,13 +227,13 @@ export default function TableOutputHariIni({
                     </div>
                 </div>
 
-                {/* 🔍 PANEL FILTER (Aktif di Mode 'history') */}
+                {/* 🔍 PANEL FILTER RENTANG TANGGAL (Aktif di Mode 'history') */}
                 {viewMode === 'history' && (
                     <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3 animate-in fade-in duration-200">
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                                 <Filter className="w-3.5 h-3.5 text-emerald-400" />
-                                Filter Data Setoran
+                                Filter Rentang Tanggal & Atribut
                             </span>
                             <button
                                 type="button"
@@ -239,14 +244,25 @@ export default function TableOutputHariIni({
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                            {/* Filter Tanggal */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                            {/* Dari Tanggal */}
                             <div>
-                                <label className="block text-slate-400 mb-1 font-medium">Tanggal</label>
+                                <label className="block text-slate-400 mb-1 font-medium">Dari Tanggal</label>
                                 <input
                                     type="date"
-                                    value={filterTanggal}
-                                    onChange={(e) => setFilterTanggal(e.target.value)}
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                                />
+                            </div>
+
+                            {/* Sampai Tanggal */}
+                            <div>
+                                <label className="block text-slate-400 mb-1 font-medium">Sampai Tanggal</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
                                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
                                 />
                             </div>
@@ -335,7 +351,7 @@ export default function TableOutputHariIni({
                                             <span>
                                                 {viewMode === 'today'
                                                     ? 'Belum ada setoran output dicatat hari ini.'
-                                                    : 'Tidak ada data setoran yang cocok dengan filter.'}
+                                                    : 'Tidak ada data setoran yang cocok dengan filter rentang tanggal.'}
                                             </span>
                                         </div>
                                     </td>
