@@ -22,16 +22,18 @@ def auto_migrate_db():
     with engine.connect() as conn:
         is_sqlite = engine.url.drivername.startswith("sqlite")
         columns_to_add = [
-            ("kode_mesin", "VARCHAR(50)"),
-            ("bahan_id", "VARCHAR(50)"),
-            ("jumlah_bahan_digunakan", "FLOAT DEFAULT 0.0"),
+            ("log_output_borongan", "kode_mesin", "VARCHAR(50)"),
+            ("log_output_borongan", "bahan_id", "VARCHAR(50)"),
+            ("log_output_borongan", "jumlah_bahan_digunakan", "FLOAT DEFAULT 0.0"),
+            ("log_login", "device_info", "VARCHAR(255)"),
+            ("log_login", "lokasi", "VARCHAR(255)"),
         ]
-        for col_name, col_type in columns_to_add:
+        for tbl_name, col_name, col_type in columns_to_add:
             try:
                 if is_sqlite:
-                    conn.execute(text(f"ALTER TABLE log_output_borongan ADD COLUMN {col_name} {col_type};"))
+                    conn.execute(text(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} {col_type};"))
                 else:
-                    conn.execute(text(f"ALTER TABLE log_output_borongan ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
+                    conn.execute(text(f"ALTER TABLE {tbl_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
                 conn.commit()
             except Exception:
                 pass

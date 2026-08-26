@@ -19,6 +19,7 @@ from core.security import (
     get_current_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from core.client_tracker import parse_device_info, get_real_client_ip, get_location_from_ip
 
 router = APIRouter(tags=["Autentikasi & Security Gate"])
 
@@ -62,14 +63,25 @@ def is_working_hours() -> bool:
     return start_work <= now_wib_time <= end_work
 
 
-# 📝 Helper Rekam Log Login & Security Attempt
-def record_login_log(db: Session, karyawan_id: Optional[str], username: str, status_login: str, ip_address: Optional[str], ket: Optional[str] = None):
+# 📝 Helper Rekam Log Login & Security Attempt (Dilengkapi Device & Lokasi)
+def record_login_log(
+    db: Session,
+    karyawan_id: Optional[str],
+    username: str,
+    status_login: str,
+    ip_address: Optional[str],
+    device_info: Optional[str] = None,
+    lokasi: Optional[str] = None,
+    ket: Optional[str] = None
+):
     try:
         log_entry = models.LogLogin(
             karyawan_id=karyawan_id,
             username=username,
             status=status_login,
             ip_address=ip_address,
+            device_info=device_info,
+            lokasi=lokasi,
             keterangan=ket
         )
         db.add(log_entry)
@@ -151,27 +163,58 @@ async def register_karyawan(
     return {"message": f"Karyawan {user_data.nama} ({final_id}) sukses didaftarkan!"}
 
 
-# 🟢 2. Login Utama (Dilengkapi Login Time Guard & Audit Log)
+# 🟢 2. Login Utama (Dilengkapi Login Time Guard, Device Tracking, Geo Location, & Audit Log)
 @router.post("/login")
 async def login(credentials: LoginInput, request: Request, db: Session = Depends(get_db)):
-    client_ip = request.client.host if request.client else "Unknown"
+    client_ip = get_real_client_ip(request)
+    user_agent = request.headers.get("user-agent", "")
+    device_info = parse_device_info(user_agent)
+    lokasi = get_location_from_ip(client_ip, request)
+    
     user = db.query(models.Karyawan).filter(models.Karyawan.username == credentials.username).first()
     
     # 1️⃣ Validasi Kredensial Password
     if not user or not verify_password(credentials.password, user.hashed_password):
-        record_login_log(db, user.id_karyawan if user else None, credentials.username, "FAILED_PASSWORD", client_ip, "Kombinasi Username atau Password salah")
+        record_login_log(
+            db, 
+            user.id_karyawan if user else None, 
+            credentials.username, 
+            "FAILED_PASSWORD", 
+            client_ip, 
+            device_info, 
+            lokasi, 
+            "Kombinasi Username atau Password salah"
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kombinasi Username atau Password salah!")
     
     # 2️⃣ Validasi Status Aktif Akun
     if not user.is_active:
-        record_login_log(db, user.id_karyawan, credentials.username, "BLOCKED_INACTIVE", client_ip, "Akun nonaktif/diarsipkan")
+        record_login_log(
+            db, 
+            user.id_karyawan, 
+            credentials.username, 
+            "BLOCKED_INACTIVE", 
+            client_ip, 
+            device_info, 
+            lokasi, 
+            "Akun nonaktif/diarsipkan"
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Akun Anda dalam status nonaktif/diarsipkan.")
 
     # 3️⃣ 🛡️ Login Time Guard (Blokir Akses di Luar Jam Kerja, Kecuali Owner/Developer)
     user_role_upper = str(user.role or "").upper()
     if user_role_upper not in ["OWNER", "DEVELOPER"]:
         if not is_working_hours():
-            record_login_log(db, user.id_karyawan, credentials.username, "BLOCKED_OFF_HOURS", client_ip, "Upaya login di luar jam operasional (07:00 - 20:00)")
+            record_login_log(
+                db, 
+                user.id_karyawan, 
+                credentials.username, 
+                "BLOCKED_OFF_HOURS", 
+                client_ip, 
+                device_info, 
+                lokasi, 
+                "Upaya login di luar jam operasional (07:00 - 20:00)"
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail="Akses Ditolak: Sistem dibatasi di luar jam operasional (07:00 - 20:00). Hubungi Owner untuk pengecualian."
@@ -183,7 +226,16 @@ async def login(credentials: LoginInput, request: Request, db: Session = Depends
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     
-    record_login_log(db, user.id_karyawan, credentials.username, "SUCCESS", client_ip, "Login berhasil")
+    record_login_log(
+        db, 
+        user.id_karyawan, 
+        credentials.username, 
+        "SUCCESS", 
+        client_ip, 
+        device_info, 
+        lokasi, 
+        "Login berhasil"
+    )
 
     return {
         "access_token": token,

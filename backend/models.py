@@ -362,4 +362,6 @@ class LogLogin(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     status = Column(String(50), nullable=False)    # "SUCCESS", "BLOCKED_OFF_HOURS", "FAILED_PASSWORD"
     ip_address = Column(String(50), nullable=True)
+    device_info = Column(String(255), nullable=True)  # Contoh: "💻 Windows (Chrome)" atau "📱 Android (Chrome Mobile)"
+    lokasi = Column(String(255), nullable=True)       # Contoh: "Jakarta, Indonesia (Telkomsel)"
     keterangan = Column(String(255), nullable=True)

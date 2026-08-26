@@ -34,6 +34,8 @@ def get_login_logs(
             "timestamp": log.timestamp,
             "status": log.status,
             "ip_address": log.ip_address,
+            "device_info": getattr(log, 'device_info', None) or "Tidak Diketahui",
+            "lokasi": getattr(log, 'lokasi', None) or "Tidak Diketahui",
             "keterangan": log.keterangan
         }
         for log in logs
