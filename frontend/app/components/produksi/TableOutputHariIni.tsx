@@ -13,7 +13,9 @@ import {
     Sparkles,
     Filter,
     RotateCcw,
-    RefreshCw
+    RefreshCw,
+    Cpu,
+    Package
 } from 'lucide-react';
 
 import { LogOutput, StatusVerifikasiOutput, LogOutputFilters } from '../services/produksiService';
@@ -328,15 +330,16 @@ export default function TableOutputHariIni({
                                 <th className="py-3 px-3.5 font-semibold">Pekerja</th>
                                 <th className="py-3 px-3.5 font-semibold">Artikel SPK</th>
                                 <th className="py-3 px-3.5 font-semibold">Sub-Proses</th>
+                                <th className="py-3 px-3.5 font-semibold">Mesin & Bahan</th>
                                 <th className="py-3 px-3.5 text-center font-semibold">Pass / Disetor</th>
-                                <th className="py-3 px-3.5 text-right font-semibold">Subtotal Rp</th>
+                                <th className="py-3 px-3.5 text-right font-semibold">Subtotal Upah</th>
                                 <th className="py-3 px-3.5 text-center font-semibold">Status QC</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 text-slate-300">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={viewMode === 'history' ? 7 : 6} className="py-16 text-center text-slate-500 font-medium">
+                                    <td colSpan={viewMode === 'history' ? 8 : 7} className="py-16 text-center text-slate-500 font-medium">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <RefreshCw className="w-6 h-6 text-emerald-400 animate-spin" />
                                             <span>Memuat data setoran...</span>
@@ -345,7 +348,7 @@ export default function TableOutputHariIni({
                                 </tr>
                             ) : displayedLogs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={viewMode === 'history' ? 7 : 6} className="py-16 text-center text-slate-500 font-medium">
+                                    <td colSpan={viewMode === 'history' ? 8 : 7} className="py-16 text-center text-slate-500 font-medium">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <History className="w-8 h-8 text-slate-600 stroke-[1.5]" />
                                             <span>
@@ -380,7 +383,7 @@ export default function TableOutputHariIni({
                                                                 log.foto_bukti_setoran!,
                                                                 `Bukti Foto: ${log.spk_id}`,
                                                                 `Pekerja: ${log.nama_karyawan || log.karyawan_id} (${log.tahapan_proses})`
-                                                            )}
+                                                             )}
                                                             className="text-emerald-400 hover:text-emerald-300 p-1 bg-slate-950 border border-slate-800 hover:border-emerald-500/40 rounded-md transition-colors"
                                                             title="Lihat Foto Bukti Setoran"
                                                         >
@@ -410,6 +413,28 @@ export default function TableOutputHariIni({
                                                 </span>
                                             </td>
 
+                                            {/* MESIN & BAHAN BAKU */}
+                                            <td className="py-3.5 px-3.5">
+                                                <div className="space-y-1">
+                                                    {log.kode_mesin || log.nama_mesin ? (
+                                                        <div className="inline-flex items-center gap-1 text-[10px] font-mono text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20" title={log.nama_mesin || log.kode_mesin}>
+                                                            <Cpu className="w-3 h-3 text-cyan-400 shrink-0" />
+                                                            <span className="truncate max-w-[120px]">{log.nama_mesin || log.kode_mesin}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-600 block">-</span>
+                                                    )}
+                                                    {log.nama_bahan && (
+                                                        <div className="flex items-center gap-1 text-[10px] text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20" title={`${log.nama_bahan} (${log.jumlah_bahan_digunakan || 0} ${log.satuan_bahan || ''})`}>
+                                                            <Package className="w-3 h-3 text-indigo-400 shrink-0" />
+                                                            <span className="truncate max-w-[120px]">
+                                                                {log.jumlah_bahan_digunakan} {log.satuan_bahan || ''} {log.nama_bahan}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+
                                             {/* PASS / DISETOR & REJECT BADGE */}
                                             <td className="py-3.5 px-3.5 text-center">
                                                 <div className="font-bold font-mono text-emerald-400 text-xs">
@@ -421,14 +446,21 @@ export default function TableOutputHariIni({
                                                 {hasReject && (
                                                     <div className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
                                                         <AlertTriangle className="w-3 h-3 shrink-0" />
-                                                        <span>{log.qty_reject} Reject</span>
+                                                        <span>{log.qty_reject} Defect</span>
                                                     </div>
                                                 )}
                                             </td>
 
                                             {/* SUBTOTAL RP */}
-                                            <td className="py-3.5 px-3.5 text-right font-bold text-amber-400 font-mono text-xs">
-                                                Rp {(log.subtotal_rp || 0).toLocaleString('id-ID')}
+                                            <td className="py-3.5 px-3.5 text-right font-mono text-xs">
+                                                <div className="font-bold text-amber-400">
+                                                    Rp {(log.subtotal_rp || 0).toLocaleString('id-ID')}
+                                                </div>
+                                                {log.is_paid && (
+                                                    <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded font-semibold">
+                                                        PAID
+                                                    </span>
+                                                )}
                                             </td>
 
                                             {/* STATUS QC */}

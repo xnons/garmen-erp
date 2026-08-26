@@ -123,7 +123,51 @@ def record_worker_output(
                 detail=f"Alur Rantai Pasok Terisolasi! Output {tahapan_str} ({total_subproses_exist + payload.qty_pass} Pcs) melebihi hasil Cutting yang sudah di-approve QC ({total_cutting_approved} Pcs)."
             )
 
-    # 6. Hitung & Simpan Log Output
+    # 6. Validasi & Penanganan Mesin yang Digunakan
+    mesin_record = None
+    if getattr(payload, "kode_mesin", None):
+        mesin_record = db.query(models.Mesin).filter(models.Mesin.kode_mesin == payload.kode_mesin).first()
+        if not mesin_record:
+            raise HTTPException(status_code=404, detail=f"Mesin dengan kode '{payload.kode_mesin}' tidak ditemukan!")
+        # Update operator aktif pada mesin
+        mesin_record.operator_id = payload.karyawan_id
+        mesin_record.updated_at = datetime.utcnow()
+
+    # 7. Validasi & Pengurangan Bahan Baku Inventaris
+    bahan_record = None
+    jumlah_dipakai = 0.0
+    if getattr(payload, "bahan_id", None):
+        bahan_record = db.query(models.BahanBaku).filter(models.BahanBaku.id == payload.bahan_id).first()
+        if not bahan_record:
+            raise HTTPException(status_code=404, detail=f"Bahan baku ID '{payload.bahan_id}' tidak ditemukan di inventaris!")
+
+        # Tentukan jumlah pemakaian bahan
+        if getattr(payload, "jumlah_bahan_digunakan", 0) and payload.jumlah_bahan_digunakan > 0:
+            jumlah_dipakai = float(payload.jumlah_bahan_digunakan)
+        elif tahapan_str == "CUTTING" and getattr(spk, "konsumsi_kain_per_pcs", 0) and spk.konsumsi_kain_per_pcs > 0:
+            jumlah_dipakai = round(float(payload.qty_pass) * float(spk.konsumsi_kain_per_pcs), 2)
+
+        if jumlah_dipakai > 0:
+            stok_awal = float(bahan_record.stok_saat_ini or 0.0)
+            stok_akhir = stok_awal - jumlah_dipakai
+            bahan_record.stok_saat_ini = stok_akhir
+            bahan_record.terakhir_diperbarui = datetime.utcnow()
+
+            # Rekam mutasi bahan KELUAR_PRODUKSI
+            log_mutasi = models.LogMutasiBahan(
+                bahan_id=bahan_record.id,
+                tanggal=datetime.utcnow(),
+                tipe="KELUAR_PRODUKSI",
+                jumlah=jumlah_dipakai,
+                stok_sebelum=stok_awal,
+                stok_sesudah=stok_akhir,
+                referensi_po_spk=f"{spk.id} - Setoran {tahapan_str} #{getattr(payload, 'nomor_tiket', '') or ''}",
+                catatan=f"Pengurangan otomatis output produksi {tahapan_str} ({payload.qty_pass} Pcs) oleh {karyawan.nama}",
+                petugas=getattr(current_user, "nama", None) or current_user.id_karyawan
+            )
+            db.add(log_mutasi)
+
+    # 8. Hitung & Simpan Log Output
     tarif_snapshot = tarif_record.tarif_per_pcs
     subtotal = payload.qty_pass * tarif_snapshot
 
@@ -133,6 +177,9 @@ def record_worker_output(
         spk_id=payload.spk_id,
         tahapan_proses=tahapan_str,
         nomor_tiket=getattr(payload, 'nomor_tiket', None),
+        kode_mesin=payload.kode_mesin if getattr(payload, 'kode_mesin', None) else None,
+        bahan_id=payload.bahan_id if getattr(payload, 'bahan_id', None) else None,
+        jumlah_bahan_digunakan=jumlah_dipakai,
         qty_disetor=payload.qty_disetor,
         qty_pass=payload.qty_pass,
         qty_rework=rework_val,
@@ -157,8 +204,21 @@ def record_worker_output(
     db.refresh(new_log)
 
     new_log.nama_karyawan = karyawan.nama
+    new_log.tipe_pay_karyawan = getattr(karyawan, "tipe_pay", "BORONGAN")
     new_log.nama_artikel = spk.nama_artikel
+    new_log.nama_mesin = f"{mesin_record.nama_mesin} ({mesin_record.kode_mesin})" if mesin_record else None
+    new_log.nama_bahan = bahan_record.nama_item if bahan_record else None
+    new_log.satuan_bahan = bahan_record.satuan if bahan_record else None
     return new_log
+
+
+def _populate_log_details(log: models.LogOutputBorongan):
+    log.nama_karyawan = log.karyawan.nama if log.karyawan else log.karyawan_id
+    log.tipe_pay_karyawan = log.karyawan.tipe_pay if log.karyawan else "BORONGAN"
+    log.nama_artikel = log.spk.nama_artikel if log.spk else "-"
+    log.nama_mesin = f"{log.mesin.nama_mesin} ({log.mesin.kode_mesin})" if log.mesin else (log.kode_mesin or None)
+    log.nama_bahan = log.bahan.nama_item if log.bahan else (log.bahan_id or None)
+    log.satuan_bahan = log.bahan.satuan if log.bahan else None
 
 
 @router.get("/output", response_model=List[LogOutputResponse])
@@ -169,6 +229,7 @@ def get_output_logs(
     end_date: Optional[date] = Query(None, description="Filter rentang tanggal akhir"),
     karyawan_id: Optional[str] = Query(None, description="Filter per karyawan"),
     spk_id: Optional[str] = Query(None, description="Filter per SPK"),
+    kode_mesin: Optional[str] = Query(None, description="Filter per mesin"),
     status_verifikasi: Optional[StatusVerifikasiOutput] = Query(None, description="Filter status QC"),
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
@@ -189,6 +250,8 @@ def get_output_logs(
         query = query.filter(models.LogOutputBorongan.karyawan_id == karyawan_id)
     if spk_id:
         query = query.filter(models.LogOutputBorongan.spk_id == spk_id)
+    if kode_mesin:
+        query = query.filter(models.LogOutputBorongan.kode_mesin == kode_mesin)
     if status_verifikasi:
         query = query.filter(models.LogOutputBorongan.status_verifikasi == get_enum_val(status_verifikasi))
 
@@ -196,8 +259,7 @@ def get_output_logs(
     logs = query.order_by(models.LogOutputBorongan.tanggal.desc(), models.LogOutputBorongan.created_at.desc()).all()
 
     for log in logs:
-        log.nama_karyawan = log.karyawan.nama if log.karyawan else log.karyawan_id
-        log.nama_artikel = log.spk.nama_artikel if log.spk else "-"
+        _populate_log_details(log)
 
     return logs
 
@@ -227,12 +289,35 @@ def delete_output_log(
     log.deleted_by = getattr(current_user, "nama", None) or current_user.id_karyawan
     log.alasan_hapus = alasan_hapus
 
+    # Rollback cutting quota
     if log.tahapan_proses == "CUTTING" and log.spk:
         log.spk.realisasi_potong = max(0, log.spk.realisasi_potong - log.qty_pass)
 
+    # Rollback stok bahan baku jika sebelumnya ada pemakaian bahan
+    if log.bahan_id and (log.jumlah_bahan_digunakan or 0) > 0:
+        bahan = db.query(models.BahanBaku).filter(models.BahanBaku.id == log.bahan_id).first()
+        if bahan:
+            stok_awal = float(bahan.stok_saat_ini or 0.0)
+            stok_akhir = stok_awal + float(log.jumlah_bahan_digunakan)
+            bahan.stok_saat_ini = stok_akhir
+            bahan.terakhir_diperbarui = datetime.utcnow()
+
+            mutasi_retur = models.LogMutasiBahan(
+                bahan_id=bahan.id,
+                tanggal=datetime.utcnow(),
+                tipe="PENYESUAIAN",
+                jumlah=float(log.jumlah_bahan_digunakan),
+                stok_sebelum=stok_awal,
+                stok_sesudah=stok_akhir,
+                referensi_po_spk=f"Rollback Setoran #{log.id} ({log.spk_id})",
+                catatan=f"Pengembalian stok bahan karena setoran output #{log.id} dihapus. Alasan: {alasan_hapus}",
+                petugas=getattr(current_user, "nama", None) or current_user.id_karyawan
+            )
+            db.add(mutasi_retur)
+
     db.commit()
 
-    return {"message": f"Log setoran #{log_id} berhasil dihapus dari sistem.", "log_id": log_id}
+    return {"message": f"Log setoran #{log_id} berhasil dihapus dan stok bahan terkait telah di-rollback.", "log_id": log_id}
 
 
 # ===========================================================================
@@ -294,8 +379,7 @@ def verify_output_log(
     db.commit()
     db.refresh(log)
 
-    log.nama_karyawan = log.karyawan.nama if log.karyawan else log.karyawan_id
-    log.nama_artikel = log.spk.nama_artikel if log.spk else "-"
+    _populate_log_details(log)
 
     return log
 

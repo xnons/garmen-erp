@@ -75,6 +75,12 @@ export interface LogOutput {
     spk_id: string;
     tahapan_proses: TahapanProses;
     nomor_tiket?: string;      // 🟢 Standar Pabrik: Nomor Bundle / Lot Tiket
+    kode_mesin?: string;       // 🟢 Modul Mesin Terintegrasi
+    nama_mesin?: string;
+    bahan_id?: string;         // 🟢 Modul Inventaris Terintegrasi
+    nama_bahan?: string;
+    satuan_bahan?: string;
+    jumlah_bahan_digunakan?: number;
     qty_disetor: number;
     qty_pass: number;
     qty_rework?: number;     // 🟢 Standar Pabrik: Barang cacat bisa diperbaiki
@@ -97,6 +103,7 @@ export interface LogOutput {
     created_at?: string;
 
     nama_karyawan?: string;
+    tipe_pay_karyawan?: string;
     nama_artikel?: string;
 }
 
@@ -106,6 +113,9 @@ export interface RecordOutputPayload {
     spk_id: string;
     tahapan_proses: TahapanProses;
     nomor_tiket?: string;     // 🟢 Nomor Tiket Bundle/Lot Fisik
+    kode_mesin?: string;      // 🟢 Mesin yang digunakan
+    bahan_id?: string;        // 🟢 Bahan baku yang dikurangi
+    jumlah_bahan_digunakan?: number; // 🟢 Konsumsi bahan
     qty_disetor: number;
     qty_pass: number;
     qty_rework?: number;    // 🟢 Rework

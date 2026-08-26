@@ -266,6 +266,11 @@ class LogOutputBorongan(Base):
     payroll_id = Column(String(100), nullable=True)             # ID Slip / Periode Gaji
     paid_at = Column(DateTime, nullable=True)
 
+    # Relasi Mesin & Inventaris Terintegrasi
+    kode_mesin = Column(String(50), ForeignKey("mesin.kode_mesin"), nullable=True)
+    bahan_id = Column(String(50), ForeignKey("bahan_baku.id"), nullable=True)
+    jumlah_bahan_digunakan = Column(Float, nullable=True, default=0.0)
+
     # Soft Delete Audit Trail (Diperlukan untuk penghapusan ber-PIN)
     is_deleted = Column(Boolean, default=False)
     deleted_at = Column(DateTime, nullable=True)
@@ -277,6 +282,8 @@ class LogOutputBorongan(Base):
     # Relasi
     spk = relationship("SPKProduksi", back_populates="output_logs")
     karyawan = relationship("Karyawan", back_populates="output_borongan")
+    mesin = relationship("Mesin", foreign_keys=[kode_mesin])
+    bahan = relationship("BahanBaku", foreign_keys=[bahan_id])
 
 
 # ===========================================================================

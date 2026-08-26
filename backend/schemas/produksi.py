@@ -186,7 +186,10 @@ class LogOutputBase(BaseModel):
     karyawan_id: str
     spk_id: str
     tahapan_proses: Optional[str] = "SEWING"
-    nomor_tiket: Optional[str] = None      # 🟢 Tambahkan field nomor tiket
+    nomor_tiket: Optional[str] = None      # 🟢 Standar Pabrik: Nomor Tiket Bundle / Lot Fisik
+    kode_mesin: Optional[str] = None       # 🟢 Modul Mesin Terintegrasi
+    bahan_id: Optional[str] = None         # 🟢 Modul Inventaris Terintegrasi
+    jumlah_bahan_digunakan: Optional[float] = Field(default=0.0, ge=0.0) # 🟢 Konsumsi Bahan Baku
     qty_disetor: Optional[int] = Field(default=0, ge=0)
     qty_pass: Optional[int] = Field(default=0, ge=0)
     qty_rework: Optional[int] = Field(default=0, ge=0)  # 🟢 Tambahkan rework
@@ -202,6 +205,9 @@ class LogOutputCreate(LogOutputBase):
 
 
 class LogOutputUpdate(BaseModel):
+    kode_mesin: Optional[str] = None
+    bahan_id: Optional[str] = None
+    jumlah_bahan_digunakan: Optional[float] = Field(default=None, ge=0.0)
     qty_disetor: Optional[int] = Field(default=None, gt=0)
     qty_pass: Optional[int] = Field(default=None, ge=0)
     qty_reject: Optional[int] = Field(default=None, ge=0)
@@ -240,6 +246,10 @@ class LogOutputResponse(LogOutputBase):
     
     nama_karyawan: Optional[str] = None
     nama_artikel: Optional[str] = None
+    nama_mesin: Optional[str] = None
+    nama_bahan: Optional[str] = None
+    satuan_bahan: Optional[str] = None
+    tipe_pay_karyawan: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 

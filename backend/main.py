@@ -13,13 +13,34 @@ from core.security import get_password_hash
 from routers import auth, karyawan, mesin, inventaris, dashboard, audit, payroll
 from routers import produksi_master, produksi_output
 
+from sqlalchemy import text
+
 # Buat Tabel Database Otomatis jika belum ada
 models.Base.metadata.create_all(bind=engine)
+
+def auto_migrate_db():
+    with engine.connect() as conn:
+        is_sqlite = engine.url.drivername.startswith("sqlite")
+        columns_to_add = [
+            ("kode_mesin", "VARCHAR(50)"),
+            ("bahan_id", "VARCHAR(50)"),
+            ("jumlah_bahan_digunakan", "FLOAT DEFAULT 0.0"),
+        ]
+        for col_name, col_type in columns_to_add:
+            try:
+                if is_sqlite:
+                    conn.execute(text(f"ALTER TABLE log_output_borongan ADD COLUMN {col_name} {col_type};"))
+                else:
+                    conn.execute(text(f"ALTER TABLE log_output_borongan ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
+                conn.commit()
+            except Exception:
+                pass
 
 
 # --- LIFESPAN SEEDER ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    auto_migrate_db()
     db = SessionLocal()
     try:
         # Seeder Akun Owner Master

@@ -16,7 +16,9 @@ import {
     CheckCircle2,
     RefreshCw,
     Lock,
-    AlertTriangle
+    AlertTriangle,
+    Cpu,
+    Package
 } from 'lucide-react';
 import { LogOutput, StatusVerifikasiOutput } from '../services/produksiService';
 
@@ -404,9 +406,23 @@ export default function TabVerifikasiQC({
                                         </td>
 
                                         <td className="py-3.5 px-3.5">
-                                            <span className="text-[10px] bg-slate-950 text-slate-300 border border-slate-800 font-semibold px-2 py-0.5 rounded-md font-mono">
+                                            <span className="text-[10px] bg-slate-950 text-slate-300 border border-slate-800 font-semibold px-2 py-0.5 rounded-md font-mono inline-block">
                                                 {log.tahapan_proses}
                                             </span>
+                                            {(log.kode_mesin || log.nama_mesin) && (
+                                                <div className="mt-1 flex items-center gap-1 text-[9px] font-mono text-cyan-400">
+                                                    <Cpu className="w-2.5 h-2.5 shrink-0" />
+                                                    <span className="truncate max-w-[110px]" title={log.nama_mesin || log.kode_mesin}>{log.nama_mesin || log.kode_mesin}</span>
+                                                </div>
+                                            )}
+                                            {log.nama_bahan && (
+                                                <div className="mt-0.5 flex items-center gap-1 text-[9px] text-indigo-400">
+                                                    <Package className="w-2.5 h-2.5 shrink-0" />
+                                                    <span className="truncate max-w-[110px]" title={`${log.nama_bahan} (${log.jumlah_bahan_digunakan || 0} ${log.satuan_bahan || ''})`}>
+                                                        {log.jumlah_bahan_digunakan} {log.satuan_bahan} {log.nama_bahan}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </td>
 
                                         <td className="py-3.5 px-3.5 text-center font-mono text-xs">

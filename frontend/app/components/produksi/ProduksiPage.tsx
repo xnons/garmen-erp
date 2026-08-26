@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, ChangeEvent, FormEvent } from 'react';
 import { ClipboardList, CheckCircle2, Settings, AlertCircle, FileCheck, RefreshCw, BarChart2, BookOpen, X } from 'lucide-react';
+import api from '../services/api';
 import {
     produksiService,
     SPK,
@@ -63,6 +64,8 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
     // Data States
     const [spkList, setSpkList] = useState<SPK[]>([]);
     const [karyawanList, setKaryawanList] = useState<Karyawan[]>([]);
+    const [mesinList, setMesinList] = useState<any[]>([]);
+    const [bahanList, setBahanList] = useState<any[]>([]);
     const [outputLogs, setOutputLogs] = useState<LogOutput[]>([]);
 
     // Loading & Feedback States
@@ -87,6 +90,9 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         spk_id: '',
         tahapan_proses: 'SEWING',
         nomor_tiket: '',
+        kode_mesin: '',
+        bahan_id: '',
+        jumlah_bahan_digunakan: '',
         qty_disetor: '',
         qty_pass: '',
         qty_rework: '0',
@@ -103,13 +109,17 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
     const loadInitialData = useCallback(async () => {
         try {
             setLoading(true);
-            const [dataSPK, dataKaryawan] = await Promise.all([
+            const [dataSPK, dataKaryawan, dataMesin, dataBahan] = await Promise.all([
                 produksiService.getAllSPK(),
-                produksiService.getKaryawanProduksi().catch(() => [])
+                produksiService.getKaryawanProduksi().catch(() => []),
+                api.get('/api/mesin').then(r => r.data).catch(() => []),
+                api.get('/api/inventaris').then(r => r.data).catch(() => [])
             ]);
 
             setSpkList(dataSPK.filter((s) => s.status !== 'ARCHIVED'));
             setKaryawanList(dataKaryawan as unknown as Karyawan[]);
+            setMesinList(dataMesin || []);
+            setBahanList(dataBahan || []);
         } catch (err: any) {
             setErrorMessage(extractErrorMessage(err));
         } finally {
@@ -167,6 +177,9 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                 spk_id: formInput.spk_id,
                 tahapan_proses: formInput.tahapan_proses as TahapanProses,
                 nomor_tiket: formInput.nomor_tiket || '',
+                kode_mesin: formInput.kode_mesin || undefined,
+                bahan_id: formInput.bahan_id || undefined,
+                jumlah_bahan_digunakan: formInput.jumlah_bahan_digunakan ? parseFloat(formInput.jumlah_bahan_digunakan) : undefined,
                 qty_disetor: parseInt(formInput.qty_disetor || '0', 10),
                 qty_pass: parseInt(formInput.qty_pass || '0', 10),
                 qty_rework: parseInt(formInput.qty_rework || '0', 10),
@@ -175,11 +188,14 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                 catatan: formInput.catatan.trim() || undefined
             });
 
-            setSuccessMessage('Output borongan berhasil dicatat & menunggu verifikasi QC!');
+            setSuccessMessage('Output borongan berhasil dicatat, upah dihitung, & data mesin/bahan terhubung!');
 
             setFormInput((prev) => ({
                 ...prev,
                 nomor_tiket: '',
+                kode_mesin: '',
+                bahan_id: '',
+                jumlah_bahan_digunakan: '',
                 qty_disetor: '',
                 qty_pass: '',
                 qty_rework: '0',
@@ -189,6 +205,8 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
             }));
 
             fetchOutputLogs();
+            // Refresh data mesin dan bahan agar update stok & status langsung terlihat
+            loadInitialData();
         } catch (err: any) {
             setErrorMessage(extractErrorMessage(err));
         } finally {
@@ -365,6 +383,8 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                         setFormInput={setFormInput}
                         karyawanList={karyawanList}
                         spkList={spkList}
+                        mesinList={mesinList}
+                        bahanList={bahanList}
                         handleQtyDisetorChange={handleQtyDisetorChange}
                         handleSubmitOutput={handleSubmitOutput}
                         isSubmitting={isSubmittingForm}

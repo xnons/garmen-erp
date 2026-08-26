@@ -81,7 +81,7 @@ export default function Sidebar({
               {!isCollapsed && (
                 <div className="transition-all duration-300">
                   <h1 className="text-white font-extrabold text-base tracking-wider leading-none flex items-center gap-1.5">
-                    NEXORA
+                    MASTER_GARMENT
                     <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20 shadow-sm">
                       ERP
                     </span>
