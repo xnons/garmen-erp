@@ -150,7 +150,7 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
     };
 
     return (
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto bg-slate-950 text-slate-100 space-y-6 custom-scrollbar">
+        <div className="space-y-4 sm:space-y-6 text-slate-100">
 
             {/* 🟢 BANNER PERINGATAN DEADLINE OTOMATIS */}
             <DeadlineAlertBanner
@@ -161,7 +161,7 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
             />
 
             {/* Header Module */}
-            <div className="bg-slate-900/90 backdrop-blur-md p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+            <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
                 <div>
                     <div className="flex items-center gap-2.5 mb-1">
                         <h2 className="text-2xl font-bold tracking-tight text-white">
@@ -377,6 +377,6 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
 
             </div>
 
-        </main>
+        </div>
     );
 }

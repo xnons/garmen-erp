@@ -8,6 +8,7 @@ import api from './components/services/api';
 
 export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // STATE AWAL USER
   const [activeUser, setActiveUser] = useState<any>(null);
@@ -178,12 +179,14 @@ export default function DashboardPage() {
 
   // JIKA SUDAH SUKSES LOGIN
   return (
-    <div className="flex h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden m-0 p-0">
-      {/* SISI KIRI: Navigasi Menu */}
+    <div className="flex h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden m-0 p-0 relative">
+      {/* SISI KIRI: Navigasi Menu (Statis di PC, Drawer di HP) */}
       <Sidebar
         activeMenu={activeMenu}
         setActiveMenu={setActiveMenu}
         activeUser={activeUser}
+        mobileOpen={mobileMenuOpen}
+        setMobileOpen={setMobileMenuOpen}
       />
 
       {/* SISI KANAN: Konten Dinamis */}
@@ -192,6 +195,7 @@ export default function DashboardPage() {
         setActiveMenu={setActiveMenu}
         activeUser={activeUser}
         onLogout={handleLogout}
+        onOpenMobileMenu={() => setMobileMenuOpen(true)}
       />
     </div>
   );

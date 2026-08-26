@@ -254,17 +254,17 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
     };
 
     return (
-        <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6 text-slate-100">
+        <div className="space-y-4 sm:space-y-6 text-slate-100 max-w-7xl mx-auto">
             {/* HEADER PAGE & NAVIGATION TABS */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
                 <div>
-                    <h1 className="text-2xl font-black text-white tracking-wide">Modul Produksi Borongan</h1>
+                    <h1 className="text-xl sm:text-2xl font-black text-white tracking-wide">Modul Produksi Borongan</h1>
                     <p className="text-xs text-slate-400 mt-1">
                         Pencatatan output harian, verifikasi QC anti-fraud, dan penetapan tarif borongan SPK
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full lg:w-auto overflow-hidden">
                     <button
                         type="button"
                         onClick={() => {
@@ -272,71 +272,72 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
                             fetchOutputLogs();
                         }}
                         disabled={loading}
-                        className="p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-semibold transition-all mr-2"
+                        className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer active:scale-95"
                         title="Refresh Data"
                     >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-4 h-4 text-indigo-400 ${loading ? 'animate-spin' : ''}`} />
                     </button>
 
-                    <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1 overflow-x-auto">
+                    {/* Scrollable Tab Pills on Mobile */}
+                    <div className="flex bg-slate-950/90 p-1 rounded-xl border border-slate-800 gap-1 overflow-x-auto custom-scrollbar w-full sm:w-auto">
                         <button
                             type="button"
                             onClick={() => setActiveTab('input')}
-                            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'input'
+                            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${activeTab === 'input'
                                 ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
                                 }`}
                         >
-                            <ClipboardList className="w-4 h-4" />
-                            Input Output Harian
+                            <ClipboardList className="w-3.5 h-3.5" />
+                            <span>Input Output</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={() => setActiveTab('qc')}
-                            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'qc'
+                            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${activeTab === 'qc'
                                 ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
                                 }`}
                         >
-                            <CheckCircle2 className="w-4 h-4" />
-                            Verifikasi QC
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Verifikasi QC</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={() => setActiveTab('spk')}
-                            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'spk'
+                            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${activeTab === 'spk'
                                 ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
                                 }`}
                         >
-                            <Settings className="w-4 h-4" />
-                            SPK & Tarif
+                            <Settings className="w-3.5 h-3.5" />
+                            <span>SPK & Tarif</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={() => setActiveTab('analitik')}
-                            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'analitik'
+                            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${activeTab === 'analitik'
                                 ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
                                 }`}
                         >
-                            <BarChart2 className="w-4 h-4" />
-                            Dashboard Analitik
+                            <BarChart2 className="w-3.5 h-3.5" />
+                            <span>Analitik</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={() => setActiveTab('tutorial')}
-                            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'tutorial'
+                            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${activeTab === 'tutorial'
                                 ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
                                 : 'text-slate-400 hover:text-white hover:bg-slate-900'
                                 }`}
                         >
-                            <BookOpen className="w-4 h-4" />
-                            Tutorial
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span>Tutorial</span>
                         </button>
                     </div>
                 </div>
