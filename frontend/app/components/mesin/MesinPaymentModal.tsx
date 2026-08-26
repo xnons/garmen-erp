@@ -17,7 +17,7 @@ export default function MesinPaymentModal({ machine, onClose, onAddPayment }: Me
 
     if (!machine) return null;
 
-    // 🟢 Safe IDR Formatter untuk mencegah error 'RpNaN'
+    // 🟢 Safe IDR Formatter
     const formatIDR = (val: any) => {
         const num = Number(val);
         if (isNaN(num) || num === null || num === undefined) return 'Rp 0';
@@ -48,8 +48,8 @@ export default function MesinPaymentModal({ machine, onClose, onAddPayment }: Me
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-            <div className="w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-7 shadow-2xl space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+            <div className="w-full max-w-lg rounded-3xl bg-slate-900/95 border border-slate-800 p-6 sm:p-7 shadow-2xl space-y-6 animate-modal-pop backdrop-blur-xl">
 
                 {/* Modal Header */}
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -59,7 +59,7 @@ export default function MesinPaymentModal({ machine, onClose, onAddPayment }: Me
                         </div>
                         <div>
                             <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider block">
-                                Opsi Pencatatan Angsuran
+                                Pencatatan Angsuran / Pembayaran
                             </span>
                             <h2 className="text-lg font-bold text-white">{machine.nama_mesin}</h2>
                         </div>
@@ -77,14 +77,14 @@ export default function MesinPaymentModal({ machine, onClose, onAddPayment }: Me
                     <div className="flex items-start gap-2.5">
                         <Wallet className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                         <div>
-                            <p className="text-slate-500">Harga Beli Total</p>
-                            <p className="text-sm font-semibold text-white font-mono mt-0.5">{formatIDR(hargaBeli)}</p>
+                            <p className="text-slate-500 text-[11px]">Harga Beli Total</p>
+                            <p className="text-sm font-bold text-white font-mono mt-0.5">{formatIDR(hargaBeli)}</p>
                         </div>
                     </div>
                     <div className="flex items-start gap-2.5">
                         <Banknote className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                         <div>
-                            <p className="text-slate-500">Sisa Utang</p>
+                            <p className="text-slate-500 text-[11px]">Sisa Utang</p>
                             <p className="text-sm font-bold text-amber-400 font-mono mt-0.5">{formatIDR(sisaPembayaran)}</p>
                         </div>
                     </div>
@@ -93,7 +93,9 @@ export default function MesinPaymentModal({ machine, onClose, onAddPayment }: Me
                 {/* Input Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">Nominal Pembayaran (IDR) *</label>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                            Nominal Pembayaran (IDR) *
+                        </label>
                         <input
                             type="number"
                             required
@@ -101,13 +103,13 @@ export default function MesinPaymentModal({ machine, onClose, onAddPayment }: Me
                             value={nominal || ''}
                             onChange={(e) => setNominal(Number(e.target.value))}
                             placeholder="misal: 2500000"
-                            className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white font-mono focus:border-emerald-500 outline-none transition-all"
+                            className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white font-mono focus:border-emerald-500 outline-none transition-all placeholder:text-slate-600"
                         />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
+                            <label className="block text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
                                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                                 <span>Tanggal Bayar *</span>
                             </label>
@@ -120,9 +122,9 @@ export default function MesinPaymentModal({ machine, onClose, onAddPayment }: Me
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
+                            <label className="block text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
                                 <FileText className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Catatan</span>
+                                <span>Keterangan / Catatan</span>
                             </label>
                             <input
                                 type="text"
@@ -138,13 +140,13 @@ export default function MesinPaymentModal({ machine, onClose, onAddPayment }: Me
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
                         >
                             Batal
                         </button>
                         <button
                             type="submit"
-                            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all active:scale-95 cursor-pointer"
                         >
                             Simpan Pembayaran
                         </button>

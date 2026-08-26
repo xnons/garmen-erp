@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Warehouse, Plus, Loader2, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Warehouse, Plus, Loader2, RefreshCw, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { ItemBahanBaku, LogTransaksiStok } from './types';
 import { useInventaris } from './useInventaris';
 
-// Import Sub-Komponen & Modal (Tanpa PinGateModal)
+// Import Sub-Komponen & Modal
 import StokMutasiModal from './StokMutasiModal';
 import BahanFormModal from './BahanFormModal';
 import InventarisKpiCards from './InventarisKpiCards';
@@ -23,8 +23,10 @@ interface InventarisPageProps {
 }
 
 export default function InventarisPage({ activeUser }: InventarisPageProps) {
-    // 🟢 1. ALL HOOKS - STATE & EFFECT
+    // 🟢 1. STATE USER & ACCESS CONTROL
     const [currentUser, setCurrentUser] = useState<any>(activeUser || null);
+    const [successMsg, setSuccessMsg] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
 
     useEffect(() => {
         if (activeUser) {
@@ -64,21 +66,37 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
         deleteBahanBaku,
     } = useInventaris();
 
-    // State Modals (Tanpa PIN Gate)
+    // Helper Toast
+    const showToastSuccess = (msg: string) => {
+        setSuccessMsg(msg);
+        setTimeout(() => setSuccessMsg(null), 3500);
+    };
+
+    const showToastError = (msg: string) => {
+        setActionError(msg);
+        setTimeout(() => setActionError(null), 4000);
+    };
+
+    // State Modals
     const [selectedMutasiItem, setSelectedMutasiItem] = useState<ItemBahanBaku | null>(null);
     const [isMutasiModalOpen, setIsMutasiModalOpen] = useState(false);
 
     const [isBahanModalOpen, setIsBahanModalOpen] = useState(false);
     const [selectedEditItem, setSelectedEditItem] = useState<ItemBahanBaku | null>(null);
 
-    // 🟢 2. ALL HOOKS - MEMOIZATIONS
+    // 🟢 2. MEMOIZATIONS & STATS
     const activeInventory = useMemo(
         () => (inventarisList || []).filter((i) => !i.is_archived),
         [inventarisList]
     );
 
+    const archivedInventory = useMemo(
+        () => (inventarisList || []).filter((i) => i.is_archived),
+        [inventarisList]
+    );
+
     const totalAsetInventaris = useMemo(
-        () => activeInventory.reduce((acc, item) => acc + (item.stok_saat_ini * item.harga_per_satuan), 0),
+        () => activeInventory.reduce((acc, item) => acc + ((item.stok_saat_ini || 0) * (item.harga_per_satuan || 0)), 0),
         [activeInventory]
     );
 
@@ -108,7 +126,15 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
                 (item.nomor_nota_po && item.nomor_nota_po.toLowerCase().includes(q));
 
             const matchesKategori = filter.kategori === 'ALL' || item.kategori === filter.kategori;
-            const matchesStatus = filter.statusStok === 'ALL' || item.status_stok === filter.statusStok;
+
+            let matchesStatus = true;
+            if (filter.statusStok === 'AMAN') {
+                matchesStatus = item.stok_saat_ini > item.stok_minimum;
+            } else if (filter.statusStok === 'MENIPIS') {
+                matchesStatus = item.stok_saat_ini <= item.stok_minimum && item.stok_saat_ini > 0;
+            } else if (filter.statusStok === 'HABIS') {
+                matchesStatus = item.stok_saat_ini === 0;
+            }
 
             let matchesTanggal = true;
             if (filter.tanggalMulai && item.tanggal_pembelian) {
@@ -122,7 +148,7 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
         });
     }, [inventarisList, filter]);
 
-    // 🟢 3. ACTION HANDLERS (Langsung Eksekusi Berdasarkan Role Login)
+    // 🟢 3. ACTION HANDLERS
     const handleOpenMutasi = (item: ItemBahanBaku) => {
         setSelectedMutasiItem(item);
         setIsMutasiModalOpen(true);
@@ -139,11 +165,14 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
     };
 
     const handleToggleArchive = async (targetItem: ItemBahanBaku) => {
+        const nextArchived = !targetItem.is_archived;
         const res = await updateBahanBaku(targetItem.id, {
-            is_archived: !targetItem.is_archived,
+            is_archived: nextArchived,
         });
         if (!res.success) {
-            alert(res.message || 'Gagal mengubah status arsip.');
+            showToastError(res.message || 'Gagal mengubah status arsip.');
+        } else {
+            showToastSuccess(nextArchived ? `Material "${targetItem.nama_item}" berhasil diarsipkan.` : `Material "${targetItem.nama_item}" dipulihkan ke stok aktif.`);
         }
     };
 
@@ -151,7 +180,9 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
         if (confirm('Apakah Anda yakin ingin menghapus bahan baku ini secara permanen?')) {
             const res = await deleteBahanBaku(itemId);
             if (!res.success) {
-                alert(res.message || 'Gagal menghapus bahan baku.');
+                showToastError(res.message || 'Gagal menghapus bahan baku.');
+            } else {
+                showToastSuccess('Bahan baku berhasil dihapus secara permanen.');
             }
         }
     };
@@ -166,10 +197,11 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
         });
 
         if (!res.success) {
-            alert(res.message || 'Gagal menyimpan mutasi stok.');
+            showToastError(res.message || 'Gagal menyimpan mutasi stok.');
         } else {
             setIsMutasiModalOpen(false);
             setSelectedMutasiItem(null);
+            showToastSuccess(`Mutasi stok (${transaction.tipe} ${transaction.jumlah}) berhasil dicatat.`);
         }
     };
 
@@ -177,10 +209,11 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
         if (selectedEditItem) {
             const res = await updateBahanBaku(selectedEditItem.id, data);
             if (!res.success) {
-                alert(res.message || 'Gagal memperbarui data bahan baku.');
+                showToastError(res.message || 'Gagal memperbarui data bahan baku.');
             } else {
                 setIsBahanModalOpen(false);
                 setSelectedEditItem(null);
+                showToastSuccess('Data bahan baku berhasil diperbarui.');
             }
         } else {
             const res = await addBahanBaku({
@@ -199,118 +232,130 @@ export default function InventarisPage({ activeUser }: InventarisPageProps) {
             });
 
             if (!res.success) {
-                alert(res.message || 'Gagal menambahkan bahan baku baru.');
+                showToastError(res.message || 'Gagal menambahkan bahan baku baru.');
             } else {
                 setIsBahanModalOpen(false);
+                showToastSuccess('Bahan baku baru berhasil ditambahkan ke inventaris.');
             }
         }
     };
 
-    // 🛑 4. CONDITIONAL RENDERING / EARLY RETURNS
-
-    // A. Role Tidak Diizinkan
+    // 🛑 4. ACCESS RESTRICTION FALLBACK
     if (!isAccessAllowed) {
         return (
-            <main className="flex-1 h-screen overflow-y-auto p-8 bg-slate-900 flex items-center justify-center text-slate-100">
+            <div className="flex items-center justify-center p-8 text-slate-100 min-h-[60vh]">
                 <div className="text-center max-w-md p-8 glass-panel rounded-3xl border border-rose-500/30 bg-rose-950/10 shadow-2xl">
                     <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <ShieldAlert className="w-8 h-8" />
                     </div>
                     <h3 className="text-lg font-bold text-white mb-2">Akses Ditolak</h3>
                     <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-                        Modul Inventaris & Stok Bahan Baku bersifat terbatas. Hanya pengguna dengan role <strong className="text-rose-300">Owner</strong>, <strong className="text-rose-300">Developer</strong>, atau <strong className="text-rose-300">Admin</strong> yang memiliki izin untuk mengakses menu ini.
+                        Modul Inventaris & Stok Bahan Baku bersifat terbatas. Hanya pengguna dengan hak akses <strong className="text-rose-300">Owner</strong>, <strong className="text-rose-300">Developer</strong>, atau <strong className="text-rose-300">Admin</strong> yang memiliki izin untuk mengelola inventaris.
                     </p>
                     <div className="px-4 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-[11px] text-slate-400">
                         Role Anda saat ini: <span className="text-indigo-400 font-semibold">{userRole || 'TIDAK DIKETAHUI'}</span>
                     </div>
                 </div>
-            </main>
+            </div>
         );
     }
 
-    // B. Tampilan Utama (Tanpa PIN Gate)
+    // 🟢 5. MAIN CONTENT VIEW
     return (
-        <main className="flex-1 h-screen overflow-y-auto p-4 sm:p-8 bg-slate-900 text-slate-100 space-y-6">
-            <div className="max-w-7xl mx-auto space-y-6 pb-12">
-                {/* Header Section */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-2xl border border-slate-800">
-                    <div>
-                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                            <Warehouse className="w-6 h-6 text-indigo-400" />
-                            <span>Inventaris & Stok Bahan Baku</span>
-                            {loading && <Loader2 className="w-5 h-5 text-indigo-400 animate-spin ml-2" />}
-                        </h2>
-                        <p className="text-slate-400 text-sm mt-1">
-                            Pencatatan kain, aksesoris, benang, PO vendor, lot dyeing, dan alokasi material SPK.
-                        </p>
-                    </div>
+        <div className="space-y-6">
+            {/* Toast Alerts */}
+            {successMsg && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl flex items-center gap-3 animate-in fade-in shadow-lg shadow-emerald-500/5">
+                    <CheckCircle2 className="w-5 h-5 shrink-0" />
+                    <span className="text-sm font-semibold">{successMsg}</span>
+                </div>
+            )}
+            {(error || actionError) && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-2xl flex items-center gap-3 animate-in fade-in shadow-lg shadow-rose-500/5">
+                    <ShieldAlert className="w-5 h-5 shrink-0" />
+                    <span className="text-sm font-semibold">{error || actionError}</span>
+                </div>
+            )}
 
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={fetchInventaris}
-                            disabled={loading}
-                            title="Refresh Data dari Server"
-                            className="flex items-center gap-2 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition-all disabled:opacity-50 cursor-pointer"
-                        >
-                            <RefreshCw className={`w-4 h-4 text-indigo-400 ${loading ? 'animate-spin' : ''}`} />
-                            <span className="hidden sm:inline">Refresh Data</span>
-                        </button>
-
-                        <button
-                            onClick={handleOpenTambahBahan}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span>Tambah Bahan Baku</span>
-                        </button>
-                    </div>
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel p-6 rounded-2xl border border-slate-800">
+                <div>
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2.5">
+                        <Warehouse className="w-6 h-6 text-indigo-400" />
+                        <span>Inventaris & Stok Bahan Baku</span>
+                        {loading && <Loader2 className="w-5 h-5 text-indigo-400 animate-spin ml-2" />}
+                    </h2>
+                    <p className="text-slate-400 text-sm mt-1">
+                        Pencatatan kain, aksesoris, benang, PO vendor, lot batching, dan mutasi material SPK.
+                    </p>
                 </div>
 
-                {error && (
-                    <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-sm flex items-center justify-between">
-                        <span>{error}</span>
-                    </div>
-                )}
+                <div className="flex items-center gap-3 self-end md:self-center">
+                    <button
+                        onClick={fetchInventaris}
+                        disabled={loading}
+                        title="Refresh Data dari Server"
+                        className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-950 border border-slate-800 hover:bg-slate-800 active:scale-95 text-slate-300 text-xs font-semibold rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                    >
+                        <RefreshCw className={`w-4 h-4 text-indigo-400 ${loading ? 'animate-spin' : ''}`} />
+                        <span className="hidden sm:inline">Refresh</span>
+                    </button>
 
-                <InventarisKpiCards
-                    totalAset={totalAsetInventaris}
-                    totalMenipis={totalItemMenipis}
-                    totalHabis={totalItemHabis}
-                />
-
-                <InventarisFilterBar
-                    filter={filter}
-                    setFilter={setFilter}
-                />
-
-                <InventarisTable
-                    items={filteredInventory}
-                    onOpenMutasi={handleOpenMutasi}
-                    onOpenEdit={handleOpenEditBahan}
-                    onToggleArchive={handleToggleArchive}
-                    onDelete={handleTriggerDelete}
-                />
-
-                <StokMutasiModal
-                    item={selectedMutasiItem}
-                    isOpen={isMutasiModalOpen}
-                    onClose={() => {
-                        setIsMutasiModalOpen(false);
-                        setSelectedMutasiItem(null);
-                    }}
-                    onSaveMutasi={handleSaveMutasi}
-                />
-
-                <BahanFormModal
-                    isOpen={isBahanModalOpen}
-                    onClose={() => {
-                        setIsBahanModalOpen(false);
-                        setSelectedEditItem(null);
-                    }}
-                    onSave={handleSaveBahan}
-                    initialData={selectedEditItem}
-                />
+                    <button
+                        onClick={handleOpenTambahBahan}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                    >
+                        <Plus className="w-4 h-4" />
+                        <span>Tambah Bahan Baku</span>
+                    </button>
+                </div>
             </div>
-        </main>
+
+            {/* KPI Cards */}
+            <InventarisKpiCards
+                totalAset={totalAsetInventaris}
+                totalItemAktif={activeInventory.length}
+                totalMenipis={totalItemMenipis}
+                totalHabis={totalItemHabis}
+            />
+
+            {/* Filter Bar */}
+            <InventarisFilterBar
+                filter={filter}
+                setFilter={setFilter}
+                totalAktif={activeInventory.length}
+                totalArchived={archivedInventory.length}
+            />
+
+            {/* Table */}
+            <InventarisTable
+                items={filteredInventory}
+                onOpenMutasi={handleOpenMutasi}
+                onOpenEdit={handleOpenEditBahan}
+                onToggleArchive={handleToggleArchive}
+                onDelete={handleTriggerDelete}
+            />
+
+            {/* Modals */}
+            <StokMutasiModal
+                item={selectedMutasiItem}
+                isOpen={isMutasiModalOpen}
+                onClose={() => {
+                    setIsMutasiModalOpen(false);
+                    setSelectedMutasiItem(null);
+                }}
+                onSaveMutasi={handleSaveMutasi}
+            />
+
+            <BahanFormModal
+                isOpen={isBahanModalOpen}
+                onClose={() => {
+                    setIsBahanModalOpen(false);
+                    setSelectedEditItem(null);
+                }}
+                onSave={handleSaveBahan}
+                initialData={selectedEditItem}
+            />
+        </div>
     );
 }
