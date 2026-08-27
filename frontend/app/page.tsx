@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Lock, ShieldCheck, User } from 'lucide-react';
-import Sidebar from './components/layout/Sidebar';
-import DashboardContent from './components/dashboard/DashboardContent';
-import api from './components/services/api';
+import Sidebar from '@/components/layout/Sidebar';
+import DashboardContent from '@/components/dashboard/DashboardContent';
+import api from '@/services/api';
 
 export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('dashboard');

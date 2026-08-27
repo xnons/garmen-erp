@@ -5,8 +5,10 @@ frontend/out/
 frontend/.env*.local
 
 # Backend (FastAPI / Python)
-backend/__pycache__/
-backend/*.pyc
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 backend/venv/
 backend/.venv/
 backend/env/
