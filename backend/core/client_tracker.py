@@ -80,17 +80,60 @@ def get_real_client_ip(request: Request) -> str:
     return "127.0.0.1"
 
 
+def get_location_from_coords(lat: float, lon: float) -> str:
+    """
+    Mengubah koordinat GPS (Latitude & Longitude) menjadi nama wilayah/kota yang jelas dan akurat
+    menggunakan reverse-geocoding OpenStreetMap Nominatim.
+    """
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=14&addressdetails=1"
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "NexoraERP-GeolocationEngine/1.2"}
+        )
+        with urllib.request.urlopen(req, timeout=2.5) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                address = data.get("address", {})
+                
+                # Ekstrak komponen wilayah utama: kelurahan/suburb, kecamatan/kota, provinsi
+                parts = []
+                suburb = address.get("suburb") or address.get("village") or address.get("neighbourhood") or address.get("quarter")
+                city = address.get("city") or address.get("town") or address.get("city_district") or address.get("county")
+                state = address.get("state")
+                
+                if suburb and suburb not in parts:
+                    parts.append(suburb)
+                if city and city not in parts:
+                    parts.append(city)
+                if state and state not in parts:
+                    parts.append(state)
+                
+                if parts:
+                    return f"📍 {', '.join(parts)} (GPS)"
+                
+                if data.get("display_name"):
+                    raw_display = data.get("display_name", "")
+                    short_display = ", ".join(raw_display.split(",")[:3])
+                    return f"📍 {short_display} (GPS)"
+    except Exception as e:
+        print(f"⚠️ Reverse geocode error: {e}")
+    
+    # Fallback jika service offline: gunakan format koordinat presisi
+    return f"📍 Lat: {lat:.4f}, Lon: {lon:.4f} (GPS)"
+
+
 def get_location_from_ip(ip: str, request: Optional[Request] = None) -> str:
     """
     Mendeteksi perkiraan lokasi (Kota, Negara / ISP) dari IP Address.
     Dilengkapi timeout cepat agar proses login tidak terhambat.
     """
     if not ip or ip in ["127.0.0.1", "::1", "localhost", "Unknown"]:
-        return "📍 Lokal (Jaringan Internal Kantor)"
+        return "📍 Jaringan Lokal / Server Kantor"
 
     # Cek private IP range (LAN)
     if ip.startswith("10.") or ip.startswith("192.168.") or ip.startswith("172."):
-        return "📍 Jaringan Lokal / Wi-Fi Kantor"
+        return "📍 Wi-Fi Internal Kantor"
 
     # Cek header Cloudflare jika ada
     if request:

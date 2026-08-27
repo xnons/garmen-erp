@@ -313,12 +313,18 @@ export default function TabAuditLog() {
                                         </td>
 
                                         {/* LOKASI & IP */}
-                                        <td className="py-3.5 px-4 font-mono">
-                                            <div className="flex items-center gap-1.5 text-xs text-slate-200 font-sans font-medium">
+                                        <td className="py-3.5 px-4">
+                                            <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-200 font-sans font-medium">
                                                 <span>{log.lokasi || '📍 Indonesia'}</span>
+                                                {log.lokasi?.includes('(GPS)') && (
+                                                    <span className="px-1.5 py-0.2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-mono font-bold">
+                                                        GPS VERIFIED
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                                IP: {log.ip_address || '127.0.0.1'}
+                                            <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center gap-1">
+                                                <span>IP:</span>
+                                                <span className="text-slate-400">{log.ip_address || '127.0.0.1'}</span>
                                             </div>
                                         </td>
 

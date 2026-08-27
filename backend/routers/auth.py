@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 import models
-from schemas.karyawan import RegisterInput, LoginInput
+from schemas.karyawan import RegisterInput, LoginInput, LocationUpdateInput
 from core.security import (
     get_password_hash, 
     verify_password, 
@@ -19,7 +19,12 @@ from core.security import (
     get_current_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
-from core.client_tracker import parse_device_info, get_real_client_ip, get_location_from_ip
+from core.client_tracker import (
+    parse_device_info, 
+    get_real_client_ip, 
+    get_location_from_ip,
+    get_location_from_coords
+)
 
 router = APIRouter(tags=["Autentikasi & Security Gate"])
 
@@ -169,7 +174,14 @@ async def login(credentials: LoginInput, request: Request, db: Session = Depends
     client_ip = get_real_client_ip(request)
     user_agent = request.headers.get("user-agent", "")
     device_info = parse_device_info(user_agent)
-    lokasi = get_location_from_ip(client_ip, request)
+    
+    # 📍 Resolusi Lokasi (Prioritaskan GPS Presisi -> Nominatim Coords -> Fallback IP)
+    if credentials.device_location and credentials.device_location.strip():
+        lokasi = credentials.device_location.strip()
+    elif credentials.latitude is not None and credentials.longitude is not None:
+        lokasi = get_location_from_coords(credentials.latitude, credentials.longitude)
+    else:
+        lokasi = get_location_from_ip(client_ip, request)
     
     user = db.query(models.Karyawan).filter(models.Karyawan.username == credentials.username).first()
     
@@ -249,6 +261,34 @@ async def login(credentials: LoginInput, request: Request, db: Session = Depends
             "poin_pelanggaran": user.poin_pelanggaran
         }
     }
+
+
+# 🟢 2B. Update Lokasi Presisi Post-Login (GPS Background Sync)
+@router.post("/update-location")
+async def update_login_location(
+    loc_data: LocationUpdateInput,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(get_current_user)
+):
+    """
+    Memperbarui log login sesi terakhir dengan koordinat GPS presisi
+    setelah user mengizinkan akses lokasi di browser.
+    """
+    latest_log = db.query(models.LogLogin).filter(
+        models.LogLogin.username == current_user.username,
+        models.LogLogin.status == "SUCCESS"
+    ).order_by(models.LogLogin.timestamp.desc()).first()
+
+    if latest_log:
+        if loc_data.device_location and loc_data.device_location.strip():
+            latest_log.lokasi = loc_data.device_location.strip()
+        elif loc_data.latitude is not None and loc_data.longitude is not None:
+            latest_log.lokasi = get_location_from_coords(loc_data.latitude, loc_data.longitude)
+        
+        db.commit()
+        return {"status": "success", "lokasi": latest_log.lokasi}
+
+    return {"status": "no_active_log"}
 
 
 # 👤 3. Profil Pengguna Aktif (Restore / Revalidate JWT Session)

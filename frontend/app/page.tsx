@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Lock, ShieldCheck, User } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { AlertTriangle, Lock, ShieldCheck, User, MapPin, Loader2, Navigation } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import DashboardContent from '@/components/dashboard/DashboardContent';
 import api from '@/services/api';
+import { getPreciseLocation, getBrowserCoordinates, reverseGeocodeCoords } from '@/utils/geoUtils';
 
 export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('dashboard');
@@ -18,6 +19,41 @@ export default function DashboardPage() {
   const [loginInput, setLoginInput] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+
+  // State Deteksi Lokasi Presisi (GPS)
+  const [locationData, setLocationData] = useState<{
+    latitude?: number;
+    longitude?: number;
+    locationName?: string;
+    status: 'idle' | 'loading' | 'granted' | 'denied' | 'unavailable';
+  }>({ status: 'idle' });
+
+  // 📍 Handler Meminta Izin & Mengambil Lokasi GPS Browser
+  const triggerLocationDetection = useCallback(async () => {
+    setLocationData(prev => ({ ...prev, status: 'loading' }));
+    try {
+      const res = await getPreciseLocation(4000);
+      if (res.status === 'granted' && res.latitude && res.longitude) {
+        setLocationData({
+          latitude: res.latitude,
+          longitude: res.longitude,
+          locationName: res.locationName,
+          status: 'granted'
+        });
+      } else {
+        setLocationData({ status: res.status === 'denied' ? 'denied' : 'unavailable' });
+      }
+    } catch {
+      setLocationData({ status: 'unavailable' });
+    }
+  }, []);
+
+  // Proaktif minta deteksi lokasi saat halaman login dimuat
+  useEffect(() => {
+    if (!activeUser) {
+      triggerLocationDetection();
+    }
+  }, [activeUser, triggerLocationDetection]);
 
   // 1. CEK & VALIDASI TOKEN SETIAP KALI WEB DIBUKA
   useEffect(() => {
@@ -52,6 +88,28 @@ export default function DashboardPage() {
     checkAuthSession();
   }, []);
 
+  // 1B. BACKGROUND SYNC LOKASI SETELAH LOGIN SUKSES
+  useEffect(() => {
+    if (activeUser) {
+      const syncGPS = async () => {
+        try {
+          const coords = await getBrowserCoordinates(3500);
+          if (coords) {
+            const locName = await reverseGeocodeCoords(coords.latitude, coords.longitude);
+            await api.post("/api/auth/update-location", {
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              device_location: locName
+            });
+          }
+        } catch (err) {
+          console.debug("Silent GPS background sync notice:", err);
+        }
+      };
+      syncGPS();
+    }
+  }, [activeUser]);
+
   // 2. LISTENER EVENT TOKEN EXPIRED (DITRIGER SAAT API MENDAPAT 401 UNAUTHORIZED)
   useEffect(() => {
     const handleSessionExpired = (e: any) => {
@@ -65,14 +123,37 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // 3. FUNGSI UNTUK LOGIN KE BACKEND
+  // 3. FUNGSI UNTUK LOGIN KE BACKEND (Dilengkapi data GPS)
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
     setLoginLoading(true);
 
     try {
-      const response = await api.post("/api/auth/login", loginInput);
+      // Jika lokasi belum sempat terdeteksi, coba ambil cepat (timeout 2s)
+      let currentLoc = { ...locationData };
+      if (currentLoc.status !== 'granted') {
+        const fastCoords = await getBrowserCoordinates(2000);
+        if (fastCoords) {
+          const fastName = await reverseGeocodeCoords(fastCoords.latitude, fastCoords.longitude);
+          currentLoc = {
+            latitude: fastCoords.latitude,
+            longitude: fastCoords.longitude,
+            locationName: fastName,
+            status: 'granted'
+          };
+          setLocationData(currentLoc);
+        }
+      }
+
+      const payload = {
+        ...loginInput,
+        latitude: currentLoc.latitude,
+        longitude: currentLoc.longitude,
+        device_location: currentLoc.locationName
+      };
+
+      const response = await api.post("/api/auth/login", payload);
       const data = response.data;
 
       localStorage.setItem("access_token", data.access_token);
@@ -157,6 +238,41 @@ export default function DashboardPage() {
                 onChange={(e) => setLoginInput({ ...loginInput, password: e.target.value })}
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
               />
+            </div>
+
+            {/* 📍 DETEKSI & STATUS IZIN LOKASI PRESISI (GPS) */}
+            <div className="pt-1 pb-1">
+              {locationData.status === 'loading' ? (
+                <div className="flex items-center justify-center gap-2 p-2.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl text-[11px]">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                  <span className="truncate font-medium">Mendeteksi koordinat lokasi fisik (GPS)...</span>
+                </div>
+              ) : locationData.status === 'granted' && locationData.locationName ? (
+                <div className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-[11px]">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="truncate font-semibold">{locationData.locationName}</span>
+                  </div>
+                  <span className="text-[9px] bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300 font-mono font-bold shrink-0">
+                    GPS AKTIF
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={triggerLocationDetection}
+                  className="w-full flex items-center justify-between p-2.5 bg-slate-950/80 border border-slate-800 hover:border-indigo-500/40 text-slate-400 hover:text-slate-200 rounded-xl text-[11px] transition-all cursor-pointer group"
+                  title="Klik untuk mengizinkan akses lokasi presisi untuk audit keamanan"
+                >
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Navigation className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
+                    <span className="truncate">Izin Lokasi Presisi: Belum Aktif</span>
+                  </div>
+                  <span className="text-[10px] text-indigo-400 font-bold group-hover:underline shrink-0">
+                    Aktifkan GPS
+                  </span>
+                </button>
+              )}
             </div>
 
             <button

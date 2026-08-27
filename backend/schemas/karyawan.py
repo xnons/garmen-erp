@@ -43,10 +43,20 @@ class UpdateKaryawanInput(BaseModel):
     is_active: Optional[bool] = None
 
 
-# 🟢 3. SCHEMA LOGIN USER
+# 🟢 3. SCHEMA LOGIN USER & GEOLOCATION
 class LoginInput(BaseModel):
     username: str
     password: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    device_location: Optional[str] = None
+
+
+# 🟢 3B. SCHEMA UPDATE LOKASI POST-LOGIN
+class LocationUpdateInput(BaseModel):
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    device_location: Optional[str] = None
 
 
 # 🟢 4. SCHEMA CATAT SANKSI / PELANGGARAN PEKERJA
