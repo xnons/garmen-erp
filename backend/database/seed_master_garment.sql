@@ -118,16 +118,16 @@ ON CONFLICT (item_code) DO UPDATE SET
 
 -- 4. INSERT MASTER SALES ORDERS
 INSERT INTO sales_orders (id, so_number, buyer_id, style_name, item_category, color, order_qty, status, order_date, contract_type, unit_price, total_order_value) VALUES
-(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260001', (SELECT id FROM partners WHERE name = 'WILMER STUDIOS' LIMIT 1), 'KEMEJA PIQUE SAKU HITAM', 'GARMENT', '-', 0, 'REGISTERED', '2026-04-01', 'CMT', 35000.0, 0.0),
-(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260002', (SELECT id FROM partners WHERE name = 'WILMER STUDIOS' LIMIT 1), 'KEMEJA PIQUE SAKU PUTIH', 'GARMENT', '-', 0, 'REGISTERED', '2026-04-01', 'CMT', 35000.0, 0.0),
-(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260003', (SELECT id FROM partners WHERE name = 'INSIGHT ( SMBU )' LIMIT 1), 'FLANELLA LONG SHIRT', 'GARMENT', '-', 0, 'REGISTERED', '2026-04-01', 'CMT', 38000.0, 0.0),
+(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260001', (SELECT id FROM partners WHERE name = 'WILMER STUDIOS' LIMIT 1), 'KEMEJA PIQUE SAKU HITAM', 'GARMENT', '-', 500, 'REGISTERED', '2026-04-01', 'CMT', 35000.0, 17500000.0),
+(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260002', (SELECT id FROM partners WHERE name = 'WILMER STUDIOS' LIMIT 1), 'KEMEJA PIQUE SAKU PUTIH', 'GARMENT', '-', 400, 'REGISTERED', '2026-04-01', 'CMT', 35000.0, 14000000.0),
+(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260003', (SELECT id FROM partners WHERE name = 'INSIGHT ( SMBU )' LIMIT 1), 'FLANELLA LONG SHIRT', 'GARMENT', '-', 600, 'REGISTERED', '2026-04-01', 'CMT', 38000.0, 22800000.0),
 (COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260004', (SELECT id FROM partners WHERE name = 'VOXFLY ( SMBU )' LIMIT 1), 'WIND MILD BLACK', 'LONG JEANS', 'BLACK', 1060, 'SHIPPED', '2026-04-01', 'CMT', 35000.0, 37100000.0),
 (COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260005', (SELECT id FROM partners WHERE name = 'VOXFLY ( SMBU )' LIMIT 1), 'WIND MILD BLUE', 'LONG JEANS', 'NAVY', 1494, 'CUTTING', '2026-04-01', 'CMT', 35000.0, 52290000.0),
-(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260006', (SELECT id FROM partners WHERE name = 'VOXFLY ( SMBU )' LIMIT 1), 'WIND MILD BLUE', 'GARMENT', '-', 0, 'REGISTERED', '2026-04-01', 'CMT', 35000.0, 0.0),
-(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260007', (SELECT id FROM partners WHERE name = 'WARNING' LIMIT 1), 'DECOTTON 2.433', 'GARMENT', '-', 0, 'REGISTERED', '2026-04-01', 'CMT', 32000.0, 0.0),
-(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260008', (SELECT id FROM partners WHERE name = 'WARNING' LIMIT 1), 'DECOTTON 2.434', 'GARMENT', '-', 0, 'REGISTERED', '2026-04-01', 'CMT', 32000.0, 0.0),
-(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260009', (SELECT id FROM partners WHERE name = 'WARNING' LIMIT 1), 'DECOTTON 2.435', 'GARMENT', '-', 0, 'REGISTERED', '2026-04-01', 'CMT', 32000.0, 0.0),
-(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260010', (SELECT id FROM partners WHERE name = 'VOXFLY ( SMBU )' LIMIT 1), 'SKULLY SHIRT BENDERA PUTIH', 'GARMENT', '-', 0, 'REGISTERED', '2026-04-01', 'CMT', 30000.0, 0.0),
+(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260006', (SELECT id FROM partners WHERE name = 'VOXFLY ( SMBU )' LIMIT 1), 'WIND MILD BLUE', 'GARMENT', '-', 300, 'REGISTERED', '2026-04-01', 'CMT', 35000.0, 10500000.0),
+(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260007', (SELECT id FROM partners WHERE name = 'WARNING' LIMIT 1), 'DECOTTON 2.433', 'GARMENT', '-', 250, 'REGISTERED', '2026-04-01', 'CMT', 32000.0, 8000000.0),
+(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260008', (SELECT id FROM partners WHERE name = 'WARNING' LIMIT 1), 'DECOTTON 2.434', 'GARMENT', '-', 250, 'REGISTERED', '2026-04-01', 'CMT', 32000.0, 8000000.0),
+(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260009', (SELECT id FROM partners WHERE name = 'WARNING' LIMIT 1), 'DECOTTON 2.435', 'GARMENT', '-', 250, 'REGISTERED', '2026-04-01', 'CMT', 32000.0, 8000000.0),
+(COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260010', (SELECT id FROM partners WHERE name = 'VOXFLY ( SMBU )' LIMIT 1), 'SKULLY SHIRT BENDERA PUTIH', 'GARMENT', '-', 300, 'REGISTERED', '2026-04-01', 'CMT', 30000.0, 9000000.0),
 (COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260025', (SELECT id FROM partners WHERE name = 'VOXFLY ( SMBU )' LIMIT 1), 'SAMURAI', 'SS KEMEJA', 'BIRU', 1163, 'SHIPPED', '2026-04-13', 'CMT', 32000.0, 37216000.0),
 (COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260028', (SELECT id FROM partners WHERE name = 'NEVER SURENDER' LIMIT 1), 'DENIM BLUE WHISKER', 'LONG JEANS', 'BLUE', 200, 'SHIPPED', '2026-04-21', 'CMT', 38000.0, 7600000.0),
 (COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260029', (SELECT id FROM partners WHERE name = 'NEVER SURENDER' LIMIT 1), 'DENIM BLACK WHISKER', 'LONG JEANS', 'BLACK', 200, 'SHIPPED', '2026-04-21', 'CMT', 38000.0, 7600000.0),
@@ -139,3 +139,37 @@ INSERT INTO sales_orders (id, so_number, buyer_id, style_name, item_category, co
 (COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260076', (SELECT id FROM partners WHERE name = 'WARNING' LIMIT 1), 'ARVYN LN#1 18', 'SS KEMEJA', 'BLACK', 120, 'SHIPPED', '2026-05-20', 'CMT', 33000.0, 3960000.0),
 (COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260078', (SELECT id FROM partners WHERE name = 'WARNING' LIMIT 1), 'SKIVE LN#5 REG-FIT', 'SS KEMEJA', 'BROWN', 78, 'FINISHING', '2026-05-20', 'CMT', 33000.0, 2574000.0)
 ON CONFLICT (so_number) DO NOTHING;
+
+-- 5. INSERT MATERIAL RECEIPTS & INSPECTIONS
+INSERT INTO material_receipts (id, item_id, supplier_id, receipt_date, roll_number, qty_received, unit, contract_type, inspection_status) VALUES
+(gen_random_uuid()::text, (SELECT id FROM inventory_items WHERE item_code = 'MG-2604-BH0001' LIMIT 1), (SELECT id FROM partners WHERE category = 'BUYER' LIMIT 1), '2026-04-02', 'ROLL-2604-001', 500.0, 'YARD', 'FOB', 'PASS'),
+(gen_random_uuid()::text, (SELECT id FROM inventory_items WHERE item_code = 'MG-2604-BH0002' LIMIT 1), (SELECT id FROM partners WHERE category = 'BUYER' LIMIT 1), '2026-04-03', 'ROLL-2604-002', 800.0, 'YARD', 'FOB', 'PASS')
+ON CONFLICT DO NOTHING;
+
+-- 6. INSERT CUTTING LOGS & PREP TASKS
+INSERT INTO cutting_records (id, so_id, cutting_date, operator_id, qty_cut, size_breakdown_cut, main_fabric_used, puring_used, main_consumption_rate, puring_consumption_rate, gelaran_layers, fabric_waste_yards) VALUES
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), '2026-04-05', 'KRY-CUT-01', 1060, '{"28": 212, "30": 318, "32": 318, "34": 212}'::json, 1378.0, 212.0, 1.3, 0.2, 50, 5.0),
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260005' LIMIT 1), '2026-04-07', 'KRY-CUT-01', 1494, '{"28": 300, "30": 450, "32": 450, "34": 294}'::json, 1942.2, 298.8, 1.3, 0.2, 60, 8.0)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO cutting_prep_tasks (id, so_id, task_type, operator_id, task_date, qty_done, size_breakdown, piece_rate, total_wage) VALUES
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), 'NUMBERING', 'KRY-PRS-01', '2026-04-06', 1060, '{"28": 212, "30": 318, "32": 318, "34": 212}'::json, 400.0, 424000.0),
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), 'PRESS', 'KRY-PRS-01', '2026-04-06', 1060, '{"28": 212, "30": 318, "32": 318, "34": 212}'::json, 400.0, 424000.0)
+ON CONFLICT DO NOTHING;
+
+-- 7. INSERT WIP MOVEMENTS (DISTRIBUSI SUBCON)
+INSERT INTO wip_movements (id, so_id, stage_name, sequence_order, partner_id, internal_supervisor_id, surat_jalan_no, dispatch_date, qty_dispatched, size_breakdown_dispatched, received_date, qty_received, qty_reject, size_breakdown_received, balance_discrepancy, status) VALUES
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), 'SEWING', 1, (SELECT id FROM partners WHERE name = 'AL-ITIHAD GARMENT' LIMIT 1), 'KRY-SEW-01', 'SJ-SEW-2604.01', '2026-04-08', 1060, '{"28": 212, "30": 318, "32": 318, "34": 212}'::json, '2026-04-18', 1060, 0, '{"28": 212, "30": 318, "32": 318, "34": 212}'::json, 0, 'COMPLETED'),
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), 'WASHING', 2, (SELECT id FROM partners WHERE name = 'ANUGRAH WASHING' LIMIT 1), 'KRY-SEW-01', 'SJ-WSH-2604.01', '2026-04-19', 1060, '{"28": 212, "30": 318, "32": 318, "34": 212}'::json, '2026-04-25', 1060, 0, '{"28": 212, "30": 318, "32": 318, "34": 212}'::json, 0, 'COMPLETED')
+ON CONFLICT DO NOTHING;
+
+-- 8. INSERT FINISHING WAGES & SHIPMENT SJP
+INSERT INTO piece_rate_wages (id, so_id, operator_id, operation_type, work_date, qty_completed, qty_reject, size_breakdown, wage_per_piece, total_wage, notes) VALUES
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), 'KRY-FIN-01', 'STIM', '2026-04-26', 1060, 0, '{"28": 212, "30": 318, "32": 318, "34": 212}'::json, 500.0, 530000.0, 'Steam uap rapi oleh Johan'),
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), 'KRY-FIN-02', 'KANCING', '2026-04-27', 1060, 0, '{"28": 212, "30": 318, "32": 318, "34": 212}'::json, 400.0, 424000.0, 'Pasang kancing & rivet saku'),
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), 'KRY-FIN-04', 'PACKING', '2026-04-28', 1055, 5, '{"28": 212, "30": 318, "32": 318, "34": 207}'::json, 400.0, 422000.0, 'Lipat polybag & hangtag (5 pcs reject finishing)')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO shipments (id, so_id, shipment_date, surat_jalan_no, driver_id, driver_name, vehicle_plate_no, carton_box_count, destination_address, total_qty_shipped, size_breakdown_shipped, unit_price, total_invoice_amount, invoice_number, is_invoiced, remarks) VALUES
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), '2026-04-30', 'SJP-2604.0001', 'KRY-EXP-01', 'Sandi', 'D 8821 CJM', 35, 'Gudang Distribusi VOXFLY Jakarta Barat', 1055, '{"28": 212, "30": 318, "32": 318, "34": 207}'::json, 35000.0, 36925000.0, 'INV-2604-001', TRUE, 'Pengiriman tuntas 1.055 pcs dengan SJP Resmi Sandi.')
+ON CONFLICT DO NOTHING;

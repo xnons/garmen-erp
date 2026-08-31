@@ -144,7 +144,7 @@ def seed_production_database():
         print("🚀 Memulai seeding data produksi PT. Chikal Jaya Makmur...\n")
 
         # 1. Seed Partners
-        print(f"[1/4] Seeding {len(PARTNERS_DATA)} Rekanan (Buyers & Subcon)...")
+        print(f"[1/8] Seeding {len(PARTNERS_DATA)} Rekanan (Buyers & Subcon)...")
         partner_map = {}
         for p in PARTNERS_DATA:
             existing = db.query(models.Partner).filter(models.Partner.name == p["name"]).first()
@@ -161,12 +161,13 @@ def seed_production_database():
             partner_map[p["name"]] = existing.id
 
         # 2. Seed Karyawan
-        print(f"[2/4] Seeding {len(EMPLOYEES_DATA)} Karyawan Operasional...")
+        print(f"[2/8] Seeding {len(EMPLOYEES_DATA)} Karyawan Operasional...")
         default_pwd_hash = get_password_hash("MasterGarment2026!")
+        emp_map = {}
         for e in EMPLOYEES_DATA:
             existing = db.query(models.Karyawan).filter(models.Karyawan.username == e["username"]).first()
             if not existing:
-                emp = models.Karyawan(
+                existing = models.Karyawan(
                     id_karyawan=e["id_karyawan"],
                     nama=e["nama"],
                     username=e["username"],
@@ -181,14 +182,17 @@ def seed_production_database():
                     tarif_borongan_pcs=e.get("tarif_borongan_pcs", 0),
                     total_hadir=26
                 )
-                db.add(emp)
+                db.add(existing)
+                db.flush()
+            emp_map[e["id_karyawan"]] = existing.id_karyawan
 
         # 3. Seed Inventory Items
-        print(f"[3/4] Seeding {len(INVENTORY_ITEMS_DATA)} Item Kain & Puring...")
+        print(f"[3/8] Seeding {len(INVENTORY_ITEMS_DATA)} Item Kain & Puring...")
+        item_map = {}
         for inv in INVENTORY_ITEMS_DATA:
             existing = db.query(models.InventoryItem).filter(models.InventoryItem.item_code == inv["item_code"]).first()
             if not existing:
-                item = models.InventoryItem(
+                existing = models.InventoryItem(
                     item_code=inv["item_code"],
                     description=inv["description"],
                     item_type=inv["item_type"],
@@ -196,20 +200,28 @@ def seed_production_database():
                     unit_price=inv["unit_price"],
                     current_stock=inv["current_stock"]
                 )
-                db.add(item)
+                db.add(existing)
+                db.flush()
             else:
                 existing.description = inv["description"]
                 existing.unit_price = inv["unit_price"]
+                existing.current_stock = inv["current_stock"]
+            item_map[inv["item_code"]] = existing.id
 
         # 4. Seed Sales Orders
-        print(f"[4/4] Seeding {len(SALES_ORDERS_DATA)} Sales Orders...")
+        print(f"[4/8] Seeding {len(SALES_ORDERS_DATA)} Sales Orders...")
+        so_map = {}
         for so in SALES_ORDERS_DATA:
             existing = db.query(models.SalesOrder).filter(models.SalesOrder.so_number == so["so_number"]).first()
             buyer_id = partner_map.get(so["buyer_name"])
             if not existing:
-                so_obj = models.SalesOrder(
+                existing = models.SalesOrder(
                     so_number=so["so_number"],
                     buyer_id=buyer_id,
+                    buyer_po_number=f"PO-{so['so_number'][-4:]}",
+                    customer_pic_name="Ibu Dewi / Merchandiser",
+                    customer_pic_phone="08129876543",
+                    delivery_address="Gudang Distribusi Buyer",
                     style_name=so["style_name"],
                     item_category=so["item_category"],
                     color=so["color"],
@@ -221,10 +233,248 @@ def seed_production_database():
                     total_order_value=so["total_order_value"],
                     size_breakdown_target={"28": int(so["order_qty"] * 0.2), "30": int(so["order_qty"] * 0.3), "32": int(so["order_qty"] * 0.3), "34": int(so["order_qty"] * 0.2)} if so["order_qty"] > 0 else {}
                 )
-                db.add(so_obj)
+                db.add(existing)
+                db.flush()
+            else:
+                existing.order_qty = so["order_qty"]
+                existing.status = so["status"]
+                existing.style_name = so["style_name"]
+            so_map[so["so_number"]] = existing.id
 
         db.commit()
-        print("\n✅ SEEDING DATA PRODUKSI PT. CHIKAL JAYA MAKMUR SUKSES!")
+
+        # 5. Seed Warehouse Receipts & Inspections & Allocations
+        print("[5/8] Seeding Log Barang Masuk & QC 4-Point...")
+        sample_item_id = list(item_map.values())[0] if item_map else None
+        sample_supplier_id = list(partner_map.values())[0] if partner_map else None
+        fitrah_id = emp_map.get("KRY-QC-01")
+
+        if db.query(models.MaterialReceipt).count() == 0 and sample_item_id:
+            r1 = models.MaterialReceipt(
+                item_id=sample_item_id,
+                supplier_id=sample_supplier_id,
+                receipt_date=date(2026, 4, 2),
+                roll_number="ROLL-2604-001",
+                qty_received=120.0,
+                unit="YARD",
+                contract_type="FOB",
+                inspection_status="PASS"
+            )
+            r2 = models.MaterialReceipt(
+                item_id=sample_item_id,
+                supplier_id=sample_supplier_id,
+                receipt_date=date(2026, 4, 3),
+                roll_number="ROLL-2604-002",
+                qty_received=150.0,
+                unit="YARD",
+                contract_type="FOB",
+                inspection_status="PASS"
+            )
+            db.add_all([r1, r2])
+            db.flush()
+
+            if fitrah_id:
+                insp1 = models.FabricInspection(
+                    receipt_id=r1.id,
+                    inspector_id=fitrah_id,
+                    inspection_date=date(2026, 4, 2),
+                    total_points=8,
+                    inspected_yards=120.0,
+                    points_per_100_sq_yd=13.3,
+                    grade="PASS",
+                    notes="Kualitas kain sangat baik, tidak ada cacat benang mayor"
+                )
+                db.add(insp1)
+
+            so_target = so_map.get("SO-MG260004") or list(so_map.values())[0]
+            if so_target:
+                alloc1 = models.MaterialAllocation(
+                    so_id=so_target,
+                    item_id=sample_item_id,
+                    allocation_date=date(2026, 4, 4),
+                    qty_allocated_yards=250.0,
+                    qty_actual_used_yards=245.0,
+                    allocated_by=fitrah_id,
+                    status="CONSUMED"
+                )
+                db.add(alloc1)
+            db.commit()
+
+        # 6. Seed Cutting Records & Prep Tasks
+        print("[6/8] Seeding Meja Potong & Upah Persiapan...")
+        bu_nani_id = emp_map.get("KRY-CUT-01")
+        silma_id = emp_map.get("KRY-PRS-01")
+        so_wind_black = so_map.get("SO-MG260004")
+        so_wind_blue = so_map.get("SO-MG260005")
+
+        if db.query(models.CuttingRecord).count() < 2 and so_wind_black:
+            cr1 = models.CuttingRecord(
+                so_id=so_wind_black,
+                cutting_date=date(2026, 4, 5),
+                operator_id=bu_nani_id,
+                qty_cut=1060,
+                size_breakdown_cut={"28": 212, "30": 318, "32": 318, "34": 212},
+                main_fabric_used=1378.0,
+                puring_used=212.0,
+                main_consumption_rate=1.3,
+                puring_consumption_rate=0.2,
+                gelaran_layers=50,
+                fabric_waste_yards=5.0
+            )
+            db.add(cr1)
+
+            if so_wind_blue:
+                cr2 = models.CuttingRecord(
+                    so_id=so_wind_blue,
+                    cutting_date=date(2026, 4, 7),
+                    operator_id=bu_nani_id,
+                    qty_cut=1494,
+                    size_breakdown_cut={"28": 300, "30": 450, "32": 450, "34": 294},
+                    main_fabric_used=1942.2,
+                    puring_used=298.8,
+                    main_consumption_rate=1.3,
+                    puring_consumption_rate=0.2,
+                    gelaran_layers=60,
+                    fabric_waste_yards=8.0
+                )
+                db.add(cr2)
+
+        if db.query(models.CuttingPrepTask).count() == 0 and so_wind_black and silma_id:
+            t1 = models.CuttingPrepTask(
+                so_id=so_wind_black,
+                task_type="NUMBERING",
+                operator_id=silma_id,
+                task_date=date(2026, 4, 6),
+                qty_done=1060,
+                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 212},
+                piece_rate=400.0,
+                total_wage=424000.0
+            )
+            t2 = models.CuttingPrepTask(
+                so_id=so_wind_black,
+                task_type="PRESS",
+                operator_id=silma_id,
+                task_date=date(2026, 4, 6),
+                qty_done=1060,
+                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 212},
+                piece_rate=400.0,
+                total_wage=424000.0
+            )
+            db.add_all([t1, t2])
+        db.commit()
+
+        # 7. Seed WIP Movements
+        print("[7/8] Seeding Alur Distribusi Subcon & Maklun...")
+        mkl_alitihad = partner_map.get("AL-ITIHAD GARMENT") or list(partner_map.values())[0]
+        wsh_anugrah = partner_map.get("ANUGRAH WASHING") or list(partner_map.values())[0]
+        anis_spv_id = emp_map.get("KRY-SEW-01")
+
+        if db.query(models.WIPMovement).count() == 0 and so_wind_black:
+            wip1 = models.WIPMovement(
+                so_id=so_wind_black,
+                stage_name="SEWING",
+                sequence_order=1,
+                partner_id=mkl_alitihad,
+                internal_supervisor_id=anis_spv_id,
+                surat_jalan_no="SJ-SEW-2604.01",
+                dispatch_date=date(2026, 4, 8),
+                qty_dispatched=1060,
+                size_breakdown_dispatched={"28": 212, "30": 318, "32": 318, "34": 212},
+                received_date=date(2026, 4, 18),
+                qty_received=1060,
+                qty_reject=0,
+                size_breakdown_received={"28": 212, "30": 318, "32": 318, "34": 212},
+                balance_discrepancy=0,
+                status="COMPLETED"
+            )
+            wip2 = models.WIPMovement(
+                so_id=so_wind_black,
+                stage_name="WASHING",
+                sequence_order=2,
+                partner_id=wsh_anugrah,
+                internal_supervisor_id=anis_spv_id,
+                surat_jalan_no="SJ-WSH-2604.01",
+                dispatch_date=date(2026, 4, 19),
+                qty_dispatched=1060,
+                size_breakdown_dispatched={"28": 212, "30": 318, "32": 318, "34": 212},
+                received_date=date(2026, 4, 25),
+                qty_received=1060,
+                qty_reject=0,
+                size_breakdown_received={"28": 212, "30": 318, "32": 318, "34": 212},
+                balance_discrepancy=0,
+                status="COMPLETED"
+            )
+            db.add_all([wip1, wip2])
+        db.commit()
+
+        # 8. Seed Finishing Wages & Shipments
+        print("[8/8] Seeding Upah Finishing Borongan & SJP Pengiriman...")
+        johan_id = emp_map.get("KRY-FIN-01")
+        ica_id = emp_map.get("KRY-FIN-02")
+        desti_id = emp_map.get("KRY-FIN-04")
+        sandi_driver_id = emp_map.get("KRY-EXP-01")
+
+        if db.query(models.PieceRateWage).count() == 0 and so_wind_black:
+            w1 = models.PieceRateWage(
+                so_id=so_wind_black,
+                operator_id=johan_id,
+                operation_type="STIM",
+                work_date=date(2026, 4, 26),
+                qty_completed=1060,
+                qty_reject=0,
+                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 212},
+                wage_per_piece=500.0,
+                total_wage=530000.0,
+                notes="Steam uap rapi oleh Johan"
+            )
+            w2 = models.PieceRateWage(
+                so_id=so_wind_black,
+                operator_id=ica_id,
+                operation_type="KANCING",
+                work_date=date(2026, 4, 27),
+                qty_completed=1060,
+                qty_reject=0,
+                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 212},
+                wage_per_piece=400.0,
+                total_wage=424000.0,
+                notes="Pasang kancing & rivet saku"
+            )
+            w3 = models.PieceRateWage(
+                so_id=so_wind_black,
+                operator_id=desti_id,
+                operation_type="PACKING",
+                work_date=date(2026, 4, 28),
+                qty_completed=1055,
+                qty_reject=5,
+                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 207},
+                wage_per_piece=400.0,
+                total_wage=422000.0,
+                notes="Lipat polybag & hangtag (5 pcs rijek kancing rusak)"
+            )
+            db.add_all([w1, w2, w3])
+
+        if db.query(models.Shipment).count() == 0 and so_wind_black:
+            s1 = models.Shipment(
+                so_id=so_wind_black,
+                shipment_date=date(2026, 4, 30),
+                surat_jalan_no="SJP-2604.0001",
+                driver_id=sandi_driver_id,
+                driver_name="Sandi",
+                vehicle_plate_no="D 8821 CJM",
+                carton_box_count=35,
+                destination_address="Gudang Distribusi VOXFLY Jakarta Barat",
+                total_qty_shipped=1055,
+                size_breakdown_shipped={"28": 212, "30": 318, "32": 318, "34": 207},
+                unit_price=35000.0,
+                total_invoice_amount=36925000.0,
+                invoice_number="INV-2604-001",
+                is_invoiced=True,
+                remarks="Pengiriman tuntas 1.055 pcs dengan SJP Resmi Sandi."
+            )
+            db.add(s1)
+        db.commit()
+
+        print("\n✅ SEEDING LENGKAP SEMUA 6 FASE PRODUKSI PT. CHIKAL JAYA MAKMUR SUKSES!")
 
     except Exception as err:
         db.rollback()
