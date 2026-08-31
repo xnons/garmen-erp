@@ -380,11 +380,11 @@ def get_production_analytics(
 
     logs_period = query_logs.all()
 
-    total_pass = sum(l.qty_pass for l in logs_period)
-    total_reject = sum(l.qty_reject for l in logs_period)
+    total_pass = sum((l.qty_pass or 0) for l in logs_period)
+    total_reject = sum((l.qty_reject or 0) for l in logs_period)
     total_disetor = total_pass + total_reject
     defect_rate_avg = (total_reject / total_disetor * 100) if total_disetor > 0 else 0.0
-    total_upah = sum(l.subtotal_rp for l in logs_period if l.status_verifikasi == StatusVerifikasiOutput.APPROVED.value)
+    total_upah = sum((l.subtotal_rp or 0.0) for l in logs_period if l.status_verifikasi == StatusVerifikasiOutput.APPROVED.value)
 
     daily_grouped: dict = {}
     for l in logs_period:
@@ -392,11 +392,11 @@ def get_production_analytics(
         if d_str not in daily_grouped:
             daily_grouped[d_str] = {"disetor": 0, "pass": 0, "reject": 0, "upah": 0.0}
         
-        daily_grouped[d_str]["disetor"] += l.qty_disetor
-        daily_grouped[d_str]["pass"] += l.qty_pass
-        daily_grouped[d_str]["reject"] += l.qty_reject
+        daily_grouped[d_str]["disetor"] += (l.qty_disetor or 0)
+        daily_grouped[d_str]["pass"] += (l.qty_pass or 0)
+        daily_grouped[d_str]["reject"] += (l.qty_reject or 0)
         if l.status_verifikasi == StatusVerifikasiOutput.APPROVED.value:
-            daily_grouped[d_str]["upah"] += l.subtotal_rp
+            daily_grouped[d_str]["upah"] += (l.subtotal_rp or 0.0)
 
     trend_harian = [
         DailyTrendPoint(

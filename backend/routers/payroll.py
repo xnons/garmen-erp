@@ -204,8 +204,8 @@ def mark_payroll_paid(
     karyawan_active = db.query(models.Karyawan).filter(models.Karyawan.is_active == True).all()
     for k in karyawan_active:
         user_logs = [l for l in logs_to_update if l.karyawan_id == k.id_karyawan]
-        pcs_pass = sum(l.qty_pass for l in user_logs)
-        nominal_rp = sum(l.subtotal_rp for l in user_logs)
+        pcs_pass = sum((l.qty_pass or 0) for l in user_logs)
+        nominal_rp = sum((l.subtotal_rp or 0.0) for l in user_logs)
         
         if k.tipe_pay == "BULANAN":
             nominal_rp = float(k.gaji_pokok or 0)

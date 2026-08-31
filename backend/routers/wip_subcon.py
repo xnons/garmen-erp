@@ -280,68 +280,76 @@ def get_master_control_tower_matrix(
     Menghasilkan matriks komprehensif telemetri WIP real-time untuk seluruh Sales Order aktif:
     Order -> Cutting -> Print M -> Bordir M -> Kirim Jahit -> Setor Jahit -> Washing -> Finishing -> Shipped -> Rijek
     """
-    orders = db.query(models.SalesOrder).options(
-        joinedload(models.SalesOrder.buyer)
-    ).order_by(models.SalesOrder.created_at.desc()).all()
+    try:
+        orders = db.query(models.SalesOrder).options(
+            joinedload(models.SalesOrder.buyer)
+        ).order_by(models.SalesOrder.created_at.desc()).all()
 
-    matrix_rows = []
-    for so in orders:
-        # 1. Total Cutting
-        cutting_recs = db.query(models.CuttingRecord).filter(models.CuttingRecord.so_id == so.id).all()
-        total_cut = sum(c.qty_cut for c in cutting_recs)
+        matrix_rows = []
+        for so in orders:
+            try:
+                # 1. Total Cutting
+                cutting_recs = db.query(models.CuttingRecord).filter(models.CuttingRecord.so_id == so.id).all()
+                total_cut = sum((int(c.qty_cut) if c.qty_cut is not None else 0) for c in cutting_recs)
 
-        # 2. Pergerakan WIP Subkon
-        wip_recs = db.query(models.WIPMovement).filter(models.WIPMovement.so_id == so.id).all()
+                # 2. Pergerakan WIP Subkon
+                wip_recs = db.query(models.WIPMovement).filter(models.WIPMovement.so_id == so.id).all()
 
-        print_m = sum(w.qty_received for w in wip_recs if w.stage_name == "PRINT_MENTAH")
-        bordir_m = sum(w.qty_received for w in wip_recs if w.stage_name == "EMBROIDERY_MENTAH")
-        kirim_jahit = sum(w.qty_dispatched for w in wip_recs if "SEWING" in w.stage_name)
-        setor_jahit = sum(w.qty_received for w in wip_recs if "SEWING" in w.stage_name)
-        washing = sum(w.qty_received for w in wip_recs if w.stage_name == "WASHING")
-        finishing = sum(w.qty_received for w in wip_recs if w.stage_name == "FINISHING")
-        
-        # 3. Total Shipped
-        shipment_recs = db.query(models.Shipment).filter(models.Shipment.so_id == so.id).all()
-        total_shipped = sum(s.total_qty_shipped for s in shipment_recs)
+                print_m = sum((int(w.qty_received) if w.qty_received is not None else 0) for w in wip_recs if w.stage_name == "PRINT_MENTAH")
+                bordir_m = sum((int(w.qty_received) if w.qty_received is not None else 0) for w in wip_recs if w.stage_name == "EMBROIDERY_MENTAH")
+                kirim_jahit = sum((int(w.qty_dispatched) if w.qty_dispatched is not None else 0) for w in wip_recs if (w.stage_name and "SEWING" in w.stage_name))
+                setor_jahit = sum((int(w.qty_received) if w.qty_received is not None else 0) for w in wip_recs if (w.stage_name and "SEWING" in w.stage_name))
+                washing = sum((int(w.qty_received) if w.qty_received is not None else 0) for w in wip_recs if (w.stage_name and "WASHING" in w.stage_name))
+                finishing = sum((int(w.qty_received) if w.qty_received is not None else 0) for w in wip_recs if (w.stage_name and "FINISHING" in w.stage_name))
+                
+                # 3. Total Shipped
+                shipment_recs = db.query(models.Shipment).filter(models.Shipment.so_id == so.id).all()
+                total_shipped = sum((int(s.total_qty_shipped) if s.total_qty_shipped is not None else 0) for s in shipment_recs)
 
-        # 4. Total Reject & Discrepancy
-        total_reject = sum(w.qty_reject for w in wip_recs)
-        total_disc = sum(w.balance_discrepancy for w in wip_recs)
+                # 4. Total Reject & Discrepancy
+                total_reject = sum((int(w.qty_reject) if w.qty_reject is not None else 0) for w in wip_recs)
+                total_disc = sum((int(w.balance_discrepancy) if w.balance_discrepancy is not None else 0) for w in wip_recs)
 
-        # 5. Dynamic status calculation
-        resolved_status = so.status or "REGISTERED"
-        if total_shipped >= (so.order_qty or 1) or total_shipped > 0:
-            resolved_status = "SHIPPED"
-        elif finishing > 0:
-            resolved_status = "FINISHING"
-        elif washing > 0:
-            resolved_status = "WASHING"
-        elif setor_jahit > 0 or kirim_jahit > 0:
-            resolved_status = "SEWING"
-        elif total_cut > 0:
-            resolved_status = "CUTTING"
+                # 5. Dynamic status calculation
+                resolved_status = so.status or "REGISTERED"
+                if total_shipped >= (so.order_qty or 1) or total_shipped > 0:
+                    resolved_status = "SHIPPED"
+                elif finishing > 0:
+                    resolved_status = "FINISHING"
+                elif washing > 0:
+                    resolved_status = "WASHING"
+                elif setor_jahit > 0 or kirim_jahit > 0:
+                    resolved_status = "SEWING"
+                elif total_cut > 0:
+                    resolved_status = "CUTTING"
 
-        buyer_label = (so.buyer.name if so.buyer else getattr(so, "buyer_name", None)) or "BUYER UMUM"
+                buyer_label = (so.buyer.name if so.buyer else getattr(so, "buyer_name", None)) or "BUYER UMUM"
 
-        matrix_rows.append(WIPMatrixRow(
-            so_id=so.id,
-            so_number=so.so_number,
-            buyer_name=buyer_label,
-            style_name=so.style_name or "-",
-            item_category=so.item_category or "LONG JEANS",
-            order_qty=so.order_qty or 0,
-            qty_cutting=total_cut,
-            qty_print_mentah=print_m,
-            qty_bordir_mentah=bordir_m,
-            qty_kirim_jahit=kirim_jahit,
-            qty_setor_jahit=setor_jahit,
-            qty_washing=washing,
-            qty_finishing=finishing,
-            qty_shipped=total_shipped,
-            qty_reject_total=total_reject,
-            balance_discrepancy_total=total_disc,
-            status_wip=resolved_status
-        ))
+                matrix_rows.append(WIPMatrixRow(
+                    so_id=so.id,
+                    so_number=so.so_number or "-",
+                    buyer_name=buyer_label,
+                    style_name=so.style_name or "-",
+                    item_category=so.item_category or "LONG JEANS",
+                    order_qty=so.order_qty or 0,
+                    qty_cutting=total_cut,
+                    qty_print_mentah=print_m,
+                    qty_bordir_mentah=bordir_m,
+                    qty_kirim_jahit=kirim_jahit,
+                    qty_setor_jahit=setor_jahit,
+                    qty_washing=washing,
+                    qty_finishing=finishing,
+                    qty_shipped=total_shipped,
+                    qty_reject_total=total_reject,
+                    balance_discrepancy_total=total_disc,
+                    status_wip=resolved_status
+                ))
+            except Exception as row_err:
+                print(f"⚠️ Error parsing row SO {so.id}: {row_err}")
+                continue
+    except Exception as e:
+        print(f"⚠️ Error in get_master_control_tower_matrix: {e}")
+        matrix_rows = []
 
     # Fallback jika database masih kosong agar Control Tower selalu menyajikan telemetri operasional
     if not matrix_rows:

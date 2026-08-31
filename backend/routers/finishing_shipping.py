@@ -335,16 +335,16 @@ def get_form_wi_settlement(
 
     # 1. Total Terkirim
     shipments = db.query(models.Shipment).filter(models.Shipment.so_id == so.id).all()
-    total_qty_shipped = sum(s.total_qty_shipped for s in shipments)
+    total_qty_shipped = sum((s.total_qty_shipped or 0) for s in shipments)
     total_gross_cmt = round(total_qty_shipped * (so.unit_price or 0.0), 2)
 
     # 2. Total Pemakaian Bahan (Potongan Bahan jika CMT)
     allocations = db.query(models.MaterialAllocation).options(joinedload(models.MaterialAllocation.item)).filter(models.MaterialAllocation.so_id == so.id).all()
-    total_material_cost = sum(a.qty_issued * (a.item.unit_price or 0.0) for a in allocations if a.item)
+    total_material_cost = sum((a.qty_issued or 0.0) * ((a.item.unit_price or 0.0) if a.item else 0.0) for a in allocations)
 
     # 3. Total Upah Finishing
     wages = db.query(models.PieceRateWage).filter(models.PieceRateWage.so_id == so.id).all()
-    total_finishing_wage = sum(w.total_wage for w in wages)
+    total_finishing_wage = sum((w.total_wage or 0.0) for w in wages)
 
     # 4. Net Settlement
     net_receivable = max(0.0, total_gross_cmt - total_material_cost)
