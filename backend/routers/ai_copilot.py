@@ -52,13 +52,16 @@ def ai_chat_endpoint(
         history=payload.history
     )
 
-    record_audit(
-        db=db,
-        actor_id=current_user.id_karyawan,
-        aksi="AI_COPILOT_QUERY",
-        target_id="OPENROUTER",
-        catatan=f"Konsultasi AI Persona '{payload.persona}' oleh {current_user.nama}."
-    )
+    try:
+        record_audit(
+            db=db,
+            actor_id=current_user.id_karyawan,
+            aksi="AI_COPILOT_QUERY",
+            target_id="OPENROUTER",
+            catatan=f"Konsultasi AI Persona '{payload.persona}' oleh {current_user.nama}."
+        )
+    except Exception as e:
+        print(f"[AI Audit Warning]: Gagal mencatat audit: {e}")
 
     return {
         "persona": payload.persona,

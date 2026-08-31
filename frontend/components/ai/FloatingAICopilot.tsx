@@ -6,7 +6,7 @@ import {
   FileText, Camera, Upload, CheckCircle2, AlertTriangle, RefreshCw, Copy, Check,
   Minimize2, Maximize2, MessageSquare, ChevronUp, ChevronDown, Zap
 } from 'lucide-react';
-import axios from 'axios';
+import api from '@/services/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -36,7 +36,7 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-Fill States
+  // Auto-fill States
   const [rawText, setRawText] = useState('');
   const [formType, setFormType] = useState<'SALES_ORDER' | 'CUTTING'>('SALES_ORDER');
   const [parsedResult, setParsedResult] = useState<any>(null);
@@ -48,9 +48,6 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
   const [defectNotes, setDefectNotes] = useState('');
   const [visionAnalysis, setVisionAnalysis] = useState<any>(null);
   const [isVisionLoading, setIsVisionLoading] = useState(false);
-
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   useEffect(() => {
     if (chatBottomRef.current && isOpen && !isMinimized) {
@@ -69,20 +66,16 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
     setIsChatLoading(true);
 
     try {
-      const res = await axios.post(
-        '/api/ai/chat',
-        {
-          prompt: textToSend,
-          persona: selectedPersona,
-          history: messages.map((m) => ({ role: m.role, content: m.content }))
-        },
-        { headers: authHeaders }
-      );
+      const res = await api.post('/api/ai/chat', {
+        prompt: textToSend,
+        persona: selectedPersona,
+        history: messages.map((m) => ({ role: m.role, content: m.content }))
+      });
 
       const aiReply = res.data?.reply || 'Tidak ada respon dari model AI.';
       setMessages((prev) => [...prev, { role: 'assistant', content: aiReply }]);
     } catch (err: any) {
-      const errMsg = err.response?.data?.detail || err.message || 'Gagal menghubungi AI.';
+      const errMsg = err.response?.data?.detail || err.message || 'Gagal menghubungi server AI.';
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', content: `⚠️ Terjadi kendala: ${errMsg}` }
@@ -99,16 +92,12 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
     setParsedResult(null);
 
     try {
-      const res = await axios.post(
-        '/api/ai/auto-fill',
-        {
-          raw_text: rawText,
-          target_form: formType
-        },
-        { headers: authHeaders }
-      );
+      const res = await api.post('/api/ai/auto-fill', {
+        raw_text: rawText,
+        form_type: formType
+      });
 
-      if (res.data?.success) {
+      if (res.data?.parsed_data) {
         setParsedResult(res.data.parsed_data);
       } else {
         alert(res.data?.message || 'Gagal mengekstrak teks form.');
@@ -138,16 +127,12 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
     setVisionAnalysis(null);
 
     try {
-      const res = await axios.post(
-        '/api/ai/vision-qc',
-        {
-          image_base64: selectedImage,
-          defect_notes: defectNotes
-        },
-        { headers: authHeaders }
-      );
+      const res = await api.post('/api/ai/vision-qc', {
+        image_base64: selectedImage,
+        defect_notes: defectNotes
+      });
 
-      if (res.data?.success) {
+      if (res.data?.analysis) {
         setVisionAnalysis(res.data.analysis);
       } else {
         alert(res.data?.message || 'Gagal menganalisis visual.');

@@ -120,50 +120,63 @@ def build_factory_grounded_context(db: Session) -> str:
 
 def call_openrouter_api(messages: List[Dict[str, Any]], model: Optional[str] = None, max_tokens: int = 1500) -> str:
     """
-    Eksekusi panggilan HTTP request ke OpenRouter API dengan fallback error handling yang aman.
+    Eksekusi panggilan HTTP request ke OpenRouter API dengan multi-model fallback error handling yang aman.
     """
     api_key = OPENROUTER_API_KEY
     if not api_key:
         return (
-            "⚠️ Kunci API OpenRouter (OPENROUTER_API_KEY) belum diisi pada environment Vercel / Cloud.\n\n"
+            "⚠️ Kunci API OpenRouter (OPENROUTER_API_KEY) belum diisi pada Environment Render.\n\n"
             "Panduan Pengaktifan:\n"
-            "1. Masukkan variable `OPENROUTER_API_KEY=sk-or-v1-...` di Project Settings Vercel / Environment Cloud Anda.\n"
-            "2. Gunakan model `google/gemini-2.5-flash` atau `anthropic/claude-3.5-sonnet`.\n"
-            "3. Sistem siap memproses inferensi AI cerdas multi-persona secara real-time!"
+            "1. Buka Render Dashboard -> Web Service 'garmen-erp' -> Environment.\n"
+            "2. Tambahkan variable `OPENROUTER_API_KEY=sk-or-v1-...`.\n"
+            "3. Pastikan `OPENROUTER_MODEL=google/gemini-2.5-flash`.\n"
+            "4. Klik Save Changes dan AI Co-Pilot akan langsung aktif!"
         )
 
-    target_model = model or OPENROUTER_MODEL
+    candidate_models = [model or OPENROUTER_MODEL, "google/gemini-2.5-flash", "anthropic/claude-3.5-sonnet", "deepseek/deepseek-chat"]
+    # Remove duplicates while preserving order
+    models_to_try = []
+    for m in candidate_models:
+        if m and m not in models_to_try:
+            models_to_try.append(m)
+
+    last_error = ""
     url = f"{OPENROUTER_BASE_URL.rstrip('/')}/chat/completions"
 
-    payload = {
-        "model": target_model,
-        "messages": messages,
-        "max_tokens": max_tokens,
-        "temperature": 0.3 # Low temperature for accurate, non-hallucinatory ERP reasoning
-    }
+    for target_model in models_to_try:
+        payload = {
+            "model": target_model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": 0.3 # Low temperature for accurate, non-hallucinatory ERP reasoning
+        }
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://mastergarment.id",
-        "X-Title": OPENROUTER_SITE_NAME
-    }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://mastergarment.id",
+            "X-Title": OPENROUTER_SITE_NAME
+        }
 
-    try:
-        data_bytes = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=45) as response:
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body)
-            choices = res_json.get("choices", [])
-            if choices and len(choices) > 0:
-                return choices[0].get("message", {}).get("content", "Tidak ada respon dari model AI.")
-            return "Respon OpenRouter kosong."
-    except urllib.error.HTTPError as he:
-        err_msg = he.read().decode("utf-8", errors="ignore")
-        return f"⚠️ OpenRouter HTTP Error ({he.code}): {err_msg}"
-    except Exception as ex:
-        return f"⚠️ Gagal menghubungi OpenRouter AI: {str(ex)}"
+        try:
+            data_bytes = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=45) as response:
+                res_body = response.read().decode("utf-8")
+                res_json = json.loads(res_body)
+                choices = res_json.get("choices", [])
+                if choices and len(choices) > 0:
+                    content = choices[0].get("message", {}).get("content", "")
+                    if content and content.strip():
+                        return content
+                last_error = "Respon OpenRouter kosong dari model " + target_model
+        except urllib.error.HTTPError as he:
+            err_msg = he.read().decode("utf-8", errors="ignore")
+            last_error = f"OpenRouter HTTP Error ({he.code}) pada model {target_model}: {err_msg}"
+        except Exception as ex:
+            last_error = f"Gagal menghubungi OpenRouter AI ({target_model}): {str(ex)}"
+
+    return f"⚠️ {last_error}"
 
 
 def chat_with_persona(prompt: str, persona: str, db: Session, history: Optional[List[Dict[str, str]]] = None) -> str:
