@@ -32,7 +32,12 @@ export default function WarehouseFabricModule() {
     item_type: "FABRIC_MAIN",
     unit: "YARD",
     unit_price: 25000,
-    current_stock: 0
+    current_stock: 0,
+    color_shade_lot: "",
+    width_inch: 58.0,
+    gramasi_gsm: 0,
+    min_stock_alert: 50.0,
+    rack_location: "GUDANG_UTAMA"
   });
 
   // Quick Receipt Form
@@ -441,6 +446,60 @@ export default function WarehouseFabricModule() {
                   value={newItem.unit}
                   onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white uppercase"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[11px] text-slate-300 mb-1">Lot Warna / Shade</label>
+                <input
+                  type="text"
+                  placeholder="LOT-A / JET BLACK"
+                  value={newItem.color_shade_lot}
+                  onChange={(e) => setNewItem({ ...newItem, color_shade_lot: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white uppercase"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-300 mb-1">Lebar (Inch)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={newItem.width_inch}
+                  onChange={(e) => setNewItem({ ...newItem, width_inch: Number(e.target.value) })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-300 mb-1">Gramasi (GSM)</label>
+                <input
+                  type="number"
+                  value={newItem.gramasi_gsm}
+                  onChange={(e) => setNewItem({ ...newItem, gramasi_gsm: Number(e.target.value) })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-300 mb-1">Lokasi Rak Gudang</label>
+                <input
+                  type="text"
+                  placeholder="RAK-A1-04"
+                  value={newItem.rack_location}
+                  onChange={(e) => setNewItem({ ...newItem, rack_location: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white uppercase"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-300 mb-1">Min Stock Alert</label>
+                <input
+                  type="number"
+                  value={newItem.min_stock_alert}
+                  onChange={(e) => setNewItem({ ...newItem, min_stock_alert: Number(e.target.value) })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                 />
               </div>
             </div>

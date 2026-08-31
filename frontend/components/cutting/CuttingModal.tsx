@@ -18,7 +18,11 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
     qty_cut: 500,
     main_fabric_used: 650,
     puring_used: 120,
-    puring_jala_used: 0
+    puring_jala_used: 0,
+    marker_length_yard: 12.5,
+    marker_efficiency_pct: 86.5,
+    gelaran_layers: 40,
+    fabric_waste_yards: 8.0
   });
 
   const [sizeMatrix, setSizeMatrix] = useState<Record<string, number>>({
@@ -69,7 +73,11 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
         size_breakdown_cut: sizeMatrix,
         main_fabric_used: Number(formData.main_fabric_used),
         puring_used: Number(formData.puring_used) || 0,
-        puring_jala_used: Number(formData.puring_jala_used) || 0
+        puring_jala_used: Number(formData.puring_jala_used) || 0,
+        marker_length_yard: Number(formData.marker_length_yard) || 0,
+        marker_efficiency_pct: Number(formData.marker_efficiency_pct) || 0,
+        gelaran_layers: Number(formData.gelaran_layers) || 1,
+        fabric_waste_yards: Number(formData.fabric_waste_yards) || 0
       });
 
       onSuccess();
@@ -176,6 +184,49 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
                 value={formData.puring_jala_used}
                 onChange={(e) => setFormData({ ...formData, puring_jala_used: Number(e.target.value) })}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-bold"
+              />
+            </div>
+          </div>
+
+          {/* Marker & Efisiensi Meja Potong */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/40 p-3.5 rounded-xl border border-slate-800/80">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Panjang Marker (Yd)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={formData.marker_length_yard}
+                onChange={(e) => setFormData({ ...formData, marker_length_yard: Number(e.target.value) })}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Efisiensi Pola (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={formData.marker_efficiency_pct}
+                onChange={(e) => setFormData({ ...formData, marker_efficiency_pct: Number(e.target.value) })}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-emerald-400 font-bold"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Jml Gelaran (Ply)</label>
+              <input
+                type="number"
+                value={formData.gelaran_layers}
+                onChange={(e) => setFormData({ ...formData, gelaran_layers: Number(e.target.value) })}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Sisa Afval (Yd)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={formData.fabric_waste_yards}
+                onChange={(e) => setFormData({ ...formData, fabric_waste_yards: Number(e.target.value) })}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-400 font-bold"
               />
             </div>
           </div>

@@ -74,6 +74,11 @@ class InventoryItemCreate(BaseModel):
     unit: Optional[str] = "YARD"
     unit_price: Optional[float] = 0.0
     current_stock: Optional[float] = 0.0
+    color_shade_lot: Optional[str] = None
+    width_inch: Optional[float] = 58.0
+    gramasi_gsm: Optional[float] = 0.0
+    min_stock_alert: Optional[float] = 50.0
+    rack_location: Optional[str] = "GUDANG_UTAMA"
 
 class InventoryItemResponse(InventoryItemCreate):
     id: str
@@ -151,6 +156,10 @@ class CuttingRecordCreate(BaseModel):
     main_fabric_used: float
     puring_used: Optional[float] = 0.0
     puring_jala_used: Optional[float] = 0.0
+    marker_length_yard: Optional[float] = 0.0
+    marker_efficiency_pct: Optional[float] = 0.0
+    gelaran_layers: Optional[int] = 1
+    fabric_waste_yards: Optional[float] = 0.0
 
 class CuttingRecordResponse(CuttingRecordCreate):
     id: str
@@ -250,6 +259,10 @@ class ShipmentCreate(BaseModel):
     shipment_date: date
     surat_jalan_no: str # SJP-2608.0001
     driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    vehicle_plate_no: Optional[str] = None
+    carton_box_count: Optional[int] = 0
+    destination_address: Optional[str] = None
     total_qty_shipped: int
     size_breakdown_shipped: Optional[Dict[str, int]] = {}
     unit_price: float
@@ -258,7 +271,6 @@ class ShipmentCreate(BaseModel):
 
 class ShipmentResponse(ShipmentCreate):
     id: str
-    driver_name: Optional[str] = None
     total_invoice_amount: float
     is_invoiced: bool
     class Config:

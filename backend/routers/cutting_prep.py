@@ -68,7 +68,11 @@ def create_cutting_record(
         puring_used=payload.puring_used or 0.0,
         puring_jala_used=payload.puring_jala_used or 0.0,
         main_consumption_rate=main_rate,
-        puring_consumption_rate=puring_rate
+        puring_consumption_rate=puring_rate,
+        marker_length_yard=payload.marker_length_yard or 0.0,
+        marker_efficiency_pct=payload.marker_efficiency_pct or 0.0,
+        gelaran_layers=payload.gelaran_layers or 1,
+        fabric_waste_yards=payload.fabric_waste_yards or 0.0
     )
     db.add(cutting)
     db.commit()

@@ -26,6 +26,10 @@ export default function ShippingBillingModule() {
     so_id: "",
     shipment_date: new Date().toISOString().split('T')[0],
     surat_jalan_no: `SJP-${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}.0001`,
+    driver_name: "Sandi (Ekspedisi)",
+    vehicle_plate_no: "B 9821 CJM",
+    carton_box_count: 15,
+    destination_address: "Gudang Pusat Buyer (Jakarta Barat)",
     total_qty_shipped: 300,
     unit_price: 35000,
     invoice_number: "",
@@ -77,6 +81,10 @@ export default function ShippingBillingModule() {
         so_id: newSJP.so_id,
         shipment_date: newSJP.shipment_date,
         surat_jalan_no: newSJP.surat_jalan_no.toUpperCase(),
+        driver_name: newSJP.driver_name,
+        vehicle_plate_no: newSJP.vehicle_plate_no.toUpperCase(),
+        carton_box_count: Number(newSJP.carton_box_count) || 0,
+        destination_address: newSJP.destination_address,
         total_qty_shipped: Number(newSJP.total_qty_shipped),
         size_breakdown_shipped: sizeMatrix,
         unit_price: Number(newSJP.unit_price),
@@ -352,6 +360,46 @@ export default function ShippingBillingModule() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[11px] text-slate-300 mb-1">Nama Supir Ekspedisi</label>
+                <input
+                  type="text"
+                  value={newSJP.driver_name}
+                  onChange={(e) => setNewSJP({ ...newSJP, driver_name: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-300 mb-1">Plat Nomor Truk</label>
+                <input
+                  type="text"
+                  value={newSJP.vehicle_plate_no}
+                  onChange={(e) => setNewSJP({ ...newSJP, vehicle_plate_no: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white uppercase font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-300 mb-1">Jml Dus (Koli)</label>
+                <input
+                  type="number"
+                  value={newSJP.carton_box_count}
+                  onChange={(e) => setNewSJP({ ...newSJP, carton_box_count: Number(e.target.value) })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-300 mb-1">Alamat Gudang Tujuan</label>
+              <input
+                type="text"
+                value={newSJP.destination_address}
+                onChange={(e) => setNewSJP({ ...newSJP, destination_address: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

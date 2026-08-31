@@ -13,6 +13,7 @@ from core.security import get_password_hash
 from routers import auth, karyawan, mesin, inventaris, dashboard, audit, payroll
 from routers import produksi_master, produksi_output
 from routers import ppic_so, warehouse_fabric, cutting_prep, wip_subcon, finishing_shipping
+from routers import ai_copilot, email_reports
 
 from sqlalchemy import text
 
@@ -50,6 +51,22 @@ def auto_migrate_db():
             ("mesin", "garansi_hingga", "VARCHAR(20)"),
             ("mesin", "riwayat_pembayaran", "TEXT DEFAULT '[]'"),
             ("karyawan", "can_login", "BOOLEAN DEFAULT TRUE"),
+            # Kolom baru Gudang Kain & Trims
+            ("inventory_items", "color_shade_lot", "VARCHAR(50)"),
+            ("inventory_items", "width_inch", "FLOAT DEFAULT 58.0"),
+            ("inventory_items", "gramasi_gsm", "FLOAT DEFAULT 0.0"),
+            ("inventory_items", "min_stock_alert", "FLOAT DEFAULT 50.0"),
+            ("inventory_items", "rack_location", "VARCHAR(50) DEFAULT 'GUDANG_UTAMA'"),
+            # Kolom baru Meja Potong
+            ("cutting_records", "marker_length_yard", "FLOAT DEFAULT 0.0"),
+            ("cutting_records", "marker_efficiency_pct", "FLOAT DEFAULT 0.0"),
+            ("cutting_records", "gelaran_layers", "INTEGER DEFAULT 1"),
+            ("cutting_records", "fabric_waste_yards", "FLOAT DEFAULT 0.0"),
+            # Kolom baru Ekspedisi & Pengiriman
+            ("shipments", "driver_name", "VARCHAR(100)"),
+            ("shipments", "vehicle_plate_no", "VARCHAR(50)"),
+            ("shipments", "carton_box_count", "INTEGER DEFAULT 0"),
+            ("shipments", "destination_address", "TEXT"),
         ]
         for tbl_name, col_name, col_type in columns_to_add:
             try:
@@ -157,6 +174,10 @@ app.include_router(warehouse_fabric.router)
 app.include_router(cutting_prep.router)
 app.include_router(wip_subcon.router)
 app.include_router(finishing_shipping.router)
+
+# 🟢 Router AI Co-Pilot & Automated Reporting
+app.include_router(ai_copilot.router)
+app.include_router(email_reports.router)
 
 @app.get("/")
 def root_check():

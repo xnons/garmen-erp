@@ -443,6 +443,13 @@ class InventoryItem(Base):
     unit = Column(String(20), default="YARD")                              # 'YARD', 'KG', 'PCS', 'ROLL'
     unit_price = Column(Float, default=0.0)
     current_stock = Column(Float, default=0.0)
+    
+    # 🔍 FIELD PENGAYAAN GUDANG KAIN & TRIMS
+    color_shade_lot = Column(String(50), nullable=True)                    # Lot / Batch Warna Kain
+    width_inch = Column(Float, default=58.0)                               # Lebar Kain (e.g. 58", 60")
+    gramasi_gsm = Column(Float, default=0.0)                               # Ketebalan Kain GSM
+    min_stock_alert = Column(Float, default=50.0)                          # Batas minimum stok
+    rack_location = Column(String(50), default="GUDANG_UTAMA")             # Lokasi Rak Penyimpanan (e.g. 'RAK-A1-04')
 
 class MaterialReceipt(Base):
     __tablename__ = "material_receipts"
@@ -508,6 +515,12 @@ class CuttingRecord(Base):
     puring_jala_used = Column(Float, default=0.0)
     main_consumption_rate = Column(Float, default=0.0)                     # main_fabric_used / qty_cut
     puring_consumption_rate = Column(Float, default=0.0)                   # puring_used / qty_cut
+    
+    # 🔍 FIELD PENGAYAAN MEJA POTONG
+    marker_length_yard = Column(Float, default=0.0)                        # Panjang Lembar Marker
+    marker_efficiency_pct = Column(Float, default=0.0)                     # Efisiensi Pola (%)
+    gelaran_layers = Column(Integer, default=1)                            # Jumlah Tumpukan Lembar Kain (Ply)
+    fabric_waste_yards = Column(Float, default=0.0)                        # Sisa Kain Perca / Afval
     created_at = Column(DateTime, default=datetime.utcnow)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
@@ -548,7 +561,7 @@ class WIPMovement(Base):
     qty_reject = Column(Integer, default=0)
     size_breakdown_received = Column(JSON, default={})
     balance_discrepancy = Column(Integer, default=0)                       # qty_dispatched - (qty_received + qty_reject)
-    status = Column(String(30), default="IN_PROCESS")                      # 'IN_PROCESS', 'COMPLETED', 'DISCREPANCY_FLAG'
+    status = Column(String(30), default="IN_PROCESS")                      # 'IN_PROCESS', 'PARTIAL_RECEIVED', 'COMPLETED', 'DISCREPANCY_FLAG'
     remarks = Column(Text, nullable=True)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
@@ -600,6 +613,12 @@ class Shipment(Base):
     invoice_number = Column(String(100), nullable=True)
     is_invoiced = Column(Boolean, default=False)
     remarks = Column(Text, nullable=True)
+
+    # 🔍 FIELD PENGAYAAN EKSPEDISI & PENGIRIMAN
+    driver_name = Column(String(100), nullable=True)                       # Nama Supir Ekspedisi
+    vehicle_plate_no = Column(String(50), nullable=True)                   # Nomor Polisi Truk / Mobil
+    carton_box_count = Column(Integer, default=0)                          # Jumlah Koli / Dus Karton
+    destination_address = Column(Text, nullable=True)                      # Alamat Gudang Tujuan Buyer
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
     driver = relationship("Karyawan", foreign_keys=[driver_id])

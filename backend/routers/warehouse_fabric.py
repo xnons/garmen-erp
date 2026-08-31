@@ -47,7 +47,12 @@ def create_inventory_item(
         item_type=payload.item_type.upper(),
         unit=payload.unit or "YARD",
         unit_price=payload.unit_price or 0.0,
-        current_stock=payload.current_stock or 0.0
+        current_stock=payload.current_stock or 0.0,
+        color_shade_lot=payload.color_shade_lot,
+        width_inch=payload.width_inch or 58.0,
+        gramasi_gsm=payload.gramasi_gsm or 0.0,
+        min_stock_alert=payload.min_stock_alert or 50.0,
+        rack_location=payload.rack_location or "GUDANG_UTAMA"
     )
     db.add(item)
     db.commit()

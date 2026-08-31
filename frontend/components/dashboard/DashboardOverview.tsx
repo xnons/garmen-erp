@@ -12,11 +12,18 @@ import {
     PieChart as PieIcon,
     Loader2,
     RefreshCw,
-    Inbox
+    Inbox,
+    Sparkles,
+    Mail,
+    CheckCircle2,
+    BarChart3,
+    ShieldCheck
 } from 'lucide-react';
 import {
     AreaChart,
     Area,
+    BarChart,
+    Bar,
     XAxis,
     YAxis,
     Tooltip,
@@ -28,6 +35,7 @@ import {
 import api from '@/services/api';
 import { produksiService, SPK } from '@/services/produksiService';
 import DeadlineAlertBanner from '@/components/dashboard/DeadlineAlertBanner';
+import { AICopilotModal } from '@/components/ai/AICopilotModal';
 
 interface DashboardOverviewProps {
     activeUser: any;
@@ -46,17 +54,22 @@ interface AlokasiBrandItem {
     color: string;
 }
 
-const BRAND_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#38bdf8', '#a855f7', '#64748b'];
+const BRAND_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#38bdf8', '#a855f7', '#ec4899'];
 
 export default function DashboardOverview({ activeUser, onNavigate }: DashboardOverviewProps) {
     const userRole = activeUser?.role?.toUpperCase() || 'PRODUKSI';
     const isOwnerOrDev = ['OWNER', 'DEVELOPER'].includes(userRole);
     const isAdminOrGudang = ['ADMIN', 'GUDANG'].includes(userRole);
     const isFinance = userRole === 'FINANCE';
-    const isProduksi = ['PRODUKSI', 'KARYAWAN'].includes(userRole);
+    const canViewFinancial = ['OWNER', 'DEVELOPER', 'ADMIN', 'FINANCE'].includes(userRole);
 
     const [loading, setLoading] = useState(false);
     const [spkList, setSpkList] = useState<SPK[]>([]);
+    const [isAICopilotOpen, setIsAICopilotOpen] = useState(false);
+
+    // Email Dispatch State
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
+    const [emailStatusMsg, setEmailStatusMsg] = useState<string | null>(null);
 
     const [summaryMetrics, setSummaryMetrics] = useState({
         totalOutputToday: 0,
@@ -67,8 +80,20 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
         mesinTotal: 0,
         mesinPerluService: 0,
         totalKaryawan: 0,
-        upahHariIni: 0
+        upahHariIni: 0,
+        soAktifCount: 0,
+        canViewFinancial: true
     });
+
+    const [ownerAnalytics, setOwnerAnalytics] = useState<{
+        stationThroughput: any[];
+        buyerShare: any[];
+        financialTrend: any[];
+        healthScore: number;
+        totalDiscrepancyLost: number;
+        totalRejects: number;
+        totalShippedPcs: number;
+    } | null>(null);
 
     const [trenProduksi, setTrenProduksi] = useState<TrenProduksiItem[]>([]);
     const [alokasiBrand, setAlokasiBrand] = useState<AlokasiBrandItem[]>([]);
@@ -76,11 +101,12 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
     const fetchDashboardData = useCallback(async () => {
         setLoading(true);
         try {
-            const [resStats, resProduksi, resBrand, resSPK] = await Promise.all([
+            const [resStats, resProduksi, resBrand, resSPK, resOwner] = await Promise.all([
                 api.get('/api/dashboard/overview-stats').catch(() => null),
                 api.get('/api/dashboard/chart-produksi').catch(() => null),
                 api.get('/api/dashboard/chart-brand-material').catch(() => null),
-                produksiService.getAllSPK().catch(() => [])
+                produksiService.getAllSPK().catch(() => []),
+                isOwnerOrDev ? api.get('/api/dashboard/owner-analytics').catch(() => null) : Promise.resolve(null)
             ]);
 
             if (resStats && resStats.data) {
@@ -103,6 +129,10 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                 );
             }
 
+            if (resOwner && resOwner.data && !resOwner.data.error) {
+                setOwnerAnalytics(resOwner.data);
+            }
+
             if (Array.isArray(resSPK)) {
                 setSpkList(resSPK);
             }
@@ -111,11 +141,29 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [isOwnerOrDev]);
 
     useEffect(() => {
         fetchDashboardData();
     }, [fetchDashboardData, activeUser]);
+
+    const handleSendExecutiveEmail = async () => {
+        setIsSendingEmail(true);
+        setEmailStatusMsg(null);
+        try {
+            const res = await api.post('/api/reports/send-briefing', {
+                recipient_email: 'muhammadtegarsaputra@gmail.com',
+                recipient_name: activeUser?.nama || 'Muhammad Tegar Saputra'
+            });
+            setEmailStatusMsg(res.data?.message || 'Laporan eksekutif berhasil dikirim!');
+            setTimeout(() => setEmailStatusMsg(null), 5000);
+        } catch (err: any) {
+            setEmailStatusMsg('⚠️ Terjadi kendala saat mengirim email.');
+            setTimeout(() => setEmailStatusMsg(null), 5000);
+        } finally {
+            setIsSendingEmail(false);
+        }
+    };
 
     const formatIDR = (val: number) => {
         const num = Number(val);
@@ -152,6 +200,13 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
     return (
         <div className="space-y-4 sm:space-y-6 text-slate-100">
 
+            {/* AI CO-PILOT MODAL */}
+            <AICopilotModal
+                isOpen={isAICopilotOpen}
+                onClose={() => setIsAICopilotOpen(false)}
+                activeUser={activeUser}
+            />
+
             {/* 🟢 BANNER PERINGATAN DEADLINE OTOMATIS */}
             <DeadlineAlertBanner
                 spkList={spkList}
@@ -160,15 +215,15 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                 }}
             />
 
-            {/* Header Module */}
+            {/* HEADER DASHBOARD */}
             <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
                 <div>
                     <div className="flex items-center gap-2.5 mb-1">
-                        <h2 className="text-2xl font-bold tracking-tight text-white">
+                        <h2 className="text-2xl font-black tracking-tight text-white">
                             {isOwnerOrDev && 'Ringkasan Eksekutif Operasional Pabrik'}
                             {isAdminOrGudang && 'Papan Kendali Logistik & Inventaris'}
                             {isFinance && 'Ringkasan Finansial & Penggajian'}
-                            {isProduksi && 'Lantai Produksi & Target Borongan'}
+                            {!canViewFinancial && 'Lantai Produksi & Target Borongan'}
                         </h2>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                             {userRole}
@@ -179,7 +234,29 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3 self-start md:self-auto">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                    {/* BUTTON BUKA AI CO-PILOT */}
+                    <button
+                        onClick={() => setIsAICopilotOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all active:scale-95 cursor-pointer"
+                    >
+                        <Sparkles className="w-4 h-4 animate-pulse" />
+                        AI Co-Pilot
+                    </button>
+
+                    {/* BUTTON KIRIM EMAIL LAPORAN */}
+                    {canViewFinancial && (
+                        <button
+                            onClick={handleSendExecutiveEmail}
+                            disabled={isSendingEmail}
+                            className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                            title="Kirim Laporan Eksekutif ke Email Owner"
+                        >
+                            <Mail className={`w-3.5 h-3.5 ${isSendingEmail ? 'animate-bounce text-indigo-400' : 'text-slate-400'}`} />
+                            {isSendingEmail ? 'Mengirim...' : 'Kirim Email Briefing'}
+                        </button>
+                    )}
+
                     <button
                         onClick={fetchDashboardData}
                         disabled={loading}
@@ -188,15 +265,23 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                     >
                         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
                     </button>
-                    <div className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-400 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span>Sistem Aktif | Shift Pagi</span>
-                    </div>
                 </div>
             </div>
 
+            {/* EMAIL STATUS ALERT TOAST */}
+            {emailStatusMsg && (
+                <div className="p-4 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center justify-between animate-fadeIn">
+                    <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>{emailStatusMsg}</span>
+                    </div>
+                </div>
+            )}
+
             {/* KARTU KPI UTAMA REAL-TIME */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                {/* 1. TOTAL OUTPUT HARI INI */}
                 <div className="bg-slate-900/90 p-5 rounded-3xl border border-slate-800 space-y-3 shadow-lg hover:border-indigo-500/40 transition-all">
                     <div className="flex justify-between items-center">
                         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Output Hari Ini</span>
@@ -214,21 +299,27 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                     </div>
                 </div>
 
+                {/* 2. ASET MATERIAL GUDANG (ISOLASI FINANSIAL: NON-FINANCIAL LIHAT SKU) */}
                 <div className="bg-slate-900/90 p-5 rounded-3xl border border-slate-800 space-y-3 shadow-lg hover:border-emerald-500/40 transition-all">
                     <div className="flex justify-between items-center">
-                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Aset Material Gudang</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                            {canViewFinancial ? 'Aset Material Gudang' : 'Stok Material Gudang'}
+                        </span>
                         <div className="p-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-2xl">
                             <Package className="w-5 h-5" />
                         </div>
                     </div>
                     <div>
                         <p className="text-2xl font-bold text-emerald-400 font-mono">
-                            {formatIDR(summaryMetrics.totalAsetMaterial)}
+                            {canViewFinancial ? formatIDR(summaryMetrics.totalAsetMaterial) : `${summaryMetrics.totalSkuCount} SKU Aktif`}
                         </p>
-                        <p className="text-[11px] text-slate-400 mt-1">{summaryMetrics.totalSkuCount} SKU Bahan Baku Terdaftar</p>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                            {canViewFinancial ? `${summaryMetrics.totalSkuCount} SKU Bahan Baku Terdaftar` : 'Bahan Baku Siap Potong'}
+                        </p>
                     </div>
                 </div>
 
+                {/* 3. STATUS MESIN JAHIT */}
                 <div className="bg-slate-900/90 p-5 rounded-3xl border border-slate-800 space-y-3 shadow-lg hover:border-sky-500/40 transition-all">
                     <div className="flex justify-between items-center">
                         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status Mesin Jahit</span>
@@ -246,26 +337,108 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                     </div>
                 </div>
 
-                {/* KARTU PRESENSI STAFF */}
+                {/* 4. TOTAL BATCH SO AKTIF */}
                 <div className="bg-slate-900/90 p-5 rounded-3xl border border-slate-800 space-y-3 shadow-lg hover:border-purple-500/40 transition-all">
                     <div className="flex justify-between items-center">
-                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Presensi Staff</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Batch Sales Order</span>
                         <div className="p-2.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-2xl">
                             <Users className="w-5 h-5" />
                         </div>
                     </div>
                     <div>
-                        <p className="text-base font-bold text-amber-400 font-mono leading-tight">
-                            Modul Dalam Pengembangan
+                        <p className="text-2xl font-bold text-white font-mono">
+                            {summaryMetrics.soAktifCount || 0} <span className="text-xs font-normal text-slate-400">SO Aktif</span>
                         </p>
-                        <p className="text-[11px] text-slate-400 mt-1">
+                        <p className="text-[11px] text-indigo-400 mt-1 font-semibold">
                             Total {summaryMetrics.totalKaryawan || 0} Karyawan Terdaftar
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* SECTION GRAFIK VISUALISASI RECHARTS */}
+            {/* ============================================================= */}
+            {/* 👑 OWNER & DEVELOPER EXECUTIVE ANALYTICS (MULTI-GRAPHICS)     */}
+            {/* ============================================================= */}
+            {isOwnerOrDev && ownerAnalytics && (
+                <div className="space-y-6 pt-2">
+                    
+                    <div className="flex items-center gap-2">
+                        <BarChart3 className="w-5 h-5 text-indigo-400" />
+                        <h3 className="text-lg font-black text-white tracking-tight">
+                            Executive Multi-Graphics Analytics (Owner Only)
+                        </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        
+                        {/* 1. BAR CHART: THROUGHPUT ANTAR STASIUN PABRIK */}
+                        <div className="lg:col-span-2 bg-slate-900/90 p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                                <div>
+                                    <h4 className="font-bold text-white text-sm">Throughput Output Antar Stasiun</h4>
+                                    <p className="text-[11px] text-slate-400">Total akumulasi pcs output per tahapan produksi garmen</p>
+                                </div>
+                                <span className="px-2.5 py-1 bg-indigo-500/10 text-indigo-400 text-xs font-mono font-bold rounded-lg border border-indigo-500/20">
+                                    Live Stream
+                                </span>
+                            </div>
+
+                            <div className="h-64 w-full pt-2">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={ownerAnalytics.stationThroughput}>
+                                        <XAxis dataKey="station" stroke="#64748b" fontSize={11} tickLine={false} />
+                                        <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Bar dataKey="output" name="Output Pcs" radius={[8, 8, 0, 0]}>
+                                            {ownerAnalytics.stationThroughput.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* 2. CARD TELEMETRI KESEHATAN PABRIK */}
+                        <div className="bg-slate-900/90 p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl flex flex-col justify-between">
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                                <div>
+                                    <h4 className="font-bold text-white text-sm">Factory Health Index</h4>
+                                    <p className="text-[11px] text-slate-400">Skor performa dan audit integritas pabrik</p>
+                                </div>
+                                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                            </div>
+
+                            <div className="py-4 flex flex-col items-center justify-center">
+                                <div className="w-28 h-28 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 flex flex-col items-center justify-center shadow-lg shadow-indigo-500/20 animate-pulse">
+                                    <span className="text-3xl font-black text-white font-mono">{ownerAnalytics.healthScore}</span>
+                                    <span className="text-[10px] text-indigo-400 font-bold uppercase">Skor / 100</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 text-xs border-t border-slate-800 pt-3">
+                                <div className="flex justify-between text-slate-300">
+                                    <span>Total Pengiriman SJP:</span>
+                                    <strong className="text-emerald-400 font-mono">{ownerAnalytics.totalShippedPcs} pcs</strong>
+                                </div>
+                                <div className="flex justify-between text-slate-300">
+                                    <span>Selisih Subkon Hilang:</span>
+                                    <strong className={`${ownerAnalytics.totalDiscrepancyLost > 0 ? 'text-rose-400 font-bold' : 'text-slate-400'} font-mono`}>
+                                        {ownerAnalytics.totalDiscrepancyLost} pcs
+                                    </strong>
+                                </div>
+                                <div className="flex justify-between text-slate-300">
+                                    <span>Total Rijek Terdata:</span>
+                                    <strong className="text-amber-400 font-mono">{ownerAnalytics.totalRejects} pcs</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            )}
+
+            {/* SECTION GRAFIK STANDAR (TREN OUTPUT & PORSI BUYER) */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 {/* Area Chart Tren Produksi Harian */}

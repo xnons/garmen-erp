@@ -10,6 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from database import SessionLocal
 import models
+from main import auto_migrate_db
 
 if sys.stdout.encoding != 'utf-8':
     try:
@@ -18,6 +19,7 @@ if sys.stdout.encoding != 'utf-8':
         pass
 
 def test_full_garment_workflow():
+    auto_migrate_db()
     db = SessionLocal()
     try:
         # Clean previous test record if exists
