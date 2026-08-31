@@ -170,11 +170,31 @@ export default function DashboardPage() {
     }
   };
 
-  // 🔒 STATE AUTO-LOCK & LOW FOCUS SECURITY GUARD
-  const [isScreenLocked, setIsScreenLocked] = useState(false);
+  // 🔒 STATE AUTO-LOCK & LOW FOCUS SECURITY GUARD (PERSISTENT SECURE LOCK)
+  const [isScreenLocked, setIsScreenLocked] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("nexora_screen_locked") === "true";
+    }
+    return false;
+  });
   const [unlockPinOrPassword, setUnlockPinOrPassword] = useState("");
   const [unlockError, setUnlockError] = useState("");
   const [unlockLoading, setUnlockLoading] = useState(false);
+
+  // Helper untuk Lock & Unlock dengan Persistensi
+  const triggerLockScreen = () => {
+    setIsScreenLocked(true);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("nexora_screen_locked", "true");
+    }
+  };
+
+  const triggerUnlockScreen = () => {
+    setIsScreenLocked(false);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("nexora_screen_locked");
+    }
+  };
 
   // 4. LOW-FOCUS & INACTIVITY DETECTOR GUARD
   useEffect(() => {
@@ -195,7 +215,7 @@ export default function DashboardPage() {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         blurTimer = setTimeout(() => {
-          setIsScreenLocked(true);
+          triggerLockScreen();
         }, 5 * 60 * 1000); // 5 Menit saat tab ditinggalkan
       } else {
         if (blurTimer) clearTimeout(blurTimer);
@@ -206,7 +226,7 @@ export default function DashboardPage() {
     const idleCheckInterval = setInterval(() => {
       const idleTime = Date.now() - lastActivityTime;
       if (idleTime > 15 * 60 * 1000) { // 15 Menit idle total
-        setIsScreenLocked(true);
+        triggerLockScreen();
       }
     }, 15000);
 
@@ -239,7 +259,7 @@ export default function DashboardPage() {
         try {
           const res = await api.post("/api/auth/verify-pin", { pin: key });
           if (res.data?.success || res.status === 200) {
-            setIsScreenLocked(false);
+            triggerUnlockScreen();
             setUnlockPinOrPassword("");
             setUnlockLoading(false);
             return;
@@ -256,7 +276,13 @@ export default function DashboardPage() {
       });
 
       if (res.data?.access_token) {
-        setIsScreenLocked(false);
+        localStorage.setItem("access_token", res.data.access_token);
+        localStorage.setItem("token", res.data.access_token);
+        if (res.data.user) {
+          localStorage.setItem("user", JSON.stringify(res.data.user));
+          setActiveUser(res.data.user);
+        }
+        triggerUnlockScreen();
         setUnlockPinOrPassword("");
       } else {
         setUnlockError("Kredensial PIN atau Password salah!");
@@ -275,6 +301,7 @@ export default function DashboardPage() {
     localStorage.removeItem("user");
     localStorage.removeItem("user_data");
     localStorage.removeItem("user_role");
+    localStorage.removeItem("nexora_screen_locked");
     setActiveUser(null);
     setIsScreenLocked(false);
     setLoginInput({ username: "", password: "" });
@@ -393,84 +420,86 @@ export default function DashboardPage() {
     );
   }
 
-  // JIKA SUDAH SUKSES LOGIN
+  // 🔒 JIKA SESI SEDANG DIKUNCI (FULL IMPENETRABLE LOCK SHIELD)
+  if (activeUser && isScreenLocked) {
+    return (
+      <div className="h-screen w-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-900/95 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 text-center animate-modal-pop backdrop-blur-2xl">
+          <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
+            <div className="absolute inset-0 bg-indigo-500/20 rounded-2xl blur-xl animate-pulse" />
+            <div className="relative w-16 h-16 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-indigo-400">
+              <Lock className="w-8 h-8" />
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-black text-white tracking-wide">
+              SESI DIKUNCI DEMI KEAMANAN
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Jendela aplikasi sempat ditinggalkan (Low Focus Guard). Masukkan PIN Security atau Password untuk membuka kunci.
+            </p>
+          </div>
+
+          <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center gap-3 text-left">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center text-sm uppercase shrink-0">
+              {activeUser?.nama?.charAt(0) || "U"}
+            </div>
+            <div className="truncate min-w-0">
+              <p className="text-xs font-bold text-white truncate">{activeUser?.nama}</p>
+              <p className="text-[10px] text-slate-400 font-mono">@{activeUser?.username} • <span className="text-indigo-400 uppercase font-bold">{activeUser?.role}</span></p>
+            </div>
+          </div>
+
+          {unlockError && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{unlockError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleUnlockSubmit} className="space-y-4 text-xs text-left">
+            <div>
+              <label className="block text-slate-400 font-bold mb-1 uppercase tracking-wider text-[10px]">
+                PIN Security Gate / Password
+              </label>
+              <input
+                type="password"
+                autoFocus
+                required
+                placeholder="Masukkan PIN (4-6 digit) atau Password..."
+                value={unlockPinOrPassword}
+                onChange={(e) => setUnlockPinOrPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="submit"
+                disabled={unlockLoading}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs tracking-wider uppercase shadow-lg shadow-indigo-600/30 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                {unlockLoading ? "Membuka Kunci..." : "Buka Kunci Layar"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full py-2.5 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-rose-400 rounded-xl text-xs font-semibold border border-slate-800 transition-colors cursor-pointer"
+              >
+                Keluar Akun (Logout Bersih)
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // JIKA SUDAH SUKSES LOGIN & TIDAK DALAM STATUS TERKUNCI
   return (
     <div className="flex h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden m-0 p-0 relative">
-      {/* 🔒 LOCK SCREEN OVERLAY (LOW FOCUS & INACTIVITY GUARD) */}
-      {isScreenLocked && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 text-center animate-modal-pop">
-            <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
-              <div className="absolute inset-0 bg-indigo-500/20 rounded-2xl blur-xl animate-pulse" />
-              <div className="relative w-16 h-16 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center text-indigo-400">
-                <Lock className="w-8 h-8" />
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-lg font-black text-white tracking-wide">
-                SESI DIKUNCI DEMI KEAMANAN
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Jendela aplikasi sempat ditinggalkan (Low Focus Guard). Masukkan PIN Security atau Password untuk membuka kunci.
-              </p>
-            </div>
-
-            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center gap-3 text-left">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center text-sm uppercase shrink-0">
-                {activeUser?.nama?.charAt(0) || "U"}
-              </div>
-              <div className="truncate min-w-0">
-                <p className="text-xs font-bold text-white truncate">{activeUser?.nama}</p>
-                <p className="text-[10px] text-slate-400 font-mono">@{activeUser?.username} • <span className="text-indigo-400 uppercase font-bold">{activeUser?.role}</span></p>
-              </div>
-            </div>
-
-            {unlockError && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>{unlockError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleUnlockSubmit} className="space-y-4 text-xs text-left">
-              <div>
-                <label className="block text-slate-400 font-bold mb-1 uppercase tracking-wider text-[10px]">
-                  PIN Security Gate / Password
-                </label>
-                <input
-                  type="password"
-                  autoFocus
-                  required
-                  placeholder="Masukkan PIN (4-6 digit) atau Password..."
-                  value={unlockPinOrPassword}
-                  onChange={(e) => setUnlockPinOrPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={unlockLoading}
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs tracking-wider uppercase shadow-lg shadow-indigo-600/30 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                >
-                  {unlockLoading ? "Membuka Kunci..." : "Buka Kunci Layar"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="w-full py-2.5 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-rose-400 rounded-xl text-xs font-semibold border border-slate-800 transition-colors cursor-pointer"
-                >
-                  Keluar Akun (Logout Bersih)
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* SISI KIRI: Navigasi Menu (Statis di PC, Drawer di HP) */}
       <Sidebar
         activeMenu={activeMenu}
