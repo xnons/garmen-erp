@@ -13,7 +13,11 @@ import {
     AlertCircle,
     Search,
     History,
-    Filter
+    Filter,
+    LayoutGrid,
+    List,
+    SlidersHorizontal,
+    FileText
 } from 'lucide-react';
 import api from '@/services/api';
 
@@ -56,6 +60,7 @@ export default function PayrollModule() {
     });
     const [filterTipePay, setFilterTipePay] = useState<string>('ALL');
     const [searchQuery, setSearchQuery] = useState<string>('');
+    const [viewMode, setViewMode] = useState<'TABLE' | 'COMPACT' | 'CARDS'>('TABLE');
     const [catatanTransfer, setCatatanTransfer] = useState<string>('');
     const [historyPeriode, setHistoryPeriode] = useState<string>('ALL');
 
@@ -315,82 +320,191 @@ export default function PayrollModule() {
 
                     <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
-                            <h3 className="text-sm font-bold text-white">Rincian Per Karyawan ({selectedPeriode})</h3>
-                            <div className="relative w-full sm:w-64">
-                                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
-                                <input
-                                    type="text"
-                                    placeholder="Cari nama / ID..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                                />
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-bold text-white">Rincian Per Karyawan ({selectedPeriode})</h3>
+                                <span className="text-[10px] font-mono px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-md font-bold">
+                                    {payrollData?.detail_karyawan.length || 0} Orang
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                {/* Search Box */}
+                                <div className="relative flex-1 sm:w-60">
+                                    <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                                    <input
+                                        type="text"
+                                        placeholder="Cari nama / ID..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+
+                                {/* Layout / Density Switcher */}
+                                <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
+                                    <button
+                                        onClick={() => setViewMode('TABLE')}
+                                        className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                                            viewMode === 'TABLE' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                                        }`}
+                                        title="Mode Tabel Standar"
+                                    >
+                                        <List className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('COMPACT')}
+                                        className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                                            viewMode === 'COMPACT' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                                        }`}
+                                        title="Mode Kompak (Rapat)"
+                                    >
+                                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        onClick={() => setViewMode('CARDS')}
+                                        className={`p-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+                                            viewMode === 'CARDS' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                                        }`}
+                                        title="Mode Kartu Grid"
+                                    >
+                                        <LayoutGrid className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs text-left">
-                                <thead className="bg-slate-950 text-slate-400 uppercase border-y border-slate-800">
-                                    <tr>
-                                        <th className="py-3 px-3.5">ID / Nama Pekerja</th>
-                                        <th className="py-3 px-3.5">Jabatan</th>
-                                        <th className="py-3 px-3.5">Skema Pay</th>
-                                        <th className="py-3 px-3.5">Rate / Gaji Pokok</th>
-                                        <th className="py-3 px-3.5">Setoran Bulan Ini</th>
-                                        <th className="py-3 px-3.5 text-right">Total Akumulasi Gaji</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-800/60 font-mono">
-                                    {loading ? (
-                                        <tr>
-                                            <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
-                                                <div className="flex flex-col items-center justify-center gap-2">
-                                                    <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-                                                    <span>Mengkalkulasi setoran dan skema gaji...</span>
+                        {/* 1. VIEW MODE: CARDS GRID */}
+                        {viewMode === 'CARDS' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {loading ? (
+                                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-slate-500 gap-2">
+                                        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+                                        <span>Memuat data kartu payroll...</span>
+                                    </div>
+                                ) : payrollData?.detail_karyawan.length === 0 ? (
+                                    <div className="col-span-full py-12 text-center text-slate-500">
+                                        Tidak ada data karyawan sesuai filter.
+                                    </div>
+                                ) : (
+                                    payrollData?.detail_karyawan.map((k) => (
+                                        <div
+                                            key={k.id_karyawan}
+                                            className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80 hover:border-indigo-500/40 transition-all space-y-3 shadow-md"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600/20 to-purple-600/20 border border-indigo-500/30 text-indigo-400 font-bold flex items-center justify-center text-xs uppercase">
+                                                        {k.nama.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-white text-xs leading-tight">{k.nama}</h4>
+                                                        <p className="text-[10px] text-slate-500 font-mono">{k.id_karyawan} • {k.jabatan}</p>
+                                                    </div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    ) : payrollData?.detail_karyawan.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
-                                                Tidak ada data karyawan sesuai filter.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        payrollData?.detail_karyawan.map((k) => (
-                                            <tr key={k.id_karyawan} className="hover:bg-slate-800/40 transition-colors">
-                                                <td className="py-3.5 px-3.5 font-bold text-white font-sans">
-                                                    {k.nama} <span className="text-[10px] text-slate-500 font-mono font-normal">({k.id_karyawan})</span>
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-slate-300 font-sans">{k.jabatan || '-'}</td>
-                                                <td className="py-3.5 px-3.5 font-sans">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${k.tipe_pay === 'BORONGAN'
+                                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
+                                                    k.tipe_pay === 'BORONGAN'
                                                         ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
                                                         : k.tipe_pay === 'BULANAN'
-                                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                                                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                                                        }`}>
-                                                        {k.tipe_pay}
+                                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                                        : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                }`}>
+                                                    {k.tipe_pay}
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/60 text-[11px]">
+                                                <div>
+                                                    <span className="text-slate-500 block text-[9px] uppercase font-bold">Rate/Pokok</span>
+                                                    <span className="text-slate-300 font-mono">
+                                                        {k.tipe_pay === 'BORONGAN' ? `Rp ${k.tarif_borongan_pcs.toLocaleString('id-ID')}` : `Rp ${k.gaji_pokok.toLocaleString('id-ID')}`}
                                                     </span>
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-slate-400">
-                                                    {k.tipe_pay === 'BORONGAN'
-                                                        ? `Rp ${k.tarif_borongan_pcs.toLocaleString('id-ID')} / pcs`
-                                                        : `Rp ${k.gaji_pokok.toLocaleString('id-ID')}`
-                                                    }
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-slate-200 font-bold">
-                                                    {k.tipe_pay === 'BORONGAN' ? `${k.total_pcs_bulan_ini.toLocaleString('id-ID')} pcs` : '-'}
-                                                </td>
-                                                <td className="py-3.5 px-3.5 text-right font-bold text-emerald-400 text-sm">
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-500 block text-[9px] uppercase font-bold">Setoran</span>
+                                                    <span className="text-slate-200 font-mono font-bold">
+                                                        {k.tipe_pay === 'BORONGAN' ? `${k.total_pcs_bulan_ini.toLocaleString('id-ID')} Pcs` : '-'}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                                                <span className="text-[10px] text-slate-400 font-semibold">Total Gaji:</span>
+                                                <span className="text-sm font-black text-emerald-400 font-mono">
                                                     Rp {k.total_gaji.toLocaleString('id-ID')}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+
+                        {/* 2. VIEW MODE: TABLE & COMPACT */}
+                        {viewMode !== 'CARDS' && (
+                            <div className="overflow-x-auto">
+                                <table className={`w-full text-left ${viewMode === 'COMPACT' ? 'text-[11px]' : 'text-xs'}`}>
+                                    <thead className="bg-slate-950 text-slate-400 uppercase border-y border-slate-800">
+                                        <tr>
+                                            <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'}`}>ID / Nama Pekerja</th>
+                                            <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'}`}>Jabatan</th>
+                                            <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'}`}>Skema Pay</th>
+                                            <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'}`}>Rate / Gaji Pokok</th>
+                                            <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'}`}>Setoran Bulan Ini</th>
+                                            <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'} text-right`}>Total Akumulasi Gaji</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60 font-mono">
+                                        {loading ? (
+                                            <tr>
+                                                <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
+                                                    <div className="flex flex-col items-center justify-center gap-2">
+                                                        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+                                                        <span>Mengkalkulasi setoran dan skema gaji...</span>
+                                                    </div>
                                                 </td>
                                             </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                        ) : payrollData?.detail_karyawan.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
+                                                    Tidak ada data karyawan sesuai filter.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            payrollData?.detail_karyawan.map((k) => (
+                                                <tr key={k.id_karyawan} className="hover:bg-slate-800/40 transition-colors">
+                                                    <td className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3.5 px-3.5'} font-bold text-white font-sans`}>
+                                                        {k.nama} <span className="text-[10px] text-slate-500 font-mono font-normal">({k.id_karyawan})</span>
+                                                    </td>
+                                                    <td className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3.5 px-3.5'} text-slate-300 font-sans`}>{k.jabatan || '-'}</td>
+                                                    <td className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3.5 px-3.5'} font-sans`}>
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${k.tipe_pay === 'BORONGAN'
+                                                            ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                                                            : k.tipe_pay === 'BULANAN'
+                                                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                                                : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                                            }`}>
+                                                            {k.tipe_pay}
+                                                        </span>
+                                                    </td>
+                                                    <td className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3.5 px-3.5'} text-slate-400`}>
+                                                        {k.tipe_pay === 'BORONGAN'
+                                                            ? `Rp ${k.tarif_borongan_pcs.toLocaleString('id-ID')} / pcs`
+                                                            : `Rp ${k.gaji_pokok.toLocaleString('id-ID')}`
+                                                        }
+                                                    </td>
+                                                    <td className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3.5 px-3.5'} text-slate-200 font-bold`}>
+                                                        {k.tipe_pay === 'BORONGAN' ? `${k.total_pcs_bulan_ini.toLocaleString('id-ID')} pcs` : '-'}
+                                                    </td>
+                                                    <td className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3.5 px-3.5'} text-right font-bold text-emerald-400 ${viewMode === 'COMPACT' ? 'text-xs' : 'text-sm'}`}>
+                                                        Rp {k.total_gaji.toLocaleString('id-ID')}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">

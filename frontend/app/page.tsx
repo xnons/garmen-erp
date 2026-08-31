@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Lock, ShieldCheck, User, MapPin, Loader2, Navigation } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import DashboardContent from '@/components/dashboard/DashboardContent';
+import FloatingAICopilot from '@/components/ai/FloatingAICopilot';
 import api from '@/services/api';
 import { getPreciseLocation, getBrowserCoordinates, reverseGeocodeCoords } from '@/utils/geoUtils';
 
@@ -487,6 +488,9 @@ export default function DashboardPage() {
         onLogout={handleLogout}
         onOpenMobileMenu={() => setMobileMenuOpen(true)}
       />
+
+      {/* 🤖 FLOATING AI CO-PILOT DOCK (SELALU MELAYANG DI SELURUH MENU) */}
+      <FloatingAICopilot activeUser={activeUser} />
     </div>
   );
 }

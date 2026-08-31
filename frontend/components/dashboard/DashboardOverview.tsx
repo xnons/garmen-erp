@@ -230,29 +230,20 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                         </span>
                     </div>
                     <p className="text-xs text-slate-400">
-                        Selamat datang kembali, <strong className="text-slate-200">{activeUser?.nama || 'Pengguna'}</strong>.
+                        Selamat datang kembali, <strong className="text-slate-200">{activeUser?.nama || 'Pengguna'}</strong>. Sistem siap memantau alur manufaktur garmen end-to-end.
                     </p>
                 </div>
 
                 <div className="flex items-center gap-2.5 flex-wrap">
-                    {/* BUTTON BUKA AI CO-PILOT */}
-                    <button
-                        onClick={() => setIsAICopilotOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all active:scale-95 cursor-pointer"
-                    >
-                        <Sparkles className="w-4 h-4 animate-pulse" />
-                        AI Co-Pilot
-                    </button>
-
                     {/* BUTTON KIRIM EMAIL LAPORAN */}
                     {canViewFinancial && (
                         <button
                             onClick={handleSendExecutiveEmail}
                             disabled={isSendingEmail}
-                            className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-md"
                             title="Kirim Laporan Eksekutif ke Email Owner"
                         >
-                            <Mail className={`w-3.5 h-3.5 ${isSendingEmail ? 'animate-bounce text-indigo-400' : 'text-slate-400'}`} />
+                            <Mail className={`w-4 h-4 ${isSendingEmail ? 'animate-bounce text-indigo-400' : 'text-slate-400'}`} />
                             {isSendingEmail ? 'Mengirim...' : 'Kirim Email Briefing'}
                         </button>
                     )}
@@ -260,10 +251,43 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                     <button
                         onClick={fetchDashboardData}
                         disabled={loading}
-                        className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer"
+                        className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer shadow-md"
                         title="Segarkan Data Real-time"
                     >
                         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
+                    </button>
+                </div>
+            </div>
+
+            {/* ⚡ 1-CLICK QUICK ACTION BAR */}
+            <div className="bg-slate-900/60 backdrop-blur-md p-3.5 rounded-2xl border border-slate-800/80 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 shrink-0 hidden sm:inline">
+                    Aksi Cepat:
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                    <button
+                        onClick={() => onNavigate && onNavigate('ppic')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    >
+                        <Package className="w-3.5 h-3.5" /> + Register SO Baru
+                    </button>
+                    <button
+                        onClick={() => onNavigate && onNavigate('warehouse')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    >
+                        <Package className="w-3.5 h-3.5" /> + Log Roll Kain
+                    </button>
+                    <button
+                        onClick={() => onNavigate && onNavigate('cutting')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600/10 hover:bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    >
+                        <Scissors className="w-3.5 h-3.5" /> + Log Meja Potong
+                    </button>
+                    <button
+                        onClick={() => onNavigate && onNavigate('shipping')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600/10 hover:bg-sky-600/20 text-sky-300 border border-sky-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    >
+                        <TrendingUp className="w-3.5 h-3.5" /> + Terbitkan SJP
                     </button>
                 </div>
             </div>
@@ -353,6 +377,50 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                             Total {summaryMetrics.totalKaryawan || 0} Karyawan Terdaftar
                         </p>
                     </div>
+                </div>
+            </div>
+
+            {/* 🌟 LIVE ORDER PIPELINE TRACKER */}
+            <div className="bg-slate-900/90 p-5 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl">
+                            <Activity className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-white text-sm">Live Order Pipeline & Work-In-Progress Radar</h3>
+                            <p className="text-[11px] text-slate-400">Tahapan manufaktur live dari Kain Mentah hingga SJP Dikirim</p>
+                        </div>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg self-start sm:self-auto">
+                        7 FASE REAL-TIME
+                    </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-1">
+                    {[
+                        { step: '1', title: 'PPIC / SO', status: 'REGISTERED', color: 'border-indigo-500/40 bg-indigo-500/5 text-indigo-300' },
+                        { step: '2', title: 'QC 4-Point', status: 'INSPECTED', color: 'border-cyan-500/40 bg-cyan-500/5 text-cyan-300' },
+                        { step: '3', title: 'Meja Potong', status: 'CUTTING', color: 'border-amber-500/40 bg-amber-500/5 text-amber-300' },
+                        { step: '4', title: 'Subcon Jahit', status: 'SEWING WIP', color: 'border-blue-500/40 bg-blue-500/5 text-blue-300' },
+                        { step: '5', title: 'Washing', status: 'TREATMENT', color: 'border-teal-500/40 bg-teal-500/5 text-teal-300' },
+                        { step: '6', title: 'Finishing', status: 'STEAM/PACK', color: 'border-purple-500/40 bg-purple-500/5 text-purple-300' },
+                        { step: '7', title: 'SJP Terkirim', status: 'DELIVERED', color: 'border-emerald-500/40 bg-emerald-500/5 text-emerald-300' }
+                    ].map((phase, idx) => (
+                        <div
+                            key={phase.step}
+                            className={`p-3 rounded-2xl border ${phase.color} flex flex-col justify-between space-y-2 hover:scale-[1.02] transition-transform`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black font-mono opacity-60">Fase {phase.step}</span>
+                                <span className="w-2 h-2 rounded-full bg-current animate-ping" style={{ animationDuration: `${2 + idx}s` }} />
+                            </div>
+                            <div>
+                                <p className="font-black text-xs text-white leading-tight">{phase.title}</p>
+                                <p className="text-[9px] font-mono uppercase tracking-wider opacity-75 mt-0.5">{phase.status}</p>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
 
