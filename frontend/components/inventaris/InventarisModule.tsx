@@ -1,8 +1,6 @@
-'use client';
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Warehouse, Plus, Loader2, RefreshCw, ShieldAlert, CheckCircle2 } from 'lucide-react';
-import { ItemBahanBaku, LogTransaksiStok } from './types';
+import { ItemBahanBaku, LogTransaksiStok, ViewMode } from './types';
 import { useInventaris } from './useInventaris';
 
 // Import Sub-Komponen & Modal
@@ -27,6 +25,23 @@ export default function InventarisModule({ activeUser }: InventarisPageProps) {
     const [currentUser, setCurrentUser] = useState<any>(activeUser || null);
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<ViewMode>('TABLE');
+
+    useEffect(() => {
+        try {
+            const savedMode = localStorage.getItem('inventaris_view_mode') as ViewMode;
+            if (savedMode && ['TABLE', 'CARDS', 'COMPACT'].includes(savedMode)) {
+                setViewMode(savedMode);
+            }
+        } catch (e) {}
+    }, []);
+
+    const handleChangeViewMode = (mode: ViewMode) => {
+        setViewMode(mode);
+        try {
+            localStorage.setItem('inventaris_view_mode', mode);
+        } catch (e) {}
+    };
 
     useEffect(() => {
         if (activeUser) {
@@ -325,11 +340,14 @@ export default function InventarisModule({ activeUser }: InventarisPageProps) {
                 setFilter={setFilter}
                 totalAktif={activeInventory.length}
                 totalArchived={archivedInventory.length}
+                viewMode={viewMode}
+                setViewMode={handleChangeViewMode}
             />
 
             {/* Table */}
             <InventarisTable
                 items={filteredInventory}
+                viewMode={viewMode}
                 onOpenMutasi={handleOpenMutasi}
                 onOpenEdit={handleOpenEditBahan}
                 onToggleArchive={handleToggleArchive}

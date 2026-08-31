@@ -1,21 +1,26 @@
-'use client';
-
 import React from 'react';
-import { Search, Archive, SlidersHorizontal, X, Layers, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { FilterInventaris } from './types';
+import {
+    Search, Archive, SlidersHorizontal, X, Layers, AlertCircle, CheckCircle2,
+    LayoutList, LayoutGrid, AlignJustify
+} from 'lucide-react';
+import { FilterInventaris, ViewMode } from './types';
 
 interface InventarisFilterBarProps {
     filter: FilterInventaris;
     setFilter: React.Dispatch<React.SetStateAction<FilterInventaris>>;
     totalAktif?: number;
     totalArchived?: number;
+    viewMode?: ViewMode;
+    setViewMode?: (mode: ViewMode) => void;
 }
 
 export default function InventarisFilterBar({
     filter,
     setFilter,
     totalAktif,
-    totalArchived
+    totalArchived,
+    viewMode = 'TABLE',
+    setViewMode
 }: InventarisFilterBarProps) {
     const handleResetFilter = () => {
         setFilter({
@@ -102,9 +107,9 @@ export default function InventarisFilterBar({
                     </button>
                 </div>
 
-                {/* Search Bar */}
-                <div className="flex items-center gap-2">
-                    <div className="relative flex-1 lg:w-72">
+                {/* Search Bar & Layout Switcher */}
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    <div className="relative flex-1 lg:w-64">
                         <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
                         <input
                             type="text"
@@ -116,12 +121,59 @@ export default function InventarisFilterBar({
                         {filter.search && (
                             <button
                                 onClick={() => setFilter((prev) => ({ ...prev, search: '' }))}
-                                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white cursor-pointer"
                             >
                                 <X className="w-3.5 h-3.5" />
                             </button>
                         )}
                     </div>
+
+                    {/* Layout View Switcher */}
+                    {setViewMode && (
+                        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('TABLE')}
+                                title="Tampilan Tabel Standar"
+                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                    viewMode === 'TABLE'
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                }`}
+                            >
+                                <LayoutList className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Tabel</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('CARDS')}
+                                title="Tampilan Kartu Visual"
+                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                    viewMode === 'CARDS'
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                }`}
+                            >
+                                <LayoutGrid className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Kartu</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('COMPACT')}
+                                title="Tampilan Super Padat"
+                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                    viewMode === 'COMPACT'
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                }`}
+                            >
+                                <AlignJustify className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Padat</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 

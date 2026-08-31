@@ -611,8 +611,10 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                                     </PieChart>
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <span className="text-xl font-bold text-white font-mono">{alokasiBrand.length} Brand</span>
-                                    <span className="text-[10px] text-slate-400">Aktif</span>
+                                    <span className="text-xl font-bold text-white font-mono">
+                                        {alokasiBrand.reduce((sum, b) => sum + (Number(b.value) || 0), 0).toLocaleString('id-ID')}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">Total Pcs ({alokasiBrand.length} Brand)</span>
                                 </div>
                             </>
                         ) : (
@@ -625,12 +627,18 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
 
                     <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-slate-800/80">
                         {alokasiBrand.length > 0 ? (
-                            alokasiBrand.map((item) => (
-                                <div key={item.name} className="flex items-center gap-1.5 truncate">
-                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                                    <span className="text-slate-300 truncate">{item.name} ({item.value}%)</span>
-                                </div>
-                            ))
+                            alokasiBrand.map((item) => {
+                                const total = alokasiBrand.reduce((sum, b) => sum + (Number(b.value) || 0), 0) || 1;
+                                const pct = (item as any).percentage ?? Math.round(((Number(item.value) || 0) / total) * 100);
+                                return (
+                                    <div key={item.name} className="flex items-center gap-1.5 truncate" title={`${item.name} (${pct}% • ${item.value} Pcs)`}>
+                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                        <span className="text-slate-300 truncate">
+                                            {item.name} <strong className="text-emerald-400 font-mono">({pct}%)</strong>
+                                        </span>
+                                    </div>
+                                );
+                            })
                         ) : (
                             <span className="text-slate-500 text-[10px] col-span-2 text-center">Menunggu entri stok material peruntukan brand.</span>
                         )}

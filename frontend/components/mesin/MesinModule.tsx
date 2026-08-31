@@ -1,8 +1,6 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, CheckCircle2, ShieldAlert } from 'lucide-react';
-import { MesinAsset, FilterState, PaymentRecord } from './types';
+import { MesinAsset, FilterState, PaymentRecord, ViewMode } from './types';
 import MesinHeader from './MesinHeader';
 import MesinTable from './MesinTable';
 import MesinFormModal from './MesinFormModal';
@@ -10,9 +8,18 @@ import MesinDetailModal from './MesinDetailModal';
 import MesinPaymentModal from './MesinPaymentModal';
 import MesinArchiveModal from './MesinArchiveModal';
 
-// 🟢 KONFIGURASI REST API FASTAPI
-const rawBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase}/api`;
+// 🟢 KONFIGURASI REST API FASTAPI DENGAN DYNAMIC ORIGIN DETECTION
+const getAPIBase = (): string => {
+    if (typeof window !== 'undefined') {
+        const customUrl = localStorage.getItem('custom_api_url');
+        if (customUrl) return `${customUrl.replace(/\/$/, '')}/api`;
+        if (window.location.hostname.includes('onrender.com')) {
+            return `${window.location.origin}/api`;
+        }
+    }
+    const rawBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+    return rawBase.endsWith('/api') ? rawBase : `${rawBase.replace(/\/$/, '')}/api`;
+};
 
 const getAuthHeader = () => {
     const token = typeof window !== 'undefined'
@@ -33,8 +40,25 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
     const [machines, setMachines] = useState<MesinAsset[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [filter, setFilter] = useState<FilterState>({ search: '', status: 'ALL', kategori: 'ALL', showArchived: false });
+    const [viewMode, setViewMode] = useState<ViewMode>('TABLE');
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+    useEffect(() => {
+        try {
+            const savedMode = localStorage.getItem('mesin_view_mode') as ViewMode;
+            if (savedMode && ['TABLE', 'CARDS', 'COMPACT'].includes(savedMode)) {
+                setViewMode(savedMode);
+            }
+        } catch (e) {}
+    }, []);
+
+    const handleChangeViewMode = (mode: ViewMode) => {
+        setViewMode(mode);
+        try {
+            localStorage.setItem('mesin_view_mode', mode);
+        } catch (e) {}
+    };
 
     // Modal States
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -57,7 +81,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
     const fetchMachines = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/mesin`, {
+            const res = await fetch(`${getAPIBase()}/mesin`, {
                 headers: getAuthHeader()
             });
 
@@ -123,7 +147,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
 
             if (selectedEdit) {
                 // 🔄 PUT /api/mesin/{kode_mesin}
-                const res = await fetch(`${API_BASE}/mesin/${selectedEdit.kode_mesin}`, {
+                const res = await fetch(`${getAPIBase()}/mesin/${selectedEdit.kode_mesin}`, {
                     method: 'PUT',
                     headers: getAuthHeader(),
                     body: JSON.stringify(payload)
@@ -134,7 +158,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
                 showToastSuccess(`Data mesin "${formData.nama_mesin}" berhasil diperbarui.`);
             } else {
                 // ➕ POST /api/mesin
-                const res = await fetch(`${API_BASE}/mesin`, {
+                const res = await fetch(`${getAPIBase()}/mesin`, {
                     method: 'POST',
                     headers: getAuthHeader(),
                     body: JSON.stringify(payload)
@@ -165,7 +189,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
             const hargaBeli = Number(target.harga_beli) || 0;
             const newStatus = (hargaBeli > 0 && newTerbayar >= hargaBeli) ? 'LUNAS' : (newTerbayar > 0 ? 'DICICIL' : 'BELUM_BAYAR');
 
-            const res = await fetch(`${API_BASE}/mesin/${target.kode_mesin}`, {
+            const res = await fetch(`${getAPIBase()}/mesin/${target.kode_mesin}`, {
                 method: 'PUT',
                 headers: getAuthHeader(),
                 body: JSON.stringify({
@@ -193,7 +217,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
         if (!target) return;
 
         try {
-            const res = await fetch(`${API_BASE}/mesin/${target.kode_mesin}`, {
+            const res = await fetch(`${getAPIBase()}/mesin/${target.kode_mesin}`, {
                 method: 'PUT',
                 headers: getAuthHeader(),
                 body: JSON.stringify({
@@ -235,6 +259,8 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
                 machines={machines}
                 filter={filter}
                 setFilter={setFilter}
+                viewMode={viewMode}
+                setViewMode={handleChangeViewMode}
                 onOpenAddModal={() => {
                     setSelectedEdit(null);
                     setIsFormOpen(true);
@@ -252,6 +278,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
             ) : (
                 <MesinTable
                     machines={filteredMachines}
+                    viewMode={viewMode}
                     onSelectDetail={(m) => setSelectedDetail(m)}
                     onEdit={(m) => {
                         setSelectedEdit(m);

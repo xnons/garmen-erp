@@ -14,9 +14,12 @@ import {
     X,
     Layers,
     Sparkles,
-    AlertTriangle
+    AlertTriangle,
+    LayoutList,
+    LayoutGrid,
+    AlignJustify
 } from 'lucide-react';
-import { MesinAsset, FilterState } from './types';
+import { MesinAsset, FilterState, ViewMode } from './types';
 
 interface MesinHeaderProps {
     machines: MesinAsset[];
@@ -25,6 +28,8 @@ interface MesinHeaderProps {
     onOpenAddModal: () => void;
     onRefresh?: () => void;
     loading?: boolean;
+    viewMode?: ViewMode;
+    setViewMode?: (mode: ViewMode) => void;
 }
 
 export default function MesinHeader({
@@ -33,7 +38,9 @@ export default function MesinHeader({
     setFilter,
     onOpenAddModal,
     onRefresh,
-    loading = false
+    loading = false,
+    viewMode = 'TABLE',
+    setViewMode
 }: MesinHeaderProps) {
     const allMachines = machines || [];
     const activeMachines = allMachines.filter(m => m.status !== 'ARCHIVED');
@@ -235,9 +242,9 @@ export default function MesinHeader({
                         </button>
                     </div>
 
-                    {/* Search & Category Filter */}
+                    {/* Search & Category Filter & Layout Switcher */}
                     <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative flex-1 sm:w-64">
+                        <div className="relative flex-1 sm:w-56">
                             <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
                             <input
                                 type="text"
@@ -249,7 +256,7 @@ export default function MesinHeader({
                             {filter.search && (
                                 <button
                                     onClick={() => setFilter(prev => ({ ...prev, search: '' }))}
-                                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white cursor-pointer"
                                 >
                                     <X className="w-3.5 h-3.5" />
                                 </button>
@@ -268,6 +275,53 @@ export default function MesinHeader({
                             <option value="RUSAK">Rusak</option>
                             <option value="NON_AKTIF">Non-Aktif</option>
                         </select>
+
+                        {/* Layout View Switcher */}
+                        {setViewMode && (
+                            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setViewMode('TABLE')}
+                                    title="Tampilan Tabel Standar"
+                                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                        viewMode === 'TABLE'
+                                            ? 'bg-indigo-600 text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <LayoutList className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Tabel</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setViewMode('CARDS')}
+                                    title="Tampilan Kartu Visual"
+                                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                        viewMode === 'CARDS'
+                                            ? 'bg-indigo-600 text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <LayoutGrid className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Kartu</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setViewMode('COMPACT')}
+                                    title="Tampilan Super Padat"
+                                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                        viewMode === 'COMPACT'
+                                            ? 'bg-indigo-600 text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <AlignJustify className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Padat</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

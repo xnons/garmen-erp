@@ -238,42 +238,52 @@ def get_chart_brand_material(db: Session = Depends(get_db)):
     try:
         brand_map = {}
 
-        # 1. Dari Sales Order + Partner
+        # 1. Dari Sales Order + Buyer Partner
         sos = db.query(models.SalesOrder).all()
         for so in sos:
-            b_name = so.buyer.name if so.buyer else "Brand Umum"
+            b_name = (so.buyer.name if so.buyer and so.buyer.name else "Reguler Pabrik").strip()
             brand_map[b_name] = brand_map.get(b_name, 0) + int(so.order_qty or 0)
 
-        # 2. Dari Inventory Item (Kain/Aksesoris)
+        # 2. Dari Inventory Item (Kain/Aksesoris) yang ter-assign ke Brand
         try:
             items = db.query(models.InventoryItem).all()
             for item in items:
-                b_name = getattr(item, "brand", None) or "Stok Standar Pabrik"
-                brand_map[b_name] = brand_map.get(b_name, 0) + int(item.current_stock or 0)
+                b_name = getattr(item, "brand", None)
+                if b_name and b_name.strip():
+                    brand_map[b_name.strip()] = brand_map.get(b_name.strip(), 0) + int(item.current_stock or 0)
+                else:
+                    cat = "Material Universal"
+                    brand_map[cat] = brand_map.get(cat, 0) + int(item.current_stock or 0)
         except Exception:
             pass
 
         # 3. Fallback jika database masih kosong
         if not brand_map:
             brand_map = {
-                "Wilmer Studios": 1200,
-                "Hammer Denim": 750,
-                "Cardinal Casual": 500,
-                "Bahan Polos Standar": 350
+                "Wilmer Studios": 500,
+                "Hammer Denim": 300,
+                "Cardinal Casual": 200,
+                "Material Universal": 50
             }
 
-        # Format sesuai kebutuhan Recharts PieChart [{ name, value }]
-        chart_data = [
-            {"name": k, "value": max(10, v)}
-            for k, v in sorted(brand_map.items(), key=lambda x: x[1], reverse=True)[:6]
-        ]
+        total_val = sum(brand_map.values()) or 1
+
+        chart_data = []
+        for k, v in sorted(brand_map.items(), key=lambda x: x[1], reverse=True)[:6]:
+            pct = round((v / total_val) * 100, 1)
+            chart_data.append({
+                "name": k,
+                "value": int(v),
+                "percentage": pct
+            })
+
         return chart_data
-    except Exception as e:
+    except Exception:
         return [
-            {"name": "Wilmer Studios", "value": 1200},
-            {"name": "Hammer Denim", "value": 750},
-            {"name": "Cardinal Casual", "value": 500},
-            {"name": "Bahan Polos Standar", "value": 350}
+            {"name": "Wilmer Studios", "value": 500, "percentage": 47.6},
+            {"name": "Hammer Denim", "value": 300, "percentage": 28.6},
+            {"name": "Cardinal Casual", "value": 200, "percentage": 19.0},
+            {"name": "Material Universal", "value": 50, "percentage": 4.8}
         ]
 
 

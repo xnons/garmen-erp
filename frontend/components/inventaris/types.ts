@@ -42,6 +42,8 @@ export interface ItemBahanBaku {
     terakhir_diperbarui: string;
 }
 
+export type ViewMode = 'TABLE' | 'CARDS' | 'COMPACT';
+
 export interface FilterInventaris {
     search: string;
     kategori: 'ALL' | KategoriBahan;

@@ -5,12 +5,19 @@ const getBaseURL = (): string => {
         const customUrl = localStorage.getItem('custom_api_url');
         if (customUrl) return customUrl;
 
-        // Jika frontend dibuka di domain Cloud Render/Vercel dan env kosong atau salah domain
+        // 1. Jika frontend dibuka di domain Render (*.onrender.com),
+        // selalu prioritaskan origin aktif browser agar sinkron dengan domain backend aktif (misal garmen-erp-1.onrender.com)
+        if (window.location.hostname.includes('onrender.com')) {
+            return window.location.origin;
+        }
+
+        // 2. Jika ada NEXT_PUBLIC_API_URL yang valid
         const envUrl = process.env.NEXT_PUBLIC_API_URL;
-        if (envUrl && envUrl.startsWith('http')) {
+        if (envUrl && envUrl.startsWith('http') && !envUrl.includes('127.0.0.1') && !envUrl.includes('localhost')) {
             return envUrl;
         }
 
+        // 3. Jika di browser production non-local
         if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
             return window.location.origin;
         }

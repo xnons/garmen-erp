@@ -53,6 +53,8 @@ export interface MesinAsset {
     arsip_info?: ArchiveInfo;
 }
 
+export type ViewMode = 'TABLE' | 'CARDS' | 'COMPACT';
+
 export interface FilterState {
     search: string;
     status: string;
