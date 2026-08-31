@@ -3,10 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileSpreadsheet, Plus, Search, RefreshCw, Users, Layers, 
-  Calendar, CheckCircle2, ChevronRight, Phone, MapPin, Tag, ArrowUpRight
+  Calendar, CheckCircle2, ChevronRight, Phone, MapPin, Tag, ArrowUpRight,
+  Pencil, Trash2
 } from 'lucide-react';
 import api from '@/services/api';
 import SalesOrderModal from './SalesOrderModal';
+import PartnerModal from './PartnerModal';
 
 export default function PPICModule() {
   const [activeTab, setActiveTab] = useState<'ORDERS' | 'PARTNERS'>('ORDERS');
@@ -14,7 +16,13 @@ export default function PPICModule() {
   const [partners, setPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  // Modal States
+  const [isSOModalOpen, setIsSOModalOpen] = useState<boolean>(false);
+  const [selectedSO, setSelectedSO] = useState<any>(null);
+
+  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState<boolean>(false);
+  const [selectedPartner, setSelectedPartner] = useState<any>(null);
 
   // Filter partner category
   const [partnerCategory, setPartnerCategory] = useState<string>("ALL");
@@ -37,6 +45,46 @@ export default function PPICModule() {
       console.error("Gagal mengambil data PPIC:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenEditSO = (so: any) => {
+    setSelectedSO(so);
+    setIsSOModalOpen(true);
+  };
+
+  const handleOpenCreateSO = () => {
+    setSelectedSO(null);
+    setIsSOModalOpen(true);
+  };
+
+  const handleDeleteSO = async (so: any) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus Sales Order '${so.so_number}'? Aksi ini akan dicatat di Log Audit Keamanan.`)) return;
+    try {
+      await api.delete(`/api/ppic/orders/${so.id}`);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menghapus Sales Order.");
+    }
+  };
+
+  const handleOpenEditPartner = (partner: any) => {
+    setSelectedPartner(partner);
+    setIsPartnerModalOpen(true);
+  };
+
+  const handleOpenCreatePartner = () => {
+    setSelectedPartner(null);
+    setIsPartnerModalOpen(true);
+  };
+
+  const handleDeletePartner = async (partner: any) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus Rekanan '${partner.name}'?`)) return;
+    try {
+      await api.delete(`/api/ppic/partners/${partner.id}`);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menghapus rekanan.");
     }
   };
 
@@ -70,13 +118,23 @@ export default function PPICModule() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-600/20"
-          >
-            <Plus className="w-4 h-4" />
-            + Buat Sales Order Baru
-          </button>
+          {activeTab === 'ORDERS' ? (
+            <button
+              onClick={handleOpenCreateSO}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-600/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              + Buat Sales Order Baru
+            </button>
+          ) : (
+            <button
+              onClick={handleOpenCreatePartner}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-600/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              + Tambah Master Rekanan
+            </button>
+          )}
         </div>
       </div>
 
@@ -85,7 +143,7 @@ export default function PPICModule() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('ORDERS')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'ORDERS'
                 ? 'bg-slate-800 text-blue-400 border border-blue-500/30'
                 : 'text-slate-400 hover:text-white'
@@ -95,7 +153,7 @@ export default function PPICModule() {
           </button>
           <button
             onClick={() => setActiveTab('PARTNERS')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'PARTNERS'
                 ? 'bg-slate-800 text-blue-400 border border-blue-500/30'
                 : 'text-slate-400 hover:text-white'
@@ -118,7 +176,7 @@ export default function PPICModule() {
           </div>
           <button
             onClick={fetchData}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors"
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-400' : ''}`} />
           </button>
@@ -141,59 +199,80 @@ export default function PPICModule() {
             filteredOrders.map((so) => {
               const breakdown = so.size_breakdown_target || {};
               return (
-                <div key={so.id} className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl space-y-4 hover:border-slate-700 transition-all group">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                        {so.buyer_name || "BUYER UMUM"}
+                <div key={so.id} className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl space-y-4 hover:border-slate-700 transition-all group flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          {so.buyer_name || "BUYER UMUM"}
+                        </span>
+                        <h3 className="text-lg font-black text-white mt-1 group-hover:text-blue-300 transition-colors">
+                          {so.so_number}
+                        </h3>
+                        <p className="text-xs text-slate-400 font-semibold">{so.style_name}</p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-slate-800 text-emerald-400 border border-slate-700">
+                        {so.order_qty.toLocaleString('id-ID')} Pcs
                       </span>
-                      <h3 className="text-lg font-black text-white mt-1 group-hover:text-blue-300 transition-colors">
-                        {so.so_number}
-                      </h3>
-                      <p className="text-xs text-slate-400 font-semibold">{so.style_name}</p>
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-slate-800 text-emerald-400 border border-slate-700">
-                      {so.order_qty.toLocaleString('id-ID')} Pcs
-                    </span>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-800/80 text-slate-300">
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">Kategori:</span>
-                      <span className="font-semibold">{so.item_category}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">Warna:</span>
-                      <span className="font-semibold">{so.color || "-"}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">Harga CMT:</span>
-                      <span className="font-semibold text-emerald-400">Rp {(so.unit_price || 0).toLocaleString('id-ID')}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">Status Lini:</span>
-                      <span className="font-bold text-indigo-400">{so.status}</span>
-                    </div>
-                  </div>
-
-                  {/* Size Breakdown Pills */}
-                  {Object.keys(breakdown).length > 0 && (
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-semibold block mb-1.5">BREAKDOWN SIZE:</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {Object.entries(breakdown).map(([sz, qty]: any) => (
-                          <div key={sz} className="px-2 py-0.5 bg-slate-950 border border-slate-800 rounded text-[11px]">
-                            <span className="text-slate-400 mr-1">{sz}:</span>
-                            <span className="font-bold text-white">{qty}</span>
-                          </div>
-                        ))}
+                    <div className="grid grid-cols-2 gap-2 text-xs py-2 my-3 border-y border-slate-800/80 text-slate-300">
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Kategori:</span>
+                        <span className="font-semibold">{so.item_category}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Warna:</span>
+                        <span className="font-semibold">{so.color || "-"}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Harga CMT:</span>
+                        <span className="font-semibold text-emerald-400">Rp {(so.unit_price || 0).toLocaleString('id-ID')}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">Status Lini:</span>
+                        <span className="font-bold text-indigo-400">{so.status}</span>
                       </div>
                     </div>
-                  )}
 
-                  <div className="pt-2 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-800/60">
-                    <span>Tgl: {so.order_date || "-"}</span>
-                    {so.deadline && <span className="text-amber-400 font-semibold">DL: {so.deadline}</span>}
+                    {/* Size Breakdown Pills */}
+                    {Object.keys(breakdown).length > 0 && (
+                      <div className="mb-3">
+                        <span className="text-[10px] text-slate-500 font-semibold block mb-1.5">BREAKDOWN SIZE:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(breakdown).map(([sz, qty]: any) => (
+                            <div key={sz} className="px-2 py-0.5 bg-slate-950 border border-slate-800 rounded text-[11px]">
+                              <span className="text-slate-400 mr-1">{sz}:</span>
+                              <span className="font-bold text-white">{qty}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-800/60">
+                    <div className="space-y-0.5">
+                      <span>Tgl: {so.order_date || "-"}</span>
+                      {so.deadline && <span className="block text-amber-400 font-semibold">DL: {so.deadline}</span>}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEditSO(so)}
+                        title="Edit / Koreksi Sales Order"
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-all cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSO(so)}
+                        title="Hapus Sales Order"
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -206,11 +285,11 @@ export default function PPICModule() {
       {activeTab === 'PARTNERS' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
-            {['ALL', 'BUYER', 'MAKLUN_SEWING', 'SUBCON_WASHING', 'SUBCON_PRINT', 'SUBCON_EMBROIDERY'].map((cat) => (
+            {['ALL', 'BUYER', 'SUPPLIER_FABRIC', 'MAKLUN_SEWING', 'SUBCON_WASHING', 'SUBCON_PRINT', 'SUBCON_EMBROIDERY'].map((cat) => (
               <button
                 key={cat}
                 onClick={() => setPartnerCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   partnerCategory === cat
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
                     : 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800'
@@ -223,39 +302,75 @@ export default function PPICModule() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredPartners.map((p) => (
-              <div key={p.id} className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl space-y-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                      {p.category.replace('_', ' ')}
-                    </span>
-                    <h3 className="text-base font-bold text-white mt-1">{p.name}</h3>
+              <div key={p.id} className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        {p.category.replace('_', ' ')}
+                      </span>
+                      <h3 className="text-base font-bold text-white mt-1">{p.name}</h3>
+                    </div>
+                    {p.code && (
+                      <span className="text-xs font-mono text-slate-500">{p.code}</span>
+                    )}
                   </div>
-                  {p.code && (
-                    <span className="text-xs font-mono text-slate-500">{p.code}</span>
-                  )}
+                  <div className="space-y-1 mt-2">
+                    <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span>{p.address || "Bandung, Jawa Barat"}</span>
+                    </p>
+                    <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span>{p.phone || "-"}</span>
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                  {p.address || "Bandung, Jawa Barat"}
-                </p>
-                <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-slate-500" />
-                  {p.phone || "-"}
-                </p>
+
+                <div className="pt-2 flex items-center justify-end gap-1.5 border-t border-slate-800/60">
+                  <button
+                    onClick={() => handleOpenEditPartner(p)}
+                    title="Edit Data Rekanan"
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-all cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeletePartner(p)}
+                    title="Hapus Rekanan"
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Modal Dialog */}
+      {/* Modal Dialogs */}
       <SalesOrderModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isSOModalOpen}
+        onClose={() => {
+          setIsSOModalOpen(false);
+          setSelectedSO(null);
+        }}
         onSuccess={fetchData}
+        initialData={selectedSO}
+      />
+
+      <PartnerModal
+        isOpen={isPartnerModalOpen}
+        onClose={() => {
+          setIsPartnerModalOpen(false);
+          setSelectedPartner(null);
+        }}
+        onSuccess={fetchData}
+        initialData={selectedPartner}
       />
 
     </div>
   );
 }
+

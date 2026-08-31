@@ -7,10 +7,10 @@ from datetime import datetime
 from database import get_db
 import models
 from schemas.garment_blueprint import (
-    CuttingRecordCreate, CuttingRecordResponse,
-    CuttingPrepTaskCreate, CuttingPrepTaskResponse
+    CuttingRecordCreate, CuttingRecordUpdate, CuttingRecordResponse,
+    CuttingPrepTaskCreate, CuttingPrepTaskUpdate, CuttingPrepTaskResponse
 )
-from core.security import get_current_user
+from core.security import get_current_user, require_role
 from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/cutting", tags=["Cutting, Consumption & Preparation"])
@@ -53,8 +53,6 @@ def create_cutting_record(
         raise HTTPException(status_code=400, detail="Jumlah potong (qty_cut) harus lebih dari 0.")
 
     # 🟢 KALKULASI RASIO KONSUMSI KAIN UTAMA & PURING:
-    # main_consumption_rate = main_fabric_used / qty_cut (Yard/Pcs)
-    # puring_consumption_rate = puring_used / qty_cut (Yard/Pcs)
     main_rate = round(payload.main_fabric_used / payload.qty_cut, 4)
     puring_rate = round((payload.puring_used or 0.0) / payload.qty_cut, 4) if (payload.puring_used and payload.puring_used > 0) else 0.0
 
@@ -93,6 +91,71 @@ def create_cutting_record(
     resp = CuttingRecordResponse.from_orm(cutting)
     resp.operator_name = operator_name
     return resp
+
+@router.put("/records/{record_id}", response_model=CuttingRecordResponse)
+def update_cutting_record(
+    record_id: str,
+    payload: CuttingRecordUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["CUTTING", "ADMIN", "OWNER", "DEVELOPER"]))
+):
+    cutting = db.query(models.CuttingRecord).options(
+        joinedload(models.CuttingRecord.operator),
+        joinedload(models.CuttingRecord.sales_order)
+    ).filter(models.CuttingRecord.id == record_id).first()
+    if not cutting:
+        raise HTTPException(status_code=404, detail="Data potong kain tidak ditemukan.")
+
+    old_qty = cutting.qty_cut
+    update_data = payload.model_dump(exclude_unset=True)
+    for k, v in update_data.items():
+        if v is not None:
+            setattr(cutting, k, v)
+
+    # Rekalkulasi Rasio Konsumsi
+    if cutting.qty_cut > 0:
+        cutting.main_consumption_rate = round(cutting.main_fabric_used / cutting.qty_cut, 4)
+        cutting.puring_consumption_rate = round((cutting.puring_used or 0.0) / cutting.qty_cut, 4) if cutting.puring_used else 0.0
+
+    db.commit()
+    db.refresh(cutting)
+
+    so_num = cutting.sales_order.so_number if cutting.sales_order else "N/A"
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_CUTTING",
+        target_id=cutting.id,
+        catatan=f"Data meja potong #{record_id} (SO: {so_num}) dikoreksi oleh {current_user.nama} (Qty Potong: {old_qty} -> {cutting.qty_cut} pcs, Kain: {cutting.main_fabric_used} Yd)."
+    )
+
+    resp = CuttingRecordResponse.from_orm(cutting)
+    if cutting.operator:
+        resp.operator_name = cutting.operator.nama
+    return resp
+
+@router.delete("/records/{record_id}")
+def delete_cutting_record(
+    record_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    cutting = db.query(models.CuttingRecord).filter(models.CuttingRecord.id == record_id).first()
+    if not cutting:
+        raise HTTPException(status_code=404, detail="Data potong kain tidak ditemukan.")
+    
+    qty = cutting.qty_cut
+    db.delete(cutting)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_CUTTING",
+        target_id=record_id,
+        catatan=f"Log meja potong #{record_id} ({qty} pcs) dihapus oleh {current_user.nama}."
+    )
+    return {"message": "Data potong berhasil dihapus."}
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +216,79 @@ def create_prep_task(
     db.commit()
     db.refresh(task)
 
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="CREATE_PREP_TASK",
+        target_id=task.id,
+        catatan=f"Tugas persiapan {payload.task_type} ({payload.qty_done} pcs) oleh {operator_name} didaftarkan."
+    )
+
     resp = CuttingPrepTaskResponse.from_orm(task)
     resp.operator_name = operator_name
     return resp
+
+@router.put("/prep-tasks/{task_id}", response_model=CuttingPrepTaskResponse)
+def update_prep_task(
+    task_id: str,
+    payload: CuttingPrepTaskUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["CUTTING", "ADMIN", "OWNER", "DEVELOPER"]))
+):
+    task = db.query(models.CuttingPrepTask).options(
+        joinedload(models.CuttingPrepTask.operator)
+    ).filter(models.CuttingPrepTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Tugas persiapan cutting tidak ditemukan.")
+
+    old_qty = task.qty_done
+    update_data = payload.model_dump(exclude_unset=True)
+    for k, v in update_data.items():
+        if v is not None:
+            if k == "task_type":
+                setattr(task, k, str(v).upper())
+            else:
+                setattr(task, k, v)
+
+    # Rekalkulasi Gaji Borongan
+    rate = task.piece_rate or 0.0
+    task.total_wage = round((task.qty_done or 0) * rate, 2)
+
+    db.commit()
+    db.refresh(task)
+
+    op_name = task.operator.nama if task.operator else current_user.nama
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_PREP_TASK",
+        target_id=task.id,
+        catatan=f"Tugas persiapan #{task_id} ({task.task_type}) dikoreksi oleh {current_user.nama} (Qty: {old_qty} -> {task.qty_done} pcs, Total Upah: Rp {task.total_wage:,.0f})."
+    )
+
+    resp = CuttingPrepTaskResponse.from_orm(task)
+    resp.operator_name = op_name
+    return resp
+
+@router.delete("/prep-tasks/{task_id}")
+def delete_prep_task(
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    task = db.query(models.CuttingPrepTask).filter(models.CuttingPrepTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Tugas persiapan tidak ditemukan.")
+    
+    t_type = task.task_type
+    db.delete(task)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_PREP_TASK",
+        target_id=task_id,
+        catatan=f"Tugas persiapan {t_type} #{task_id} dihapus oleh {current_user.nama}."
+    )
+    return {"message": f"Tugas persiapan '{t_type}' berhasil dihapus."}

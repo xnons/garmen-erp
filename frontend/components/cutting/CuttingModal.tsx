@@ -9,9 +9,11 @@ interface CuttingModalProps {
   onClose: () => void;
   onSuccess: () => void;
   orders: any[];
+  initialData?: any;
 }
 
-export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: CuttingModalProps) {
+export default function CuttingModal({ isOpen, onClose, onSuccess, orders, initialData }: CuttingModalProps) {
+  const isEditing = !!initialData;
   const [employees, setEmployees] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     so_id: orders.length > 0 ? orders[0].id : "",
@@ -40,15 +42,48 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
   useEffect(() => {
     if (isOpen) {
       fetchEmployees();
+      if (initialData) {
+        setFormData({
+          so_id: initialData.so_id || (orders.length > 0 ? orders[0].id : ""),
+          operator_id: initialData.operator_id || "",
+          cutting_date: initialData.cutting_date || new Date().toISOString().split('T')[0],
+          qty_cut: initialData.qty_cut || 0,
+          main_fabric_used: initialData.main_fabric_used || 0,
+          puring_used: initialData.puring_used || 0,
+          puring_jala_used: initialData.puring_jala_used || 0,
+          marker_length_yard: initialData.marker_length_yard || 0,
+          marker_efficiency_pct: initialData.marker_efficiency_pct || 0,
+          gelaran_layers: initialData.gelaran_layers || 1,
+          fabric_waste_yards: initialData.fabric_waste_yards || 0
+        });
+        if (initialData.size_breakdown_cut && Object.keys(initialData.size_breakdown_cut).length > 0) {
+          setSizeMatrix(initialData.size_breakdown_cut);
+        }
+      } else {
+        setFormData({
+          so_id: orders.length > 0 ? orders[0].id : "",
+          operator_id: "",
+          cutting_date: new Date().toISOString().split('T')[0],
+          qty_cut: 500,
+          main_fabric_used: 650,
+          puring_used: 120,
+          puring_jala_used: 0,
+          marker_length_yard: 12.5,
+          marker_efficiency_pct: 86.5,
+          gelaran_layers: 40,
+          fabric_waste_yards: 8.0
+        });
+        setSizeMatrix({ "28": 100, "30": 150, "32": 150, "34": 100 });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   const fetchEmployees = async () => {
     try {
       const res = await api.get('/api/karyawan/list');
       const list = res.data?.data || res.data || [];
       setEmployees(list);
-      if (list.length > 0 && !formData.operator_id) {
+      if (list.length > 0 && !formData.operator_id && !initialData) {
         setFormData(prev => ({ ...prev, operator_id: list[0].id_karyawan }));
       }
     } catch (err) {
@@ -87,7 +122,7 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
 
     setSubmitting(true);
     try {
-      await api.post('/api/cutting/records', {
+      const payload = {
         so_id: formData.so_id,
         operator_id: formData.operator_id || null,
         cutting_date: formData.cutting_date,
@@ -100,7 +135,13 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
         marker_efficiency_pct: Number(formData.marker_efficiency_pct) || 0,
         gelaran_layers: Number(formData.gelaran_layers) || 1,
         fabric_waste_yards: Number(formData.fabric_waste_yards) || 0
-      });
+      };
+
+      if (isEditing) {
+        await api.put(`/api/cutting/records/${initialData.id}`, payload);
+      } else {
+        await api.post('/api/cutting/records', payload);
+      }
 
       onSuccess();
       onClose();

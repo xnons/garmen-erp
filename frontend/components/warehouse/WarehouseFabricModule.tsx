@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Package, ShieldCheck, Scissors, Plus, Search, RefreshCw, 
-  Printer, AlertOctagon, CheckCircle2, FileText, ArrowDownLeft, ArrowUpRight
+  Printer, AlertOctagon, CheckCircle2, FileText, ArrowDownLeft, ArrowUpRight,
+  Pencil, Trash2
 } from 'lucide-react';
 import api from '@/services/api';
 import FabricInspectionModal from './FabricInspectionModal';
@@ -24,9 +25,10 @@ export default function WarehouseFabricModule() {
   const [isAllocationOpen, setIsAllocationOpen] = useState(false);
   const [printDoc, setPrintDoc] = useState<any>(null);
 
-  // New Item quick form
+  // New & Edit Item State
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
-  const [newItem, setNewItem] = useState({
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [itemForm, setItemForm] = useState({
     item_code: "",
     description: "",
     item_type: "FABRIC_MAIN",
@@ -40,9 +42,10 @@ export default function WarehouseFabricModule() {
     rack_location: "GUDANG_UTAMA"
   });
 
-  // Quick Receipt Form
+  // New & Edit Receipt State
   const [isAddReceiptOpen, setIsAddReceiptOpen] = useState(false);
-  const [newReceipt, setNewReceipt] = useState({
+  const [editingReceipt, setEditingReceipt] = useState<any>(null);
+  const [receiptForm, setReceiptForm] = useState({
     item_id: "",
     supplier_id: "",
     receipt_date: new Date().toISOString().split('T')[0],
@@ -65,17 +68,16 @@ export default function WarehouseFabricModule() {
       } else if (activeTab === 'RECEIPTS') {
         const res = await api.get('/api/warehouse/receipts');
         setReceipts(res.data || []);
+        const iRes = await api.get('/api/warehouse/items');
+        setItems(iRes.data || []);
       } else if (activeTab === 'INSPECTION') {
         const res = await api.get('/api/warehouse/inspections');
         setInspections(res.data || []);
-        // Also fetch receipts to pass to modal
         const rRes = await api.get('/api/warehouse/receipts');
         setReceipts(rRes.data || []);
       } else if (activeTab === 'ALLOCATIONS') {
         const res = await api.get('/api/warehouse/allocations');
         setAllocations(res.data || []);
-        const iRes = await api.get('/api/warehouse/items');
-        setItems(iRes.data || []);
       }
     } catch (err) {
       console.error("Gagal mengambil data gudang bahan:", err);
@@ -84,25 +86,129 @@ export default function WarehouseFabricModule() {
     }
   };
 
-  const handleCreateItem = async (e: React.FormEvent) => {
+  // Item Handlers
+  const handleOpenCreateItem = () => {
+    setEditingItem(null);
+    setItemForm({
+      item_code: "",
+      description: "",
+      item_type: "FABRIC_MAIN",
+      unit: "YARD",
+      unit_price: 25000,
+      current_stock: 0,
+      color_shade_lot: "",
+      width_inch: 58.0,
+      gramasi_gsm: 0,
+      min_stock_alert: 50.0,
+      rack_location: "GUDANG_UTAMA"
+    });
+    setIsAddItemOpen(true);
+  };
+
+  const handleOpenEditItem = (item: any) => {
+    setEditingItem(item);
+    setItemForm({
+      item_code: item.item_code || "",
+      description: item.description || "",
+      item_type: item.item_type || "FABRIC_MAIN",
+      unit: item.unit || "YARD",
+      unit_price: item.unit_price || 25000,
+      current_stock: item.current_stock || 0,
+      color_shade_lot: item.color_shade_lot || "",
+      width_inch: item.width_inch || 58.0,
+      gramasi_gsm: item.gramasi_gsm || 0,
+      min_stock_alert: item.min_stock_alert || 50.0,
+      rack_location: item.rack_location || "GUDANG_UTAMA"
+    });
+    setIsAddItemOpen(true);
+  };
+
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/api/warehouse/items', newItem);
+      if (editingItem) {
+        await api.put(`/api/warehouse/items/${editingItem.id}`, itemForm);
+      } else {
+        await api.post('/api/warehouse/items', itemForm);
+      }
       setIsAddItemOpen(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal membuat item bahan.");
+      alert(err.response?.data?.detail || "Gagal menyimpan item bahan.");
     }
   };
 
-  const handleCreateReceipt = async (e: React.FormEvent) => {
+  const handleDeleteItem = async (item: any) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus item '${item.description}' (${item.item_code})?`)) return;
+    try {
+      await api.delete(`/api/warehouse/items/${item.id}`);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menghapus item bahan.");
+    }
+  };
+
+  // Receipt Handlers
+  const handleOpenCreateReceipt = () => {
+    setEditingReceipt(null);
+    setReceiptForm({
+      item_id: items.length > 0 ? items[0].id : "",
+      supplier_id: "",
+      receipt_date: new Date().toISOString().split('T')[0],
+      roll_number: `ROLL-${Math.floor(Math.random() * 90 + 10)}`,
+      qty_received: 100,
+      unit: "YARD",
+      contract_type: "FOB"
+    });
+    setIsAddReceiptOpen(true);
+  };
+
+  const handleOpenEditReceipt = (rec: any) => {
+    setEditingReceipt(rec);
+    setReceiptForm({
+      item_id: rec.item_id || "",
+      supplier_id: rec.supplier_id || "",
+      receipt_date: rec.receipt_date || new Date().toISOString().split('T')[0],
+      roll_number: rec.roll_number || "",
+      qty_received: rec.qty_received || 0,
+      unit: rec.unit || "YARD",
+      contract_type: rec.contract_type || "FOB"
+    });
+    setIsAddReceiptOpen(true);
+  };
+
+  const handleSaveReceipt = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/api/warehouse/receipts', newReceipt);
+      if (editingReceipt) {
+        await api.put(`/api/warehouse/receipts/${editingReceipt.id}`, receiptForm);
+      } else {
+        await api.post('/api/warehouse/receipts', receiptForm);
+      }
       setIsAddReceiptOpen(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal mencatat barang masuk.");
+      alert(err.response?.data?.detail || "Gagal menyimpan penerimaan barang.");
+    }
+  };
+
+  const handleDeleteReceipt = async (rec: any) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus roll masuk '${rec.roll_number}' (${rec.qty_received} ${rec.unit})? Stok akan otomatis disesuaikan.`)) return;
+    try {
+      await api.delete(`/api/warehouse/receipts/${rec.id}`);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menghapus penerimaan roll.");
+    }
+  };
+
+  const handleDeleteAllocation = async (alloc: any) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus Surat Jalan Penyerahan '${alloc.surat_jalan_no}' (${alloc.qty_issued} Yard)? Stok bahan akan dikembalikan ke gudang.`)) return;
+    try {
+      await api.delete(`/api/warehouse/allocations/${alloc.id}`);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal membatalkan alokasi bahan.");
     }
   };
 
@@ -147,9 +253,9 @@ export default function WarehouseFabricModule() {
               if (items.length === 0) {
                 api.get('/api/warehouse/items').then(res => setItems(res.data || []));
               }
-              setIsAddReceiptOpen(true);
+              handleOpenCreateReceipt();
             }}
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-all"
+            className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer"
           >
             <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
             + Log Roll Masuk
@@ -160,10 +266,10 @@ export default function WarehouseFabricModule() {
               api.get('/api/warehouse/receipts').then(res => setReceipts(res.data || []));
               setIsInspectionOpen(true);
             }}
-            className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-emerald-600/20"
+            className="flex items-center gap-2 px-3.5 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
           >
-            <ShieldCheck className="w-4 h-4" />
-            Uji Mutu 4-Point ASTM
+            <ShieldCheck className="w-4 h-4 text-indigo-400" />
+            + Input Uji QC 4-Point
           </button>
 
           <button
@@ -171,30 +277,30 @@ export default function WarehouseFabricModule() {
               api.get('/api/warehouse/items').then(res => setItems(res.data || []));
               setIsAllocationOpen(true);
             }}
-            className="flex items-center gap-2 px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-amber-600/20"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-600/20 cursor-pointer"
           >
             <Scissors className="w-4 h-4" />
-            Alokasi Bahan (Sheet25)
+            + Alokasi ke Potong (Sheet25)
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab('STOCK')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'STOCK'
                 ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Saldo Stok Bahan ({items.length})
+            Saldo Stok ({items.length})
           </button>
           <button
             onClick={() => setActiveTab('RECEIPTS')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'RECEIPTS'
                 ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30'
                 : 'text-slate-400 hover:text-white'
@@ -204,7 +310,7 @@ export default function WarehouseFabricModule() {
           </button>
           <button
             onClick={() => setActiveTab('INSPECTION')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'INSPECTION'
                 ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30'
                 : 'text-slate-400 hover:text-white'
@@ -214,7 +320,7 @@ export default function WarehouseFabricModule() {
           </button>
           <button
             onClick={() => setActiveTab('ALLOCATIONS')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'ALLOCATIONS'
                 ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30'
                 : 'text-slate-400 hover:text-white'
@@ -226,7 +332,7 @@ export default function WarehouseFabricModule() {
 
         <button
           onClick={fetchData}
-          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors"
+          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors cursor-pointer"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
         </button>
@@ -238,8 +344,8 @@ export default function WarehouseFabricModule() {
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-white">Daftar Bahan Baku & Stok Gudang Dewi</h3>
             <button
-              onClick={() => setIsAddItemOpen(true)}
-              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1"
+              onClick={handleOpenCreateItem}
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> + Tambah Master Item
             </button>
@@ -247,25 +353,49 @@ export default function WarehouseFabricModule() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {items.map((i) => (
-              <div key={i.id} className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                      {i.item_type}
+              <div key={i.id} className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        {i.item_type}
+                      </span>
+                      <h4 className="text-base font-black text-white mt-1">{i.description}</h4>
+                      <p className="text-xs font-mono text-slate-500">{i.item_code}</p>
+                    </div>
+                    <span className="text-right">
+                      <span className="block text-lg font-black text-emerald-400">
+                        {(i.current_stock || 0).toLocaleString('id-ID')}
+                      </span>
+                      <span className="text-[10px] uppercase font-bold text-slate-500">{i.unit}</span>
                     </span>
-                    <h4 className="text-base font-black text-white mt-1">{i.description}</h4>
-                    <p className="text-xs font-mono text-slate-500">{i.item_code}</p>
                   </div>
-                  <span className="text-right">
-                    <span className="block text-lg font-black text-emerald-400">
-                      {i.current_stock.toLocaleString('id-ID')}
-                    </span>
-                    <span className="text-[10px] uppercase font-bold text-slate-500">{i.unit}</span>
-                  </span>
+                  <div className="text-xs text-slate-400 pt-2 mt-2 border-t border-slate-800 flex justify-between">
+                    <span>Estimasi Harga/Satuan:</span>
+                    <span className="font-semibold text-slate-200">Rp {(i.unit_price || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  {i.rack_location && (
+                    <div className="text-[11px] text-slate-500 pt-1">
+                      Lokasi Rak: <span className="font-mono text-slate-300 font-semibold">{i.rack_location}</span>
+                    </div>
+                  )}
                 </div>
-                <div className="text-xs text-slate-400 pt-2 border-t border-slate-800 flex justify-between">
-                  <span>Estimasi Harga/Satuan:</span>
-                  <span className="font-semibold text-slate-200">Rp {(i.unit_price || 0).toLocaleString('id-ID')}</span>
+
+                <div className="pt-2 flex items-center justify-end gap-1.5 border-t border-slate-800/60">
+                  <button
+                    onClick={() => handleOpenEditItem(i)}
+                    title="Edit Item Bahan"
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-all cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteItem(i)}
+                    title="Hapus Item Bahan"
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -285,7 +415,8 @@ export default function WarehouseFabricModule() {
                 <th className="py-3 px-3">Supplier</th>
                 <th className="py-3 px-3 text-right">Kuantitas</th>
                 <th className="py-3 px-3">Kontrak</th>
-                <th className="py-3 px-4 text-center">Status QC</th>
+                <th className="py-3 px-3 text-center">Status QC</th>
+                <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
@@ -297,7 +428,7 @@ export default function WarehouseFabricModule() {
                   <td className="py-3 px-3 text-slate-300">{r.supplier_name || "SUPPLIER UMUM"}</td>
                   <td className="py-3 px-3 text-right font-black text-emerald-400">{r.qty_received} {r.unit}</td>
                   <td className="py-3 px-3 text-slate-400 font-semibold">{r.contract_type}</td>
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-3 px-3 text-center">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                       r.inspection_status === 'PASSED'
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -307,6 +438,24 @@ export default function WarehouseFabricModule() {
                     }`}>
                       {r.inspection_status}
                     </span>
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEditReceipt(r)}
+                        title="Edit Log Masuk"
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-all cursor-pointer"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReceipt(r)}
+                        title="Hapus Roll Masuk"
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -372,7 +521,7 @@ export default function WarehouseFabricModule() {
                 <th className="py-3 px-3">Sales Order Target</th>
                 <th className="py-3 px-3">Item Kain</th>
                 <th className="py-3 px-3 text-right">Yard Dikeluarkan</th>
-                <th className="py-3 px-4 text-center">Cetak Dokumen</th>
+                <th className="py-3 px-4 text-center">Aksi / Dokumen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
@@ -384,12 +533,21 @@ export default function WarehouseFabricModule() {
                   <td className="py-3 px-3 text-slate-300">{a.item_description}</td>
                   <td className="py-3 px-3 text-right font-black text-emerald-400">{a.qty_issued} YARD</td>
                   <td className="py-3 px-4 text-center">
-                    <button
-                      onClick={() => handlePrintAllocation(a)}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors"
-                    >
-                      <Printer className="w-3.5 h-3.5 text-blue-400" /> Cetak SJ
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handlePrintAllocation(a)}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-blue-400" /> Cetak SJ
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAllocation(a)}
+                        title="Hapus / Batalkan Alokasi"
+                        className="p-1 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -398,19 +556,21 @@ export default function WarehouseFabricModule() {
         </div>
       )}
 
-      {/* Modal Quick Create Item */}
+      {/* Modal Quick Create / Edit Item */}
       {isAddItemOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <form onSubmit={handleCreateItem} className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-6 space-y-4">
-            <h3 className="text-base font-bold text-white">Tambah Master Item Bahan</h3>
+          <form onSubmit={handleSaveItem} className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-6 space-y-4">
+            <h3 className="text-base font-bold text-white">
+              {editingItem ? `Edit Item Bahan: ${editingItem.item_code}` : 'Tambah Master Item Bahan'}
+            </h3>
             <div>
               <label className="block text-xs text-slate-300 mb-1">Kode Item</label>
               <input
                 type="text"
                 required
                 placeholder="MG-2604-BH0001"
-                value={newItem.item_code}
-                onChange={(e) => setNewItem({ ...newItem, item_code: e.target.value })}
+                value={itemForm.item_code}
+                onChange={(e) => setItemForm({ ...itemForm, item_code: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white uppercase"
               />
             </div>
@@ -420,8 +580,8 @@ export default function WarehouseFabricModule() {
                 type="text"
                 required
                 placeholder="DENIM 13 OZ STRETCH / PURING PUTIH"
-                value={newItem.description}
-                onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                value={itemForm.description}
+                onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
               />
             </div>
@@ -429,8 +589,8 @@ export default function WarehouseFabricModule() {
               <div>
                 <label className="block text-xs text-slate-300 mb-1">Tipe</label>
                 <select
-                  value={newItem.item_type}
-                  onChange={(e) => setNewItem({ ...newItem, item_type: e.target.value })}
+                  value={itemForm.item_type}
+                  onChange={(e) => setItemForm({ ...itemForm, item_type: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                 >
                   <option value="FABRIC_MAIN">FABRIC MAIN</option>
@@ -443,8 +603,8 @@ export default function WarehouseFabricModule() {
                 <label className="block text-xs text-slate-300 mb-1">Satuan</label>
                 <input
                   type="text"
-                  value={newItem.unit}
-                  onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+                  value={itemForm.unit}
+                  onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white uppercase"
                 />
               </div>
@@ -456,8 +616,8 @@ export default function WarehouseFabricModule() {
                 <input
                   type="text"
                   placeholder="LOT-A / JET BLACK"
-                  value={newItem.color_shade_lot}
-                  onChange={(e) => setNewItem({ ...newItem, color_shade_lot: e.target.value })}
+                  value={itemForm.color_shade_lot}
+                  onChange={(e) => setItemForm({ ...itemForm, color_shade_lot: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white uppercase"
                 />
               </div>
@@ -466,8 +626,8 @@ export default function WarehouseFabricModule() {
                 <input
                   type="number"
                   step="0.5"
-                  value={newItem.width_inch}
-                  onChange={(e) => setNewItem({ ...newItem, width_inch: Number(e.target.value) })}
+                  value={itemForm.width_inch}
+                  onChange={(e) => setItemForm({ ...itemForm, width_inch: Number(e.target.value) })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white"
                 />
               </div>
@@ -475,8 +635,8 @@ export default function WarehouseFabricModule() {
                 <label className="block text-[11px] text-slate-300 mb-1">Gramasi (GSM)</label>
                 <input
                   type="number"
-                  value={newItem.gramasi_gsm}
-                  onChange={(e) => setNewItem({ ...newItem, gramasi_gsm: Number(e.target.value) })}
+                  value={itemForm.gramasi_gsm}
+                  onChange={(e) => setItemForm({ ...itemForm, gramasi_gsm: Number(e.target.value) })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white"
                 />
               </div>
@@ -488,17 +648,17 @@ export default function WarehouseFabricModule() {
                 <input
                   type="text"
                   placeholder="RAK-A1-04"
-                  value={newItem.rack_location}
-                  onChange={(e) => setNewItem({ ...newItem, rack_location: e.target.value })}
+                  value={itemForm.rack_location}
+                  onChange={(e) => setItemForm({ ...itemForm, rack_location: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white uppercase"
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-300 mb-1">Min Stock Alert</label>
+                <label className="block text-xs text-slate-300 mb-1">Estimasi Harga (Rp)</label>
                 <input
                   type="number"
-                  value={newItem.min_stock_alert}
-                  onChange={(e) => setNewItem({ ...newItem, min_stock_alert: Number(e.target.value) })}
+                  value={itemForm.unit_price}
+                  onChange={(e) => setItemForm({ ...itemForm, unit_price: Number(e.target.value) })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                 />
               </div>
@@ -507,32 +667,34 @@ export default function WarehouseFabricModule() {
               <button
                 type="button"
                 onClick={() => setIsAddItemOpen(false)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl"
+                className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl cursor-pointer"
               >
-                Simpan Item
+                {editingItem ? "Simpan Perubahan" : "Simpan Item"}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Modal Quick Create Receipt */}
+      {/* Modal Quick Create / Edit Receipt */}
       {isAddReceiptOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <form onSubmit={handleCreateReceipt} className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-6 space-y-4">
-            <h3 className="text-base font-bold text-white">Log Roll Kain Masuk</h3>
+          <form onSubmit={handleSaveReceipt} className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-6 space-y-4">
+            <h3 className="text-base font-bold text-white">
+              {editingReceipt ? `Edit Roll Masuk: ${editingReceipt.roll_number}` : 'Log Roll Kain Masuk'}
+            </h3>
             <div>
               <label className="block text-xs text-slate-300 mb-1">Pilih Item Kain</label>
               <select
                 required
-                value={newReceipt.item_id}
-                onChange={(e) => setNewReceipt({ ...newReceipt, item_id: e.target.value })}
+                value={receiptForm.item_id}
+                onChange={(e) => setReceiptForm({ ...receiptForm, item_id: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
               >
                 <option value="">-- Pilih Item --</option>
@@ -546,8 +708,8 @@ export default function WarehouseFabricModule() {
                 <label className="block text-xs text-slate-300 mb-1">Nomor Roll</label>
                 <input
                   type="text"
-                  value={newReceipt.roll_number}
-                  onChange={(e) => setNewReceipt({ ...newReceipt, roll_number: e.target.value })}
+                  value={receiptForm.roll_number}
+                  onChange={(e) => setReceiptForm({ ...receiptForm, roll_number: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white uppercase"
                 />
               </div>
@@ -556,8 +718,8 @@ export default function WarehouseFabricModule() {
                 <input
                   type="number"
                   step="0.1"
-                  value={newReceipt.qty_received}
-                  onChange={(e) => setNewReceipt({ ...newReceipt, qty_received: Number(e.target.value) })}
+                  value={receiptForm.qty_received}
+                  onChange={(e) => setReceiptForm({ ...receiptForm, qty_received: Number(e.target.value) })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold"
                 />
               </div>
@@ -566,15 +728,15 @@ export default function WarehouseFabricModule() {
               <button
                 type="button"
                 onClick={() => setIsAddReceiptOpen(false)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl"
+                className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl cursor-pointer"
               >
-                Catat Masuk
+                {editingReceipt ? "Simpan Koreksi" : "Catat Masuk"}
               </button>
             </div>
           </form>

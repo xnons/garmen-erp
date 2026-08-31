@@ -193,6 +193,82 @@ def receive_wip_movement(
     resp.supervisor_name = getattr(movement.supervisor, "nama", current_user.nama)
     return resp
 
+@router.put("/movements/{movement_id}", response_model=WIPMovementResponse)
+def update_wip_movement(
+    movement_id: str,
+    payload: WIPMovementUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["PPIC", "ADMIN", "OWNER", "DEVELOPER"]))
+):
+    movement = db.query(models.WIPMovement).options(
+        joinedload(models.WIPMovement.sales_order),
+        joinedload(models.WIPMovement.partner)
+    ).filter(models.WIPMovement.id == movement_id).first()
+    if not movement:
+        raise HTTPException(status_code=404, detail="Surat Jalan pergerakan WIP tidak ditemukan.")
+
+    old_dispatch = movement.qty_dispatched
+    old_rec = movement.qty_received
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for k, v in update_data.items():
+        if v is not None:
+            setattr(movement, k, v)
+
+    # Rekalkulasi Selisih
+    movement.balance_discrepancy = (movement.qty_dispatched or 0) - ((movement.qty_received or 0) + (movement.qty_reject or 0))
+    if movement.qty_received and movement.qty_received > 0:
+        if movement.balance_discrepancy == 0:
+            movement.status = "COMPLETED"
+        elif movement.balance_discrepancy > 0:
+            movement.status = "PARTIAL_RECEIVED"
+        else:
+            movement.status = "DISCREPANCY_FLAG"
+
+    db.commit()
+    db.refresh(movement)
+
+    so_num = movement.sales_order.so_number if movement.sales_order else "N/A"
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_WIP_MOVEMENT",
+        target_id=movement.id,
+        catatan=f"Surat Jalan #{movement.surat_jalan_no or movement_id} (SO: {so_num}) dikoreksi oleh {current_user.nama} (Kirim: {old_dispatch}->{movement.qty_dispatched}, Terima: {old_rec}->{movement.qty_received})."
+    )
+
+    resp = WIPMovementResponse.from_orm(movement)
+    if movement.sales_order:
+        resp.so_number = movement.sales_order.so_number
+        resp.style_name = movement.sales_order.style_name
+    if movement.partner:
+        resp.partner_name = movement.partner.name
+    resp.supervisor_name = getattr(movement.supervisor, "nama", current_user.nama)
+    return resp
+
+@router.delete("/movements/{movement_id}")
+def delete_wip_movement(
+    movement_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    movement = db.query(models.WIPMovement).filter(models.WIPMovement.id == movement_id).first()
+    if not movement:
+        raise HTTPException(status_code=404, detail="Surat Jalan tidak ditemukan.")
+
+    sj_no = movement.surat_jalan_no
+    db.delete(movement)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_WIP_MOVEMENT",
+        target_id=movement_id,
+        catatan=f"Surat Jalan {sj_no} (#{movement_id}) dihapus oleh {current_user.nama}."
+    )
+    return {"message": f"Surat Jalan '{sj_no}' berhasil dihapus."}
+
 
 # ---------------------------------------------------------------------------
 # 3. MASTER CONTROL TOWER (LIVE WIP MATRIX TELEMETRY AGGREGATION)

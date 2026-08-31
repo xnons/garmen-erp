@@ -7,10 +7,10 @@ from datetime import datetime
 from database import get_db
 import models
 from schemas.garment_blueprint import (
-    PieceRateWageCreate, PieceRateWageResponse,
-    ShipmentCreate, ShipmentResponse
+    PieceRateWageCreate, PieceRateWageUpdate, PieceRateWageResponse,
+    ShipmentCreate, ShipmentUpdate, ShipmentResponse
 )
-from core.security import get_current_user
+from core.security import get_current_user, require_role
 from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/shipping", tags=["Finishing Borongan, Expedisi & Billing Form WI"])
@@ -74,9 +74,82 @@ def create_piece_rate_wage(
     db.commit()
     db.refresh(wage)
 
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="CREATE_FINISHING_WAGE",
+        target_id=wage.id,
+        catatan=f"Entri upah {payload.operation_type} ({payload.qty_completed} pcs @ Rp {payload.wage_per_piece}) untuk {operator_name} (Total: Rp {total_wage:,.0f})."
+    )
+
     resp = PieceRateWageResponse.from_orm(wage)
     resp.operator_name = operator_name
     return resp
+
+@router.put("/wages/{wage_id}", response_model=PieceRateWageResponse)
+def update_piece_rate_wage(
+    wage_id: str,
+    payload: PieceRateWageUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["PRODUKSI", "FINANCE", "ADMIN", "OWNER", "DEVELOPER"]))
+):
+    wage = db.query(models.PieceRateWage).options(
+        joinedload(models.PieceRateWage.operator)
+    ).filter(models.PieceRateWage.id == wage_id).first()
+    if not wage:
+        raise HTTPException(status_code=404, detail="Data upah borongan tidak ditemukan.")
+
+    old_total = wage.total_wage
+    update_data = payload.model_dump(exclude_unset=True)
+    for k, v in update_data.items():
+        if v is not None:
+            if k == "operation_type":
+                setattr(wage, k, str(v).upper())
+            else:
+                setattr(wage, k, v)
+
+    # Rekalkulasi total upah
+    wage.total_wage = round((wage.qty_completed or 0) * (wage.wage_per_piece or 0.0), 2)
+
+    db.commit()
+    db.refresh(wage)
+
+    op_name = wage.operator.nama if wage.operator else current_user.nama
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_FINISHING_WAGE",
+        target_id=wage.id,
+        catatan=f"Upah borongan #{wage_id} ({wage.operation_type} - {op_name}) dikoreksi oleh {current_user.nama} (Rp {old_total:,.0f} -> Rp {wage.total_wage:,.0f})."
+    )
+
+    resp = PieceRateWageResponse.from_orm(wage)
+    resp.operator_name = op_name
+    return resp
+
+@router.delete("/wages/{wage_id}")
+def delete_piece_rate_wage(
+    wage_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    wage = db.query(models.PieceRateWage).filter(models.PieceRateWage.id == wage_id).first()
+    if not wage:
+        raise HTTPException(status_code=404, detail="Data upah tidak ditemukan.")
+
+    t_amt = wage.total_wage
+    op_type = wage.operation_type
+    db.delete(wage)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_FINISHING_WAGE",
+        target_id=wage_id,
+        catatan=f"Entri upah {op_type} #{wage_id} (Rp {t_amt:,.0f}) dihapus oleh {current_user.nama}."
+    )
+    return {"message": "Data upah borongan berhasil dihapus."}
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +228,72 @@ def create_shipment(
     resp = ShipmentResponse.from_orm(shipment)
     resp.driver_name = getattr(shipment.driver, "nama", current_user.nama)
     return resp
+
+@router.put("/shipments/{shipment_id}", response_model=ShipmentResponse)
+def update_shipment(
+    shipment_id: str,
+    payload: ShipmentUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    shipment = db.query(models.Shipment).options(
+        joinedload(models.Shipment.driver)
+    ).filter(models.Shipment.id == shipment_id).first()
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Data pengiriman / SJP tidak ditemukan.")
+
+    old_qty = shipment.total_qty_shipped
+    old_inv = shipment.total_invoice_amount
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for k, v in update_data.items():
+        if v is not None:
+            if k == "surat_jalan_no":
+                setattr(shipment, k, str(v).upper())
+            else:
+                setattr(shipment, k, v)
+
+    # Rekalkulasi Total Invoice
+    shipment.total_invoice_amount = round((shipment.total_qty_shipped or 0) * (shipment.unit_price or 0.0), 2)
+    shipment.is_invoiced = bool(shipment.invoice_number)
+
+    db.commit()
+    db.refresh(shipment)
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_SHIPMENT_SJP",
+        target_id=shipment.id,
+        catatan=f"SJP '{shipment.surat_jalan_no}' dikoreksi oleh {current_user.nama} (Qty: {old_qty}->{shipment.total_qty_shipped} pcs, Tagihan: Rp {old_inv:,.0f} -> Rp {shipment.total_invoice_amount:,.0f})."
+    )
+
+    resp = ShipmentResponse.from_orm(shipment)
+    resp.driver_name = getattr(shipment.driver, "nama", current_user.nama)
+    return resp
+
+@router.delete("/shipments/{shipment_id}")
+def delete_shipment(
+    shipment_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    shipment = db.query(models.Shipment).filter(models.Shipment.id == shipment_id).first()
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Data pengiriman tidak ditemukan.")
+
+    sjp = shipment.surat_jalan_no
+    db.delete(shipment)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_SHIPMENT_SJP",
+        target_id=shipment_id,
+        catatan=f"SJP '{sjp}' (#{shipment_id}) dihapus oleh {current_user.nama}."
+    )
+    return {"message": f"Data pengiriman SJP '{sjp}' berhasil dihapus."}
 
 
 # ---------------------------------------------------------------------------

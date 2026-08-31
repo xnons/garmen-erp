@@ -8,11 +8,11 @@ from database import get_db
 import models
 from schemas.garment_blueprint import (
     InventoryItemCreate, InventoryItemResponse,
-    MaterialReceiptCreate, MaterialReceiptResponse,
-    FabricInspectionCreate, FabricInspectionResponse,
+    MaterialReceiptCreate, MaterialReceiptUpdate, MaterialReceiptResponse,
+    FabricInspectionCreate, FabricInspectionUpdate, FabricInspectionResponse,
     MaterialAllocationCreate, MaterialAllocationResponse
 )
-from core.security import get_current_user
+from core.security import get_current_user, require_role
 from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/warehouse", tags=["Gudang Bahan Baku & QC 4-Point"])
@@ -57,7 +57,74 @@ def create_inventory_item(
     db.add(item)
     db.commit()
     db.refresh(item)
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="CREATE_INVENTORY_ITEM",
+        target_id=item.item_code,
+        catatan=f"Master item kain '{item.item_code}' ({item.description}) didaftarkan oleh {current_user.nama}."
+    )
     return item
+
+@router.put("/items/{item_id}", response_model=InventoryItemResponse)
+def update_inventory_item(
+    item_id: str,
+    payload: InventoryItemCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["GUDANG", "ADMIN", "OWNER", "DEVELOPER"]))
+):
+    item = db.query(models.InventoryItem).filter(models.InventoryItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item inventaris tidak ditemukan.")
+
+    old_stock = item.current_stock
+    item.item_code = payload.item_code.upper()
+    item.description = payload.description
+    item.item_type = payload.item_type.upper()
+    item.unit = payload.unit or item.unit
+    item.unit_price = payload.unit_price or 0.0
+    item.current_stock = payload.current_stock or 0.0
+    item.color_shade_lot = payload.color_shade_lot
+    item.width_inch = payload.width_inch or 58.0
+    item.gramasi_gsm = payload.gramasi_gsm or 0.0
+    item.min_stock_alert = payload.min_stock_alert or 50.0
+    item.rack_location = payload.rack_location or "GUDANG_UTAMA"
+
+    db.commit()
+    db.refresh(item)
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_INVENTORY_ITEM",
+        target_id=item.item_code,
+        catatan=f"Item '{item.item_code}' diperbarui oleh {current_user.nama} (Stok: {old_stock} -> {item.current_stock} {item.unit})."
+    )
+    return item
+
+@router.delete("/items/{item_id}")
+def delete_inventory_item(
+    item_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    item = db.query(models.InventoryItem).filter(models.InventoryItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item inventaris tidak ditemukan.")
+    
+    code = item.item_code
+    db.delete(item)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_INVENTORY_ITEM",
+        target_id=code,
+        catatan=f"Master item kain '{code}' dihapus oleh {current_user.nama}."
+    )
+    return {"message": f"Item '{code}' berhasil dihapus."}
 
 
 # ---------------------------------------------------------------------------
@@ -110,10 +177,91 @@ def create_material_receipt(
     db.commit()
     db.refresh(receipt)
 
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="CREATE_RECEIPT",
+        target_id=receipt.id,
+        catatan=f"Penerimaan roll kain {payload.roll_number or '-'} ({payload.qty_received} {receipt.unit}) dicatat oleh {current_user.nama}."
+    )
+
     resp = MaterialReceiptResponse.from_orm(receipt)
     if receipt.item:
         resp.item_description = receipt.item.description
     return resp
+
+@router.put("/receipts/{receipt_id}", response_model=MaterialReceiptResponse)
+def update_material_receipt(
+    receipt_id: str,
+    payload: MaterialReceiptUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["GUDANG", "ADMIN", "OWNER", "DEVELOPER"]))
+):
+    receipt = db.query(models.MaterialReceipt).options(
+        joinedload(models.MaterialReceipt.item),
+        joinedload(models.MaterialReceipt.supplier)
+    ).filter(models.MaterialReceipt.id == receipt_id).first()
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Log penerimaan kain tidak ditemukan.")
+
+    item = receipt.item
+    old_qty = receipt.qty_received
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for k, v in update_data.items():
+        if v is not None:
+            setattr(receipt, k, v)
+
+    # Sinkronisasi penyesuaian selisih stok jika kuantitas diubah
+    if payload.qty_received is not None and item:
+        diff = payload.qty_received - old_qty
+        item.current_stock = max(0.0, (item.current_stock or 0.0) + diff)
+
+    db.commit()
+    db.refresh(receipt)
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_RECEIPT",
+        target_id=receipt.id,
+        catatan=f"Penerimaan roll {receipt.roll_number or receipt_id} dikoreksi oleh {current_user.nama} (Qty: {old_qty} -> {receipt.qty_received} {receipt.unit})."
+    )
+
+    resp = MaterialReceiptResponse.from_orm(receipt)
+    if receipt.item:
+        resp.item_description = receipt.item.description
+    if receipt.supplier:
+        resp.supplier_name = receipt.supplier.name
+    return resp
+
+@router.delete("/receipts/{receipt_id}")
+def delete_material_receipt(
+    receipt_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    receipt = db.query(models.MaterialReceipt).filter(models.MaterialReceipt.id == receipt_id).first()
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Log penerimaan kain tidak ditemukan.")
+    
+    # Revert stok
+    item = db.query(models.InventoryItem).filter(models.InventoryItem.id == receipt.item_id).first()
+    if item:
+        item.current_stock = max(0.0, (item.current_stock or 0.0) - (receipt.qty_received or 0.0))
+
+    roll_num = receipt.roll_number or receipt_id
+    db.delete(receipt)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_RECEIPT",
+        target_id=receipt_id,
+        catatan=f"Penerimaan roll {roll_num} ({receipt.qty_received} {receipt.unit}) dibatalkan/dihapus oleh {current_user.nama}."
+    )
+    return {"message": f"Penerimaan roll '{roll_num}' berhasil dihapus."}
 
 
 # ---------------------------------------------------------------------------
@@ -155,9 +303,6 @@ def create_fabric_inspection(
     summary_pt = round(summary_pt, 2)
 
     # 🟢 DETERMINASI GRADE MUTU:
-    # Grade A: 0 - 20 points
-    # Grade B: 21 - 30 points
-    # Grade C: > 30 points (DITOLAK)
     if summary_pt <= 20.0:
         grade = "GRADE_A"
         receipt_status = "PASSED"
@@ -200,9 +345,64 @@ def create_fabric_inspection(
     resp.inspector_name = current_user.nama
     return resp
 
+@router.put("/inspections/{inspection_id}", response_model=FabricInspectionResponse)
+def update_fabric_inspection(
+    inspection_id: str,
+    payload: FabricInspectionUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["GUDANG", "ADMIN", "OWNER", "DEVELOPER"]))
+):
+    inspection = db.query(models.FabricInspection).options(
+        joinedload(models.FabricInspection.inspector),
+        joinedload(models.FabricInspection.receipt)
+    ).filter(models.FabricInspection.id == inspection_id).first()
+    if not inspection:
+        raise HTTPException(status_code=404, detail="Data uji QC kain tidak ditemukan.")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for k, v in update_data.items():
+        if v is not None:
+            setattr(inspection, k, v)
+
+    # Rekalkulasi Otomatis 4-Point ASTM
+    w = inspection.width_inch or 58.0
+    l = inspection.length_after or 100.0
+    pts = inspection.total_defect_points or 0
+    if w > 0 and l > 0:
+        summary_pt = round((pts * 3600.0) / (w * l), 2)
+        inspection.summary_point = summary_pt
+        if summary_pt <= 20.0:
+            inspection.grade = "GRADE_A"
+            if inspection.receipt:
+                inspection.receipt.inspection_status = "PASSED"
+        elif summary_pt <= 30.0:
+            inspection.grade = "GRADE_B"
+            if inspection.receipt:
+                inspection.receipt.inspection_status = "PASSED"
+        else:
+            inspection.grade = "GRADE_C"
+            if inspection.receipt:
+                inspection.receipt.inspection_status = "REJECTED"
+
+    db.commit()
+    db.refresh(inspection)
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_INSPECTION",
+        target_id=inspection.id,
+        catatan=f"Hasil uji QC roll kain #{inspection_id} dikoreksi oleh {current_user.nama} (Skor Baru: {inspection.summary_point} - {inspection.grade})."
+    )
+
+    resp = FabricInspectionResponse.from_orm(inspection)
+    if inspection.inspector:
+        resp.inspector_name = inspection.inspector.nama
+    return resp
+
 
 # ---------------------------------------------------------------------------
-# 4. MATERIAL ALLOCATION (PENYERAHAN KAIN KE CUTTING - SHEET25)
+# 4. MATERIAL ALLOCATION (PENYERAHAN KAIN KE CUTTING)
 # ---------------------------------------------------------------------------
 @router.get("/allocations", response_model=List[MaterialAllocationResponse])
 def get_material_allocations(
@@ -248,7 +448,6 @@ def create_material_allocation(
             detail=f"Stok kain tidak mencukupi! Tersedia: {item.current_stock} {item.unit}, diminta: {payload.qty_issued} {item.unit}."
         )
 
-    # 🔒 SAFETY GATE: Pastikan roll kain yang dialokasikan bukan berstatus REJECTED (Grade C)
     sj_code = payload.surat_jalan_no or f"CJM-{datetime.utcnow().strftime('%y%m')}.{int(datetime.utcnow().timestamp()) % 1000}"
 
     allocation = models.MaterialAllocation(
@@ -282,3 +481,30 @@ def create_material_allocation(
     resp.so_number = so.so_number
     resp.item_description = item.description
     return resp
+
+@router.delete("/allocations/{allocation_id}")
+def delete_material_allocation(
+    allocation_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    alloc = db.query(models.MaterialAllocation).filter(models.MaterialAllocation.id == allocation_id).first()
+    if not alloc:
+        raise HTTPException(status_code=404, detail="Alokasi kain tidak ditemukan.")
+
+    # Revert stok ke item
+    item = db.query(models.InventoryItem).filter(models.InventoryItem.id == alloc.item_id).first()
+    if item:
+        item.current_stock = (item.current_stock or 0.0) + (alloc.qty_issued or 0.0)
+
+    db.delete(alloc)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_ALLOCATION",
+        target_id=allocation_id,
+        catatan=f"Alokasi kain SJ {alloc.surat_jalan_no} ({alloc.qty_issued} yard) dibatalkan dan stok dikembalikan oleh {current_user.nama}."
+    )
+    return {"message": "Alokasi kain berhasil dibatalkan dan stok dikembalikan ke gudang."}

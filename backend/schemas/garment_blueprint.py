@@ -16,6 +16,13 @@ class PartnerBase(BaseModel):
 class PartnerCreate(PartnerBase):
     pass
 
+class PartnerUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    code: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+
 class PartnerResponse(PartnerBase):
     id: str
     created_at: Optional[datetime] = None
@@ -94,6 +101,15 @@ class MaterialReceiptCreate(BaseModel):
     unit: Optional[str] = "YARD"
     contract_type: Optional[str] = "FOB" # FOB / CMT
 
+class MaterialReceiptUpdate(BaseModel):
+    item_id: Optional[str] = None
+    supplier_id: Optional[str] = None
+    receipt_date: Optional[date] = None
+    roll_number: Optional[str] = None
+    qty_received: Optional[float] = None
+    unit: Optional[str] = None
+    contract_type: Optional[str] = None
+
 class MaterialReceiptResponse(MaterialReceiptCreate):
     id: str
     inspection_status: str
@@ -110,6 +126,14 @@ class FabricInspectionCreate(BaseModel):
     length_after: float
     width_inch: float
     total_defect_points: int = 0
+    defect_remarks: Optional[str] = None
+
+class FabricInspectionUpdate(BaseModel):
+    lot_number: Optional[str] = None
+    length_before: Optional[float] = None
+    length_after: Optional[float] = None
+    width_inch: Optional[float] = None
+    total_defect_points: Optional[int] = None
     defect_remarks: Optional[str] = None
 
 class FabricInspectionResponse(BaseModel):
@@ -162,6 +186,19 @@ class CuttingRecordCreate(BaseModel):
     gelaran_layers: Optional[int] = 1
     fabric_waste_yards: Optional[float] = 0.0
 
+class CuttingRecordUpdate(BaseModel):
+    operator_id: Optional[str] = None
+    cutting_date: Optional[date] = None
+    qty_cut: Optional[int] = None
+    size_breakdown_cut: Optional[Dict[str, int]] = None
+    main_fabric_used: Optional[float] = None
+    puring_used: Optional[float] = None
+    puring_jala_used: Optional[float] = None
+    marker_length_yard: Optional[float] = None
+    marker_efficiency_pct: Optional[float] = None
+    gelaran_layers: Optional[int] = None
+    fabric_waste_yards: Optional[float] = None
+
 class CuttingRecordResponse(CuttingRecordCreate):
     id: str
     operator_id: Optional[str] = None
@@ -180,6 +217,14 @@ class CuttingPrepTaskCreate(BaseModel):
     qty_done: int
     size_breakdown: Optional[Dict[str, int]] = {}
     piece_rate: Optional[float] = 0.0
+
+class CuttingPrepTaskUpdate(BaseModel):
+    operator_id: Optional[str] = None
+    task_type: Optional[str] = None
+    task_date: Optional[date] = None
+    qty_done: Optional[int] = None
+    size_breakdown: Optional[Dict[str, int]] = None
+    piece_rate: Optional[float] = None
 
 class CuttingPrepTaskResponse(CuttingPrepTaskCreate):
     id: str
@@ -211,6 +256,17 @@ class WIPReceiveCreate(BaseModel):
     size_breakdown_received: Optional[Dict[str, int]] = {}
     defect_reason: Optional[str] = None
     remarks: Optional[str] = None
+
+class WIPMovementUpdate(BaseModel):
+    surat_jalan_no: Optional[str] = None
+    partner_id: Optional[str] = None
+    qty_dispatched: Optional[int] = None
+    size_breakdown_dispatched: Optional[Dict[str, int]] = None
+    qty_received: Optional[int] = None
+    qty_reject: Optional[int] = None
+    size_breakdown_received: Optional[Dict[str, int]] = None
+    remarks: Optional[str] = None
+    status: Optional[str] = None
 
 class WIPMovementResponse(BaseModel):
     id: str
@@ -252,6 +308,16 @@ class PieceRateWageCreate(BaseModel):
     wage_per_piece: float # e.g. 550 or 2500
     notes: Optional[str] = None
 
+class PieceRateWageUpdate(BaseModel):
+    operator_id: Optional[str] = None
+    operation_type: Optional[str] = None
+    work_date: Optional[date] = None
+    qty_completed: Optional[int] = None
+    qty_reject: Optional[int] = None
+    size_breakdown: Optional[dict] = None
+    wage_per_piece: Optional[float] = None
+    notes: Optional[str] = None
+
 class PieceRateWageResponse(PieceRateWageCreate):
     id: str
     operator_id: Optional[str] = None
@@ -272,6 +338,19 @@ class ShipmentCreate(BaseModel):
     total_qty_shipped: int
     size_breakdown_shipped: Optional[Dict[str, int]] = {}
     unit_price: float
+    invoice_number: Optional[str] = None
+    remarks: Optional[str] = None
+
+class ShipmentUpdate(BaseModel):
+    shipment_date: Optional[date] = None
+    surat_jalan_no: Optional[str] = None
+    driver_name: Optional[str] = None
+    vehicle_plate_no: Optional[str] = None
+    carton_box_count: Optional[int] = None
+    destination_address: Optional[str] = None
+    total_qty_shipped: Optional[int] = None
+    size_breakdown_shipped: Optional[Dict[str, int]] = None
+    unit_price: Optional[float] = None
     invoice_number: Optional[str] = None
     remarks: Optional[str] = None
 

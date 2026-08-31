@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Truck, Plus, Search, RefreshCw, Printer, FileText, 
-  CheckCircle2, DollarSign, ArrowUpRight, CheckCheck, Eye
+  CheckCircle2, DollarSign, ArrowUpRight, CheckCheck, Eye,
+  Pencil, Trash2, X
 } from 'lucide-react';
 import api from '@/services/api';
 import PrintSuratJalanModal from '../common/PrintSuratJalanModal';
@@ -18,11 +19,12 @@ export default function ShippingBillingModule() {
 
   // Modals
   const [isNewSJPOpen, setIsNewSJPOpen] = useState(false);
+  const [editingShipment, setEditingShipment] = useState<any>(null);
   const [printDoc, setPrintDoc] = useState<any>(null);
   const [selectedSoIdForFormWI, setSelectedSoIdForFormWI] = useState<string | null>(null);
 
-  // New SJP Form State
-  const [newSJP, setNewSJP] = useState({
+  // SJP Form State
+  const [sjpForm, setSjpForm] = useState({
     so_id: "",
     shipment_date: new Date().toISOString().split('T')[0],
     surat_jalan_no: `SJP-${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}.0001`,
@@ -56,8 +58,8 @@ export default function ShippingBillingModule() {
       setShipments(sRes.data || []);
       const oRes = await api.get('/api/ppic/orders');
       setOrders(oRes.data || []);
-      if (oRes.data && oRes.data.length > 0 && !newSJP.so_id) {
-        setNewSJP(prev => ({ ...prev, so_id: oRes.data[0].id, unit_price: oRes.data[0].unit_price || 35000 }));
+      if (oRes.data && oRes.data.length > 0 && !sjpForm.so_id) {
+        setSjpForm(prev => ({ ...prev, so_id: oRes.data[0].id, unit_price: oRes.data[0].unit_price || 35000 }));
       }
     } catch (err) {
       console.error("Gagal mengambil data pengiriman:", err);
@@ -66,35 +68,93 @@ export default function ShippingBillingModule() {
     }
   };
 
+  const handleOpenCreateSJP = () => {
+    setEditingShipment(null);
+    setSjpForm({
+      so_id: orders.length > 0 ? orders[0].id : "",
+      shipment_date: new Date().toISOString().split('T')[0],
+      surat_jalan_no: `SJP-${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}.${Math.floor(Math.random() * 900 + 100)}`,
+      driver_name: "Sandi (Ekspedisi)",
+      vehicle_plate_no: "B 9821 CJM",
+      carton_box_count: 15,
+      destination_address: "Gudang Pusat Buyer (Jakarta Barat)",
+      total_qty_shipped: 300,
+      unit_price: orders.length > 0 ? orders[0].unit_price || 35000 : 35000,
+      invoice_number: "",
+      remarks: "Pengiriman barang jadi ke gudang distributor"
+    });
+    setSizeMatrix({ "28": 60, "30": 90, "32": 90, "34": 60 });
+    setIsNewSJPOpen(true);
+  };
+
+  const handleOpenEditSJP = (s: any) => {
+    setEditingShipment(s);
+    setSjpForm({
+      so_id: s.so_id || "",
+      shipment_date: s.shipment_date || new Date().toISOString().split('T')[0],
+      surat_jalan_no: s.surat_jalan_no || "",
+      driver_name: s.driver_name || "",
+      vehicle_plate_no: s.vehicle_plate_no || "",
+      carton_box_count: s.carton_box_count || 0,
+      destination_address: s.destination_address || "",
+      total_qty_shipped: s.total_qty_shipped || 0,
+      unit_price: s.unit_price || 35000,
+      invoice_number: s.invoice_number || "",
+      remarks: s.remarks || ""
+    });
+    if (s.size_breakdown_shipped && Object.keys(s.size_breakdown_shipped).length > 0) {
+      setSizeMatrix(s.size_breakdown_shipped);
+    }
+    setIsNewSJPOpen(true);
+  };
+
+  const handleDeleteShipment = async (s: any) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus SJP '${s.surat_jalan_no}' (${s.total_qty_shipped} pcs)? Aksi ini akan dicatat di Log Audit.`)) return;
+    try {
+      await api.delete(`/api/shipping/shipments/${s.id}`);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menghapus data pengiriman.");
+    }
+  };
+
   const handleSizeChange = (key: string, val: number) => {
     const updated = { ...sizeMatrix, [key]: Math.max(0, val) };
     setSizeMatrix(updated);
     const sum = Object.values(updated).reduce((acc, q) => acc + (Number(q) || 0), 0);
-    setNewSJP(prev => ({ ...prev, total_qty_shipped: sum }));
+    setSjpForm(prev => ({ ...prev, total_qty_shipped: sum }));
   };
 
-  const handleCreateSJP = async (e: React.FormEvent) => {
+  const handleSaveSJP = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.post('/api/shipping/shipments', {
-        so_id: newSJP.so_id,
-        shipment_date: newSJP.shipment_date,
-        surat_jalan_no: newSJP.surat_jalan_no.toUpperCase(),
-        driver_name: newSJP.driver_name,
-        vehicle_plate_no: newSJP.vehicle_plate_no.toUpperCase(),
-        carton_box_count: Number(newSJP.carton_box_count) || 0,
-        destination_address: newSJP.destination_address,
-        total_qty_shipped: Number(newSJP.total_qty_shipped),
+      const payload = {
+        so_id: sjpForm.so_id,
+        shipment_date: sjpForm.shipment_date,
+        surat_jalan_no: sjpForm.surat_jalan_no.toUpperCase(),
+        driver_name: sjpForm.driver_name,
+        vehicle_plate_no: sjpForm.vehicle_plate_no.toUpperCase(),
+        carton_box_count: Number(sjpForm.carton_box_count) || 0,
+        destination_address: sjpForm.destination_address,
+        total_qty_shipped: Number(sjpForm.total_qty_shipped),
         size_breakdown_shipped: sizeMatrix,
-        unit_price: Number(newSJP.unit_price),
-        invoice_number: newSJP.invoice_number ? newSJP.invoice_number.toUpperCase() : null,
-        remarks: newSJP.remarks
-      });
+        unit_price: Number(sjpForm.unit_price),
+        invoice_number: sjpForm.invoice_number ? sjpForm.invoice_number.toUpperCase() : null,
+        remarks: sjpForm.remarks
+      };
+
+      if (editingShipment) {
+        await api.put(`/api/shipping/shipments/${editingShipment.id}`, payload);
+      } else {
+        await api.post('/api/shipping/shipments', payload);
+      }
+
       setIsNewSJPOpen(false);
+      setEditingShipment(null);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal membuat SJP.");
+      alert(err.response?.data?.detail || "Gagal menyimpan SJP.");
     } finally {
       setSubmitting(false);
     }
@@ -121,6 +181,12 @@ export default function ShippingBillingModule() {
     });
   };
 
+  const filteredShipments = shipments.filter(s =>
+    (s.surat_jalan_no && s.surat_jalan_no.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (s.invoice_number && s.invoice_number.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (s.driver_name && s.driver_name.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   return (
     <div className="space-y-6">
       
@@ -139,8 +205,8 @@ export default function ShippingBillingModule() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsNewSJPOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-emerald-600/20"
+            onClick={handleOpenCreateSJP}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-emerald-600/20 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             + Buat Surat Jalan Pengiriman (SJP)
@@ -153,32 +219,44 @@ export default function ShippingBillingModule() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('SHIPMENTS')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'SHIPMENTS'
                 ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Surat Jalan Pengiriman SJP ({shipments.length})
+            Daftar SJP Pengiriman ({shipments.length})
           </button>
           <button
             onClick={() => setActiveTab('FORM_WI')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
               activeTab === 'FORM_WI'
                 ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Rekap Form WI & Billing CMT ({orders.length})
+            Billing CMT / Rekap Form WI ({orders.length})
           </button>
         </div>
 
-        <button
-          onClick={fetchData}
-          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="relative w-56">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari SJP, Invoice..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <button
+            onClick={fetchData}
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* TAB 1: SHIPMENTS LIST */}
@@ -187,13 +265,13 @@ export default function ShippingBillingModule() {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-800 uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-4">Nomor SJP & Tgl</th>
-                <th className="py-3 px-3">Driver / Supir</th>
+                <th className="py-3 px-4">Surat Jalan (SJP) & Tgl</th>
+                <th className="py-3 px-3">Driver / Ekspedisi</th>
                 <th className="py-3 px-3 text-right">Kuantitas Kirim</th>
-                <th className="py-3 px-3 text-right">Harga CMT</th>
-                <th className="py-3 px-3 text-right">Total Nilai SJP</th>
+                <th className="py-3 px-3 text-right">Harga Satuan</th>
+                <th className="py-3 px-3 text-right">Nilai Tagihan</th>
                 <th className="py-3 px-3">No. Invoice</th>
-                <th className="py-3 px-4 text-center">Cetak SJP</th>
+                <th className="py-3 px-4 text-center">Aksi / Cetak</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-medium">
@@ -204,14 +282,14 @@ export default function ShippingBillingModule() {
                     Memuat daftar pengiriman...
                   </td>
                 </tr>
-              ) : shipments.length === 0 ? (
+              ) : filteredShipments.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
                     Belum ada data Surat Jalan Pengiriman (SJP).
                   </td>
                 </tr>
               ) : (
-                shipments.map((s) => (
+                filteredShipments.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="py-3 px-4">
                       <div className="font-mono font-bold text-white">{s.surat_jalan_no}</div>
@@ -237,12 +315,28 @@ export default function ShippingBillingModule() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => handlePrintSJP(s)}
-                        className="inline-flex items-center gap-1 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        <Printer className="w-3.5 h-3.5 text-blue-400" /> Cetak SJP
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handlePrintSJP(s)}
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-blue-400" /> Cetak
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditSJP(s)}
+                          title="Edit SJP"
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteShipment(s)}
+                          title="Hapus SJP"
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -256,32 +350,34 @@ export default function ShippingBillingModule() {
       {activeTab === 'FORM_WI' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {orders.map((so) => (
-            <div key={so.id} className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl space-y-4 hover:border-emerald-500/40 transition-all group">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    {so.buyer_name || "BUYER"}
+            <div key={so.id} className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl space-y-4 hover:border-emerald-500/40 transition-all group flex flex-col justify-between">
+              <div>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      {so.buyer_name || "BUYER"}
+                    </span>
+                    <h3 className="text-base font-black text-white mt-1 group-hover:text-emerald-300 transition-colors">
+                      {so.so_number}
+                    </h3>
+                    <p className="text-xs text-slate-400 font-semibold">{so.style_name}</p>
+                  </div>
+                  <span className="text-xs font-bold text-slate-300">
+                    Target: {so.order_qty} Pcs
                   </span>
-                  <h3 className="text-base font-black text-white mt-1 group-hover:text-emerald-300 transition-colors">
-                    {so.so_number}
-                  </h3>
-                  <p className="text-xs text-slate-400 font-semibold">{so.style_name}</p>
                 </div>
-                <span className="text-xs font-bold text-slate-300">
-                  Target: {so.order_qty} Pcs
-                </span>
-              </div>
 
-              <div className="text-xs text-slate-400 p-3 bg-slate-950 rounded-xl border border-slate-800 flex justify-between items-center">
-                <span>Ongkos Jahit CMT:</span>
-                <span className="font-black text-emerald-400 text-sm">
-                  Rp {(so.unit_price || 0).toLocaleString('id-ID')} / Pcs
-                </span>
+                <div className="text-xs text-slate-400 p-3 my-3 bg-slate-950 rounded-xl border border-slate-800 flex justify-between items-center">
+                  <span>Ongkos Jahit CMT:</span>
+                  <span className="font-black text-emerald-400 text-sm">
+                    Rp {(so.unit_price || 0).toLocaleString('id-ID')} / Pcs
+                  </span>
+                </div>
               </div>
 
               <button
                 onClick={() => setSelectedSoIdForFormWI(so.id)}
-                className="w-full py-2 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                className="w-full py-2 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <FileText className="w-4 h-4" /> Buka Rekap Form WI
               </button>
@@ -290,22 +386,33 @@ export default function ShippingBillingModule() {
         </div>
       )}
 
-      {/* Modal Quick Create SJP */}
+      {/* Modal Quick Create / Edit SJP */}
       {isNewSJPOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <form onSubmit={handleCreateSJP} className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl p-6 space-y-4 shadow-2xl my-8">
-            <h3 className="text-base font-bold text-white">Terbitkan Surat Jalan Pengiriman (SJP)</h3>
+          <form onSubmit={handleSaveSJP} className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-2xl p-6 space-y-4 shadow-2xl my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white">
+                {editingShipment ? `Edit SJP: ${editingShipment.surat_jalan_no}` : 'Terbitkan Surat Jalan Pengiriman (SJP)'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsNewSJPOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             
             <div>
               <label className="block text-xs text-slate-300 mb-1">Pilih Sales Order</label>
               <select
                 required
-                value={newSJP.so_id}
+                value={sjpForm.so_id}
                 onChange={(e) => {
                   const sId = e.target.value;
                   const found = orders.find(o => o.id === sId);
-                  setNewSJP({ 
-                    ...newSJP, 
+                  setSjpForm({ 
+                    ...sjpForm, 
                     so_id: sId, 
                     unit_price: found ? found.unit_price : 35000 
                   });
@@ -323,8 +430,8 @@ export default function ShippingBillingModule() {
                 <label className="block text-xs text-slate-300 mb-1">Nomor SJP</label>
                 <input
                   type="text"
-                  value={newSJP.surat_jalan_no}
-                  onChange={(e) => setNewSJP({ ...newSJP, surat_jalan_no: e.target.value })}
+                  value={sjpForm.surat_jalan_no}
+                  onChange={(e) => setSjpForm({ ...sjpForm, surat_jalan_no: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase"
                 />
               </div>
@@ -333,8 +440,8 @@ export default function ShippingBillingModule() {
                 <label className="block text-xs text-slate-300 mb-1">Tanggal Kirim</label>
                 <input
                   type="date"
-                  value={newSJP.shipment_date}
-                  onChange={(e) => setNewSJP({ ...newSJP, shipment_date: e.target.value })}
+                  value={sjpForm.shipment_date}
+                  onChange={(e) => setSjpForm({ ...sjpForm, shipment_date: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                 />
               </div>
@@ -344,7 +451,7 @@ export default function ShippingBillingModule() {
             <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold text-slate-300">Breakdown Ukuran SJP (Pcs):</span>
-                <span className="font-black text-emerald-400">Total: {newSJP.total_qty_shipped} Pcs</span>
+                <span className="font-black text-emerald-400">Total: {sjpForm.total_qty_shipped} Pcs</span>
               </div>
               <div className="grid grid-cols-4 gap-2">
                 {Object.entries(sizeMatrix).map(([sz, qty]) => (
@@ -367,8 +474,8 @@ export default function ShippingBillingModule() {
                 <label className="block text-[11px] text-slate-300 mb-1">Nama Supir Ekspedisi</label>
                 <input
                   type="text"
-                  value={newSJP.driver_name}
-                  onChange={(e) => setNewSJP({ ...newSJP, driver_name: e.target.value })}
+                  value={sjpForm.driver_name}
+                  onChange={(e) => setSjpForm({ ...sjpForm, driver_name: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white"
                 />
               </div>
@@ -376,8 +483,8 @@ export default function ShippingBillingModule() {
                 <label className="block text-[11px] text-slate-300 mb-1">Plat Nomor Truk</label>
                 <input
                   type="text"
-                  value={newSJP.vehicle_plate_no}
-                  onChange={(e) => setNewSJP({ ...newSJP, vehicle_plate_no: e.target.value })}
+                  value={sjpForm.vehicle_plate_no}
+                  onChange={(e) => setSjpForm({ ...sjpForm, vehicle_plate_no: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white uppercase font-mono"
                 />
               </div>
@@ -385,8 +492,8 @@ export default function ShippingBillingModule() {
                 <label className="block text-[11px] text-slate-300 mb-1">Jml Dus (Koli)</label>
                 <input
                   type="number"
-                  value={newSJP.carton_box_count}
-                  onChange={(e) => setNewSJP({ ...newSJP, carton_box_count: Number(e.target.value) })}
+                  value={sjpForm.carton_box_count}
+                  onChange={(e) => setSjpForm({ ...sjpForm, carton_box_count: Number(e.target.value) })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold"
                 />
               </div>
@@ -396,8 +503,8 @@ export default function ShippingBillingModule() {
               <label className="block text-xs text-slate-300 mb-1">Alamat Gudang Tujuan</label>
               <input
                 type="text"
-                value={newSJP.destination_address}
-                onChange={(e) => setNewSJP({ ...newSJP, destination_address: e.target.value })}
+                value={sjpForm.destination_address}
+                onChange={(e) => setSjpForm({ ...sjpForm, destination_address: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
               />
             </div>
@@ -407,8 +514,8 @@ export default function ShippingBillingModule() {
                 <label className="block text-xs text-slate-300 mb-1">Harga CMT (Rp/Pcs)</label>
                 <input
                   type="number"
-                  value={newSJP.unit_price}
-                  onChange={(e) => setNewSJP({ ...newSJP, unit_price: Number(e.target.value) })}
+                  value={sjpForm.unit_price}
+                  onChange={(e) => setSjpForm({ ...sjpForm, unit_price: Number(e.target.value) })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold"
                 />
               </div>
@@ -418,27 +525,27 @@ export default function ShippingBillingModule() {
                 <input
                   type="text"
                   placeholder="INV-2026/08/001"
-                  value={newSJP.invoice_number}
-                  onChange={(e) => setNewSJP({ ...newSJP, invoice_number: e.target.value })}
+                  value={sjpForm.invoice_number}
+                  onChange={(e) => setSjpForm({ ...sjpForm, invoice_number: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white uppercase"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={() => setIsNewSJPOpen(false)}
-                className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl"
+                className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20 cursor-pointer"
               >
-                {submitting ? "Menerbitkan..." : "Terbitkan SJP"}
+                {submitting ? "Menyimpan..." : editingShipment ? "Simpan Koreksi" : "Terbitkan SJP"}
               </button>
             </div>
           </form>

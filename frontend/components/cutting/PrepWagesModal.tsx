@@ -9,14 +9,17 @@ interface PrepWagesModalProps {
   onClose: () => void;
   onSuccess: () => void;
   orders: any[];
+  initialData?: any;
 }
 
 export default function PrepWagesModal({
   isOpen,
   onClose,
   onSuccess,
-  orders
+  orders,
+  initialData
 }: PrepWagesModalProps) {
+  const isEditing = !!initialData;
   const [employees, setEmployees] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     so_id: orders.length > 0 ? orders[0].id : "",
@@ -33,15 +36,34 @@ export default function PrepWagesModal({
   React.useEffect(() => {
     if (isOpen) {
       fetchEmployees();
+      if (initialData) {
+        setFormData({
+          so_id: initialData.so_id || (orders.length > 0 ? orders[0].id : ""),
+          operator_id: initialData.operator_id || "",
+          task_type: initialData.task_type || "PRESS_INTERLINING",
+          task_date: initialData.task_date || new Date().toISOString().split('T')[0],
+          qty_done: initialData.qty_done || 0,
+          piece_rate: initialData.piece_rate || 250
+        });
+      } else {
+        setFormData({
+          so_id: orders.length > 0 ? orders[0].id : "",
+          operator_id: "",
+          task_type: "PRESS_INTERLINING",
+          task_date: new Date().toISOString().split('T')[0],
+          qty_done: 300,
+          piece_rate: 250
+        });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   const fetchEmployees = async () => {
     try {
       const res = await api.get('/api/karyawan/list');
       const list = res.data?.data || res.data || [];
       setEmployees(list);
-      if (list.length > 0 && !formData.operator_id) {
+      if (list.length > 0 && !formData.operator_id && !initialData) {
         setFormData(prev => ({ ...prev, operator_id: list[0].id_karyawan }));
       }
     } catch (err) {
@@ -77,14 +99,20 @@ export default function PrepWagesModal({
 
     setSubmitting(true);
     try {
-      await api.post('/api/cutting/prep-tasks', {
+      const payload = {
         so_id: formData.so_id,
         operator_id: formData.operator_id,
         task_type: formData.task_type,
         task_date: formData.task_date,
         qty_done: Number(formData.qty_done),
         piece_rate: Number(formData.piece_rate)
-      });
+      };
+
+      if (isEditing) {
+        await api.put(`/api/cutting/prep-tasks/${initialData.id}`, payload);
+      } else {
+        await api.post('/api/cutting/prep-tasks', payload);
+      }
 
       onSuccess();
       onClose();

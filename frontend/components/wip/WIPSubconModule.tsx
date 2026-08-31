@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Truck, ArrowDownLeft, Plus, Search, RefreshCw, AlertTriangle, 
-  CheckCircle2, Printer, Layers, Filter, ShieldAlert, CheckCheck
+  CheckCircle2, Printer, Layers, Filter, ShieldAlert, CheckCheck,
+  Pencil, Trash2, X
 } from 'lucide-react';
 import api from '@/services/api';
 import SubconDispatcherModal from './SubconDispatcherModal';
@@ -21,6 +22,14 @@ export default function WIPSubconModule() {
   // Modals
   const [isDispatchOpen, setIsDispatchOpen] = useState(false);
   const [selectedMovementForReceive, setSelectedMovementForReceive] = useState<any>(null);
+  const [editingMovement, setEditingMovement] = useState<any>(null);
+  const [editForm, setEditForm] = useState({
+    qty_dispatched: 0,
+    qty_received: 0,
+    qty_reject: 0,
+    partner_id: "",
+    remarks: ""
+  });
   const [printDoc, setPrintDoc] = useState<any>(null);
 
   useEffect(() => {
@@ -46,6 +55,39 @@ export default function WIPSubconModule() {
       console.error("Gagal mengambil data pergerakan WIP:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenEdit = (m: any) => {
+    setEditingMovement(m);
+    setEditForm({
+      qty_dispatched: m.qty_dispatched || 0,
+      qty_received: m.qty_received || 0,
+      qty_reject: m.qty_reject || 0,
+      partner_id: m.partner_id || "",
+      remarks: m.remarks || ""
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMovement) return;
+    try {
+      await api.put(`/api/wip/movements/${editingMovement.id}`, editForm);
+      setEditingMovement(null);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal mengoreksi Surat Jalan.");
+    }
+  };
+
+  const handleDeleteMovement = async (m: any) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus Surat Jalan '${m.surat_jalan_no}' (${m.qty_dispatched} pcs)? Aksi ini akan dicatat di Audit Log.`)) return;
+    try {
+      await api.delete(`/api/wip/movements/${m.id}`);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menghapus Surat Jalan.");
     }
   };
 
@@ -94,7 +136,7 @@ export default function WIPSubconModule() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDispatchOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-purple-600/20"
+            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-purple-600/20 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             + Terbitkan Surat Jalan Kirim
@@ -118,7 +160,7 @@ export default function WIPSubconModule() {
             <button
               key={st.id}
               onClick={() => setStageFilter(st.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 stageFilter === st.id
                   ? 'bg-slate-800 text-purple-400 border border-purple-500/30'
                   : 'text-slate-400 hover:text-white'
@@ -142,7 +184,7 @@ export default function WIPSubconModule() {
           </div>
           <button
             onClick={fetchData}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors"
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-purple-400' : ''}`} />
           </button>
@@ -249,17 +291,31 @@ export default function WIPSubconModule() {
                         {m.status === 'IN_PROCESS' && (
                           <button
                             onClick={() => setSelectedMovementForReceive(m)}
-                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-all shadow-sm"
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-all shadow-sm cursor-pointer"
                           >
                             Terima Setoran
                           </button>
                         )}
                         <button
                           onClick={() => handlePrintSJ(m)}
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors cursor-pointer"
                           title="Cetak Surat Jalan Fisik"
                         >
                           <Printer className="w-3.5 h-3.5 text-blue-400" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(m)}
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-colors cursor-pointer"
+                          title="Koreksi Data Surat Jalan"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMovement(m)}
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-colors cursor-pointer"
+                          title="Hapus Surat Jalan"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -270,6 +326,97 @@ export default function WIPSubconModule() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal Edit / Koreksi Surat Jalan */}
+      {editingMovement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <form onSubmit={handleSaveEdit} className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white">
+                Koreksi SJ: {editingMovement.surat_jalan_no}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingMovement(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-xs text-slate-300 mb-1">Qty Kirim</label>
+                <input
+                  type="number"
+                  required
+                  value={editForm.qty_dispatched}
+                  onChange={(e) => setEditForm({ ...editForm, qty_dispatched: Number(e.target.value) })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-300 mb-1">Qty Terima</label>
+                <input
+                  type="number"
+                  value={editForm.qty_received}
+                  onChange={(e) => setEditForm({ ...editForm, qty_received: Number(e.target.value) })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold text-emerald-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-300 mb-1">Qty Rijek</label>
+                <input
+                  type="number"
+                  value={editForm.qty_reject}
+                  onChange={(e) => setEditForm({ ...editForm, qty_reject: Number(e.target.value) })}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold text-rose-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-300 mb-1">Vendor / Partner Subcon</label>
+              <select
+                value={editForm.partner_id}
+                onChange={(e) => setEditForm({ ...editForm, partner_id: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+              >
+                <option value="">-- Internal Garment --</option>
+                {partners.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.category})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-300 mb-1">Catatan / Keterangan Koreksi</label>
+              <textarea
+                rows={2}
+                value={editForm.remarks}
+                onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setEditingMovement(null)}
+                className="px-4 py-2 bg-slate-800 text-slate-300 text-xs rounded-xl cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Simpan Koreksi
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Modals */}
       <SubconDispatcherModal
@@ -300,3 +447,4 @@ export default function WIPSubconModule() {
     </div>
   );
 }
+

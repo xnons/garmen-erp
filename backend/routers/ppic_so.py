@@ -7,7 +7,7 @@ from datetime import datetime
 from database import get_db
 import models
 from schemas.garment_blueprint import (
-    PartnerCreate, PartnerResponse,
+    PartnerCreate, PartnerUpdate, PartnerResponse,
     SalesOrderCreate, SalesOrderUpdate, SalesOrderResponse
 )
 from core.security import get_current_user, require_role
@@ -45,7 +45,70 @@ def create_partner(
     db.add(partner)
     db.commit()
     db.refresh(partner)
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="CREATE_PARTNER",
+        target_id=partner.id,
+        catatan=f"Master Rekanan '{partner.name}' ({partner.category}) didaftarkan oleh {current_user.nama}."
+    )
     return partner
+
+@router.put("/partners/{partner_id}", response_model=PartnerResponse)
+def update_partner(
+    partner_id: str,
+    payload: PartnerUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["PPIC", "ADMIN", "OWNER", "DEVELOPER"]))
+):
+    partner = db.query(models.Partner).filter(models.Partner.id == partner_id).first()
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner / Rekanan tidak ditemukan.")
+
+    old_name = partner.name
+    update_data = payload.model_dump(exclude_unset=True)
+    for k, v in update_data.items():
+        if v is not None:
+            if k in ["name", "category"]:
+                setattr(partner, k, str(v).upper())
+            else:
+                setattr(partner, k, v)
+
+    db.commit()
+    db.refresh(partner)
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_PARTNER",
+        target_id=partner.id,
+        catatan=f"Data Rekanan '{old_name}' diperbarui menjadi '{partner.name}' oleh {current_user.nama}."
+    )
+    return partner
+
+@router.delete("/partners/{partner_id}")
+def delete_partner(
+    partner_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    partner = db.query(models.Partner).filter(models.Partner.id == partner_id).first()
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner tidak ditemukan.")
+    
+    p_name = partner.name
+    db.delete(partner)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_PARTNER",
+        target_id=partner_id,
+        catatan=f"Rekanan '{p_name}' dihapus oleh {current_user.nama}."
+    )
+    return {"message": f"Partner '{p_name}' berhasil dihapus."}
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +176,7 @@ def create_sales_order(
         actor_id=current_user.id_karyawan,
         aksi="CREATE_SALES_ORDER",
         target_id=new_so.so_number,
-        catatan=f"Sales Order '{new_so.so_number}' ({new_so.style_name}) dibuat oleh {current_user.nama}."
+        catatan=f"Sales Order '{new_so.so_number}' ({new_so.style_name} - {new_so.order_qty} pcs) dibuat oleh {current_user.nama}."
     )
 
     resp = SalesOrderResponse.from_orm(new_so)
@@ -143,13 +206,20 @@ def update_sales_order(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(require_role(["PPIC", "ADMIN", "OWNER", "DEVELOPER"]))
 ):
-    so = db.query(models.SalesOrder).filter(models.SalesOrder.id == so_id).first()
+    so = db.query(models.SalesOrder).options(joinedload(models.SalesOrder.buyer)).filter(models.SalesOrder.id == so_id).first()
     if not so:
         raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
 
+    old_qty = so.order_qty
+    old_style = so.style_name
+
     update_data = payload.model_dump(exclude_unset=True)
     for k, v in update_data.items():
-        setattr(so, k, v)
+        if v is not None:
+            if k in ["style_name", "item_category"]:
+                setattr(so, k, str(v).upper())
+            else:
+                setattr(so, k, v)
 
     if payload.size_breakdown_target:
         matrix_sum = sum(payload.size_breakdown_target.values())
@@ -158,8 +228,39 @@ def update_sales_order(
 
     db.commit()
     db.refresh(so)
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="UPDATE_SALES_ORDER",
+        target_id=so.so_number,
+        catatan=f"Sales Order '{so.so_number}' dikoreksi oleh {current_user.nama} (Style: {old_style}->{so.style_name}, Qty: {old_qty}->{so.order_qty} pcs, DL: {so.deadline})."
+    )
     
     resp = SalesOrderResponse.from_orm(so)
     if so.buyer:
         resp.buyer_name = so.buyer.name
     return resp
+
+@router.delete("/orders/{so_id}")
+def delete_sales_order(
+    so_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["ADMIN", "OWNER", "DEVELOPER"]))
+):
+    so = db.query(models.SalesOrder).filter(models.SalesOrder.id == so_id).first()
+    if not so:
+        raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
+    
+    so_num = so.so_number
+    db.delete(so)
+    db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_SALES_ORDER",
+        target_id=so_num,
+        catatan=f"Sales Order '{so_num}' dihapus oleh {current_user.nama}."
+    )
+    return {"message": f"Sales Order '{so_num}' berhasil dihapus."}

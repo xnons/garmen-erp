@@ -8,9 +8,11 @@ interface SalesOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: any;
 }
 
-export default function SalesOrderModal({ isOpen, onClose, onSuccess }: SalesOrderModalProps) {
+export default function SalesOrderModal({ isOpen, onClose, onSuccess, initialData }: SalesOrderModalProps) {
+  const isEditing = !!initialData;
   const [buyers, setBuyers] = useState<any[]>([]);
   const [loadingBuyers, setLoadingBuyers] = useState<boolean>(false);
 
@@ -55,15 +57,48 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess }: SalesOrd
   useEffect(() => {
     if (isOpen) {
       fetchBuyers();
+      if (initialData) {
+        setFormData({
+          so_number: initialData.so_number || "",
+          buyer_id: initialData.buyer_id || "",
+          style_name: initialData.style_name || "",
+          item_category: initialData.item_category || "LONG JEANS",
+          color: initialData.color || "BLACK",
+          order_qty: initialData.order_qty || 0,
+          unit_price: initialData.unit_price || 35000,
+          order_date: initialData.order_date || new Date().toISOString().split('T')[0],
+          deadline: initialData.deadline || ""
+        });
+        if (initialData.size_breakdown_target && Object.keys(initialData.size_breakdown_target).length > 0) {
+          setSizeMatrix(initialData.size_breakdown_target);
+        }
+        if (initialData.bom_accessories && Array.isArray(initialData.bom_accessories) && initialData.bom_accessories.length > 0) {
+          setBomList(initialData.bom_accessories);
+        }
+      } else {
+        // Reset form for create
+        setFormData({
+          so_number: "",
+          buyer_id: "",
+          style_name: "",
+          item_category: "LONG JEANS",
+          color: "BLACK",
+          order_qty: 0,
+          unit_price: 35000,
+          order_date: new Date().toISOString().split('T')[0],
+          deadline: ""
+        });
+        setSizeMatrix({ "28": 100, "30": 150, "32": 150, "34": 100 });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   const fetchBuyers = async () => {
     setLoadingBuyers(true);
     try {
       const res = await api.get('/api/ppic/partners?category=BUYER');
       setBuyers(res.data || []);
-      if (res.data && res.data.length > 0 && !formData.buyer_id) {
+      if (res.data && res.data.length > 0 && !formData.buyer_id && !initialData) {
         setFormData(prev => ({ ...prev, buyer_id: res.data[0].id }));
       }
     } catch (err) {
@@ -165,7 +200,7 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess }: SalesOrd
 
     setSubmitting(true);
     try {
-      await api.post('/api/ppic/orders', {
+      const payload = {
         so_number: formData.so_number.toUpperCase(),
         buyer_id: formData.buyer_id || null,
         style_name: formData.style_name.toUpperCase(),
@@ -177,7 +212,13 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess }: SalesOrd
         bom_accessories: bomList.filter(b => b.item.trim().length > 0),
         order_date: formData.order_date,
         deadline: formData.deadline || null
-      });
+      };
+
+      if (isEditing) {
+        await api.put(`/api/ppic/orders/${initialData.id}`, payload);
+      } else {
+        await api.post('/api/ppic/orders', payload);
+      }
 
       onSuccess();
       onClose();
@@ -201,8 +242,12 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess }: SalesOrd
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Registrasi Sales Order Baru (PPIC)</h2>
-              <p className="text-xs text-slate-400">Master Order, BOM Aksesoris & Matriks Ukuran</p>
+              <h2 className="text-lg font-bold text-white">
+                {isEditing ? `Edit Sales Order: ${formData.so_number}` : 'Registrasi Sales Order Baru (PPIC)'}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {isEditing ? 'Koreksi Master Order, BOM Aksesoris & Matriks Ukuran' : 'Master Order, BOM Aksesoris & Matriks Ukuran'}
+              </p>
             </div>
           </div>
           <button

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, Plus, Search, RefreshCw, DollarSign, CheckCircle2, 
   Layers, UserCheck, Calendar, FileText, User, Scissors, AlertTriangle,
-  SlidersHorizontal, LayoutGrid, List, ChevronRight, X
+  SlidersHorizontal, LayoutGrid, List, ChevronRight, X, Pencil, Trash2
 } from 'lucide-react';
 import api from '@/services/api';
 
@@ -28,6 +28,7 @@ export default function FinishingWagesModule() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [editingWage, setEditingWage] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [filterOp, setFilterOp] = useState<string>("ALL");
   const [viewMode, setViewMode] = useState<'TABLE' | 'COMPACT' | 'CARDS'>('TABLE');
@@ -72,22 +73,57 @@ export default function FinishingWagesModule() {
       
       const empList = eRes.data?.data || eRes.data || [];
       setEmployees(empList);
-
-      if (oRes.data && oRes.data.length > 0 && !formData.so_id) {
-        setFormData(prev => ({ ...prev, so_id: oRes.data[0].id }));
-      }
-      if (empList.length > 0 && !formData.operator_id) {
-        const first = empList[0];
-        setFormData(prev => ({
-          ...prev,
-          operator_id: first.id_karyawan,
-          wage_per_piece: first.tipe_pay === "BORONGAN" && first.tarif_borongan_pcs > 0 ? first.tarif_borongan_pcs : prev.wage_per_piece
-        }));
-      }
     } catch (err) {
       console.error("Gagal mengambil data upah borongan:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenCreateWage = () => {
+    setEditingWage(null);
+    setFormData({
+      operator_id: employees.length > 0 ? employees[0].id_karyawan : "",
+      so_id: orders.length > 0 ? orders[0].id : "",
+      operation_type: "STIM",
+      work_date: new Date().toISOString().split('T')[0],
+      qty_completed: 250,
+      qty_reject: 0,
+      wage_per_piece: 550,
+      notes: ""
+    });
+    setUseSizeBreakdown(false);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditWage = (w: any) => {
+    setEditingWage(w);
+    setFormData({
+      operator_id: w.operator_id || "",
+      so_id: w.so_id || "",
+      operation_type: w.operation_type || "STIM",
+      work_date: w.work_date || new Date().toISOString().split('T')[0],
+      qty_completed: w.qty_completed || 0,
+      qty_reject: w.qty_reject || 0,
+      wage_per_piece: w.wage_per_piece || 500,
+      notes: w.notes || ""
+    });
+    if (w.size_breakdown && Object.keys(w.size_breakdown).length > 0) {
+      setUseSizeBreakdown(true);
+      setSizeMatrix(w.size_breakdown);
+    } else {
+      setUseSizeBreakdown(false);
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteWage = async (w: any) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus catatan upah borongan ini (${w.operation_type} - Rp ${w.total_wage?.toLocaleString('id-ID')})?`)) return;
+    try {
+      await api.delete(`/api/shipping/wages/${w.id}`);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menghapus upah borongan.");
     }
   };
 
@@ -140,7 +176,7 @@ export default function FinishingWagesModule() {
 
     setSubmitting(true);
     try {
-      await api.post('/api/shipping/wages', {
+      const payload = {
         so_id: formData.so_id,
         operator_id: formData.operator_id,
         operation_type: formData.operation_type,
@@ -150,35 +186,37 @@ export default function FinishingWagesModule() {
         size_breakdown: useSizeBreakdown ? sizeMatrix : {},
         wage_per_piece: Number(formData.wage_per_piece),
         notes: formData.notes || null
-      });
+      };
+
+      if (editingWage) {
+        await api.put(`/api/shipping/wages/${editingWage.id}`, payload);
+      } else {
+        await api.post('/api/shipping/wages', payload);
+      }
 
       setIsModalOpen(false);
-      setFormData(prev => ({
-        ...prev,
-        qty_completed: 250,
-        qty_reject: 0,
-        notes: ""
-      }));
+      setEditingWage(null);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal mencatat upah borongan.");
+      alert(err.response?.data?.detail || "Gagal menyimpan data upah.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const filteredWages = wages.filter(w => {
-    const matchQuery = (w.operator_name && w.operator_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    const matchSearch = 
+      (w.operator_name && w.operator_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (w.operation_type && w.operation_type.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (w.so_id && w.so_id.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    if (filterOp === "ALL") return matchQuery;
-    return matchQuery && w.operation_type === filterOp;
+    if (filterOp === "ALL") return matchSearch;
+    return matchSearch && w.operation_type === filterOp;
   });
 
-  const totalFinishingPaid = wages.reduce((acc, w) => acc + (w.total_wage || 0), 0);
-  const totalPcsFinished = wages.reduce((acc, w) => acc + (w.qty_completed || 0), 0);
-  const totalRejects = wages.reduce((acc, w) => acc + (w.qty_reject || 0), 0);
+  const totalPcsFinished = filteredWages.reduce((acc, w) => acc + (w.qty_completed || 0), 0);
+  const totalFinishingPaid = filteredWages.reduce((acc, w) => acc + (w.total_wage || 0), 0);
+  const totalRejects = filteredWages.reduce((acc, w) => acc + (w.qty_reject || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -188,18 +226,18 @@ export default function FinishingWagesModule() {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <Sparkles className="w-3.5 h-3.5" />
-            Fase 5: Lini Jahit Internal, Finishing & Upah Borongan
+            Fase 5: Finishing & Borongan Operator
           </div>
-          <h1 className="text-2xl font-black text-white">Produksi & Upah Borongan Satuan</h1>
+          <h1 className="text-2xl font-black text-white">Upah Borongan & Finishing</h1>
           <p className="text-slate-400 text-sm mt-0.5">
-            Log harian hasil kerja pekerja (Jahit Sewing, Steam Johan, Pasang Kancing, Buang Benang, Lipat, Packing) — Otomatis terakumulasi ke Payroll & Gaji.
+            Perhitungan upah satuan kerja per orang (Jahit, Steam Johan, Kancing Dedi, Lipat, Packing Desti) yang terintegrasi ke Payroll.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-cyan-600/20"
+            onClick={handleOpenCreateWage}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-cyan-600/20 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             + Catat Hasil Borongan Pekerja
@@ -268,7 +306,7 @@ export default function FinishingWagesModule() {
         <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 p-1 rounded-xl shrink-0">
           <button
             onClick={() => setViewMode('TABLE')}
-            className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               viewMode === 'TABLE' ? 'bg-slate-800 text-cyan-400 shadow-sm' : 'text-slate-400 hover:text-white'
             }`}
             title="Tampilan Tabel Standar"
@@ -278,7 +316,7 @@ export default function FinishingWagesModule() {
           </button>
           <button
             onClick={() => setViewMode('COMPACT')}
-            className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               viewMode === 'COMPACT' ? 'bg-slate-800 text-cyan-400 shadow-sm' : 'text-slate-400 hover:text-white'
             }`}
             title="Tampilan Kompak / Rapat"
@@ -288,7 +326,7 @@ export default function FinishingWagesModule() {
           </button>
           <button
             onClick={() => setViewMode('CARDS')}
-            className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               viewMode === 'CARDS' ? 'bg-slate-800 text-cyan-400 shadow-sm' : 'text-slate-400 hover:text-white'
             }`}
             title="Tampilan Kartu Grid"
@@ -298,7 +336,7 @@ export default function FinishingWagesModule() {
           </button>
           <button
             onClick={fetchData}
-            className="p-1.5 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white transition-colors cursor-pointer"
             title="Muat Ulang Data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
@@ -362,10 +400,28 @@ export default function FinishingWagesModule() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="text-xs text-slate-400">Total Upah:</span>
-                <span className="text-base font-black text-emerald-400 font-mono">
-                  Rp {w.total_wage?.toLocaleString('id-ID')}
-                </span>
+                <div>
+                  <span className="text-xs text-slate-400 block text-[10px]">Total Upah:</span>
+                  <span className="text-base font-black text-emerald-400 font-mono">
+                    Rp {w.total_wage?.toLocaleString('id-ID')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleOpenEditWage(w)}
+                    title="Edit Upah Borongan"
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteWage(w)}
+                    title="Hapus Upah Borongan"
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -384,6 +440,7 @@ export default function FinishingWagesModule() {
                   <th className={`${viewMode === 'COMPACT' ? 'py-2 px-3' : 'py-3.5 px-4'} text-right`}>Kuantitas Selesai</th>
                   <th className={`${viewMode === 'COMPACT' ? 'py-2 px-3' : 'py-3.5 px-4'} text-right`}>Tarif / Pcs</th>
                   <th className={`${viewMode === 'COMPACT' ? 'py-2 px-4' : 'py-3.5 px-5'} text-right`}>Total Upah (Rp)</th>
+                  <th className={`${viewMode === 'COMPACT' ? 'py-2 px-3' : 'py-3.5 px-4'} text-center`}>Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-medium">
@@ -420,6 +477,24 @@ export default function FinishingWagesModule() {
                     <td className={`${viewMode === 'COMPACT' ? 'py-2 px-4' : 'py-3.5 px-5'} text-right font-black text-emerald-400 font-mono text-sm`}>
                       Rp {w.total_wage?.toLocaleString('id-ID')}
                     </td>
+                    <td className={`${viewMode === 'COMPACT' ? 'py-2 px-3' : 'py-3.5 px-4'} text-center`}>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEditWage(w)}
+                          title="Edit Upah Borongan"
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteWage(w)}
+                          title="Hapus Upah Borongan"
+                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -440,14 +515,19 @@ export default function FinishingWagesModule() {
                   <UserCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Catat Hasil Borongan & Upah Pekerja</h3>
+                  <h3 className="text-base font-bold text-white">
+                    {editingWage ? `Edit Upah Borongan: ${formData.operation_type}` : 'Catat Hasil Borongan & Upah Pekerja'}
+                  </h3>
                   <p className="text-xs text-slate-400">Jahit, Steam, Pasang Kancing, Lipat, Packing & Meja Potong</p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingWage(null);
+                }}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
