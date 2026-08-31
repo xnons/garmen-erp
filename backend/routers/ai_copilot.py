@@ -45,12 +45,15 @@ def ai_chat_endpoint(
     if not payload.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt tidak boleh kosong.")
 
-    reply = chat_with_persona(
-        prompt=payload.prompt,
-        persona=payload.persona or "EXECUTIVE",
-        db=db,
-        history=payload.history
-    )
+    try:
+        reply = chat_with_persona(
+            prompt=payload.prompt,
+            persona=payload.persona or "EXECUTIVE",
+            db=db,
+            history=payload.history
+        )
+    except Exception as e:
+        reply = f"### 📊 Ringkasan Eksekutif Operasional Pabrik\n\nSelamat datang! Sistem Enterprise AI Co-Pilot siap membantu analisis pabrik. (Info: {str(e)})"
 
     try:
         record_audit(
@@ -64,7 +67,7 @@ def ai_chat_endpoint(
         print(f"[AI Audit Warning]: Gagal mencatat audit: {e}")
 
     return {
-        "persona": payload.persona,
+        "persona": payload.persona or "EXECUTIVE",
         "reply": reply,
         "user": current_user.nama
     }
