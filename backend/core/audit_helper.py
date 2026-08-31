@@ -8,13 +8,19 @@ def record_audit(db: Session, actor_id: str, aksi: str, target_id: str, catatan:
     Fungsi helper untuk mencatat jejak audit ke tabel LogAudit.
     Gunakan ini di setiap endpoint sensitif/destruktif.
     """
-    new_log = models.LogAudit(
-        timestamp=datetime.now(),
-        actor_id=actor_id, # ID Karyawan yang melakukan aksi
-        aksi=aksi,         # Contoh: "DELETE_SPK", "PAYROLL_PAID"
-        target_id=str(target_id), # ID objek yang dimanipulasi
-        catatan=catatan
-    )
-    db.add(new_log)
-    db.commit()
-    db.refresh(new_log)
+    try:
+        new_log = models.LogAudit(
+            timestamp=datetime.now(),
+            actor_id=str(actor_id or "SYSTEM"),
+            aksi=str(aksi or "ACTION"),
+            target_id=str(target_id or "-"),
+            catatan=str(catatan or "")
+        )
+        db.add(new_log)
+        db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        print(f"[Audit Helper Warning]: Gagal mencatat audit trail: {e}")
