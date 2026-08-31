@@ -139,7 +139,7 @@ def receive_wip_movement(
     qty_rec = payload.qty_received
     qty_rej = payload.qty_reject or 0
 
-    # 🟢 RUMUS REKONSILIASI SELISIH MAKLUN:
+    # 🟢 RUMUS REKONSILIASI SELISIH MAKLUN (Mendukung Pengiriman Bertahap / Partial Receive):
     # balance_discrepancy = qty_dispatched - (qty_received + qty_reject)
     discrepancy = movement.qty_dispatched - (qty_rec + qty_rej)
 
@@ -148,7 +148,15 @@ def receive_wip_movement(
     movement.qty_reject = qty_rej
     movement.size_breakdown_received = payload.size_breakdown_received or {}
     movement.balance_discrepancy = discrepancy
-    movement.status = "COMPLETED" if discrepancy == 0 else "DISCREPANCY_FLAG"
+    
+    if (qty_rec + qty_rej) < movement.qty_dispatched and discrepancy > 0:
+        # Jika baru setor sebagian (partial batch delivery)
+        movement.status = "PARTIAL_RECEIVED"
+    elif discrepancy == 0:
+        movement.status = "COMPLETED"
+    else:
+        movement.status = "DISCREPANCY_FLAG"
+
     if payload.remarks:
         movement.remarks = f"{movement.remarks or ''} | Terima: {payload.remarks}"
 

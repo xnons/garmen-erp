@@ -248,13 +248,22 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
                   return (
                     <tr 
                       key={row.so_id} 
-                      className="hover:bg-indigo-950/20 transition-colors group cursor-pointer"
+                      className={`transition-colors group cursor-pointer ${
+                        hasDiscrepancy 
+                          ? 'bg-rose-950/20 hover:bg-rose-950/35 border-l-2 border-l-rose-500' 
+                          : 'hover:bg-indigo-950/20'
+                      }`}
                       onClick={() => onSelectSO && onSelectSO(row.so_id)}
                     >
                       {/* SO & Buyer */}
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-white group-hover:text-indigo-300 transition-colors">
-                          {row.so_number}
+                        <div className="font-bold text-white group-hover:text-indigo-300 transition-colors flex items-center gap-2">
+                          <span>{row.so_number}</span>
+                          {hasDiscrepancy && (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.2 bg-rose-500 text-white rounded font-mono animate-pulse">
+                              SELISIH
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-400">{row.buyer_name}</div>
                       </td>
@@ -323,15 +332,15 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
                         )}
                       </td>
 
-                      {/* Discrepancy Total */}
+                      {/* Discrepancy Total (Menyala Merah Saat Ada Selisih) */}
                       <td className="py-3.5 px-3 text-right">
                         {hasDiscrepancy ? (
-                          <span className="inline-flex items-center gap-1 font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                            <AlertTriangle className="w-3 h-3" />
-                            {row.balance_discrepancy_total}
+                          <span className="inline-flex items-center gap-1 font-extrabold text-xs text-rose-300 bg-rose-500/25 px-2 py-0.5 rounded-lg border border-rose-500/50 shadow-sm animate-pulse">
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                            <span>+{row.balance_discrepancy_total} Pcs</span>
                           </span>
                         ) : (
-                          <span className="text-slate-600">0</span>
+                          <span className="text-slate-600 font-mono">0</span>
                         )}
                       </td>
 
