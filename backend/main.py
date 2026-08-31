@@ -15,14 +15,17 @@ from routers import produksi_master, produksi_output
 from routers import ppic_so, warehouse_fabric, cutting_prep, wip_subcon, finishing_shipping
 from routers import ai_copilot, email_reports
 
-from sqlalchemy import text
-
-# Buat Tabel Database Otomatis jika belum ada
-models.Base.metadata.create_all(bind=engine)
+def init_db():
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        print("[Database Init]: Tabel database berhasil diverifikasi.")
+    except Exception as e:
+        print(f"[Database Error]: Gagal menghubungkan database saat inisialisasi: {e}")
 
 def auto_migrate_db():
-    with engine.connect() as conn:
-        is_sqlite = engine.url.drivername.startswith("sqlite")
+    try:
+        with engine.connect() as conn:
+            is_sqlite = engine.url.drivername.startswith("sqlite")
         columns_to_add = [
             ("log_output_borongan", "kode_mesin", "VARCHAR(50)"),
             ("log_output_borongan", "bahan_id", "VARCHAR(50)"),
@@ -77,14 +80,17 @@ def auto_migrate_db():
                 conn.commit()
             except Exception:
                 pass
+    except Exception as e:
+        print(f"[Database Migration Warning]: Gagal melakukan auto-migration: {e}")
 
 
 # --- LIFESPAN SEEDER ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()
     auto_migrate_db()
-    db = SessionLocal()
     try:
+        db = SessionLocal()
         # Seeder Akun Developer Utama
         dev_exist = db.query(models.Karyawan).filter(models.Karyawan.username == "developer").first()
         if not dev_exist:
@@ -118,7 +124,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️ Info Seeder: {e}")
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            pass
     
     yield
     print("🔴 Engine Nexora ERP dimatikan.")
