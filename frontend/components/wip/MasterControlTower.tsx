@@ -63,6 +63,12 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
     
     if (statusFilter === "ALL") return matchQuery;
     if (statusFilter === "DISCREPANCY") return matchQuery && row.balance_discrepancy_total > 0;
+    if (statusFilter === "SHIPPED") return matchQuery && (row.status_wip === "SHIPPED" || row.qty_shipped > 0);
+    if (statusFilter === "FINISHING") return matchQuery && (row.status_wip === "FINISHING" || row.qty_finishing > 0);
+    if (statusFilter === "WASHING") return matchQuery && (row.status_wip === "WASHING" || row.qty_washing > 0);
+    if (statusFilter === "SEWING") return matchQuery && (row.status_wip === "SEWING" || row.qty_setor_jahit > 0 || row.qty_kirim_jahit > 0);
+    if (statusFilter === "CUTTING") return matchQuery && (row.status_wip === "CUTTING" || row.qty_cutting > 0);
+    if (statusFilter === "REGISTERED") return matchQuery && (row.status_wip === "REGISTERED" || row.status_wip === "DRAFT");
     return matchQuery && row.status_wip === statusFilter;
   });
 

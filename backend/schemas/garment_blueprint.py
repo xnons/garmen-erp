@@ -397,18 +397,21 @@ class ShipmentResponse(ShipmentCreate):
 class WIPMatrixRow(BaseModel):
     so_id: str
     so_number: str
-    buyer_name: str
-    style_name: str
-    item_category: str
-    order_qty: int
-    qty_cutting: int
-    qty_print_mentah: int
-    qty_bordir_mentah: int
-    qty_kirim_jahit: int
-    qty_setor_jahit: int
-    qty_washing: int
-    qty_finishing: int
-    qty_shipped: int
-    qty_reject_total: int
-    balance_discrepancy_total: int
-    status_wip: str
+    buyer_name: Optional[str] = "UMUM"
+    style_name: Optional[str] = "-"
+    item_category: Optional[str] = "LONG JEANS"
+    order_qty: Optional[int] = 0
+    qty_cutting: Optional[int] = 0
+    qty_print_mentah: Optional[int] = 0
+    qty_bordir_mentah: Optional[int] = 0
+    qty_kirim_jahit: Optional[int] = 0
+    qty_setor_jahit: Optional[int] = 0
+    qty_washing: Optional[int] = 0
+    qty_finishing: Optional[int] = 0
+    qty_shipped: Optional[int] = 0
+    qty_reject_total: Optional[int] = 0
+    balance_discrepancy_total: Optional[int] = 0
+    status_wip: Optional[str] = "REGISTERED"
+
+    class Config:
+        from_attributes = True
