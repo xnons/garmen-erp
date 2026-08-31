@@ -388,3 +388,217 @@ class LogLogin(Base):
     device_info = Column(String(255), nullable=True)  # Contoh: "💻 Windows (Chrome)" atau "📱 Android (Chrome Mobile)"
     lokasi = Column(String(255), nullable=True)       # Contoh: "Jakarta, Indonesia (Telkomsel)"
     keterangan = Column(String(255), nullable=True)
+
+
+# ===========================================================================
+# 8. PT. CHIKAL JAYA MAKMUR (MASTER GARMENT) ENTERPRISE BLUEPRINT MODELS
+# ===========================================================================
+import uuid
+
+def generate_uuid():
+    return str(uuid.uuid4())
+
+# 8.1 Master Data Rekanan / Partners (Buyers, Suppliers, Subcon)
+class Partner(Base):
+    __tablename__ = "partners"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    code = Column(String(50), unique=True, index=True, nullable=True)
+    name = Column(String(100), nullable=False, index=True)
+    category = Column(String(50), nullable=False) # BUYER, SUPPLIER_FABRIC, MAKLUN_SEWING, SUBCON_WASHING, SUBCON_PRINT, SUBCON_EMBROIDERY
+    address = Column(Text, nullable=True)
+    phone = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# 8.2 Master Sales Orders (Code SO e.g. SO-MG260004)
+class SalesOrder(Base):
+    __tablename__ = "sales_orders"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    so_number = Column(String(50), unique=True, index=True, nullable=False) # e.g. 'SO-MG260004'
+    buyer_id = Column(String(50), ForeignKey("partners.id"), nullable=True)
+    style_name = Column(String(150), nullable=False, index=True)           # e.g. 'WIND MILD BLACK'
+    item_category = Column(String(100), default="LONG JEANS")              # 'LONG JEANS', 'SS KEMEJA', 'OUTER'
+    color = Column(String(50), nullable=True)
+    order_qty = Column(Integer, default=0, nullable=False)
+    unit_price = Column(Float, default=0.0)
+    size_breakdown_target = Column(JSON, default={})                       # {"28": 170, "30": 200, "32": 179} atau {"S": 20, "M": 50}
+    bom_accessories = Column(JSON, default=[])                             # [{"item": "Kancing 24L", "qty_per_pcs": 5}]
+    status = Column(String(50), default="REGISTERED")                      # REGISTERED, CUTTING, WIP_SUBCON, SEWING, WASHING, FINISHING, SHIPPED, CLOSED
+    order_date = Column(Date, nullable=False, default=datetime.utcnow)
+    deadline = Column(Date, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    buyer = relationship("Partner", foreign_keys=[buyer_id])
+
+# 8.3 Raw Material Warehouse & Fabric Inspection (4-Point ASTM)
+class InventoryItem(Base):
+    __tablename__ = "inventory_items"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    item_code = Column(String(50), unique=True, index=True, nullable=False) # e.g. 'MG-2604-BH0001'
+    description = Column(Text, nullable=False)                              # e.g. 'PURING PUTIH 01 WARNING'
+    item_type = Column(String(30), nullable=False)                         # 'FABRIC_MAIN', 'PURING', 'INTERLINING', 'TRIMS_ACCESSORY'
+    unit = Column(String(20), default="YARD")                              # 'YARD', 'KG', 'PCS', 'ROLL'
+    unit_price = Column(Float, default=0.0)
+    current_stock = Column(Float, default=0.0)
+
+class MaterialReceipt(Base):
+    __tablename__ = "material_receipts"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    item_id = Column(String(50), ForeignKey("inventory_items.id"), nullable=False)
+    supplier_id = Column(String(50), ForeignKey("partners.id"), nullable=True)
+    receipt_date = Column(Date, nullable=False)
+    roll_number = Column(String(50), nullable=True)
+    qty_received = Column(Float, nullable=False)
+    unit = Column(String(20), default="YARD")
+    contract_type = Column(String(20), default="FOB")                      # 'FOB' / 'CMT'
+    inspection_status = Column(String(30), default="PENDING")              # 'PENDING', 'PASSED', 'REJECTED'
+
+    item = relationship("InventoryItem", foreign_keys=[item_id])
+    supplier = relationship("Partner", foreign_keys=[supplier_id])
+
+class FabricInspection(Base):
+    __tablename__ = "fabric_inspections"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    receipt_id = Column(String(50), ForeignKey("material_receipts.id"), nullable=False)
+    inspector_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    inspection_date = Column(Date, nullable=False)
+    lot_number = Column(String(50), nullable=True)
+    length_before = Column(Float, nullable=False)
+    length_after = Column(Float, nullable=False)
+    width_inch = Column(Float, nullable=False)
+    total_defect_points = Column(Integer, default=0)
+    summary_point = Column(Float, nullable=False)                          # (total_points * 3600) / (width_inch * length_after)
+    grade = Column(String(10), nullable=False)                             # 'GRADE_A', 'GRADE_B', 'GRADE_C'
+    defect_remarks = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    receipt = relationship("MaterialReceipt", foreign_keys=[receipt_id])
+    inspector = relationship("Karyawan", foreign_keys=[inspector_id])
+
+class MaterialAllocation(Base):
+    __tablename__ = "material_allocations"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
+    item_id = Column(String(50), ForeignKey("inventory_items.id"), nullable=False)
+    dispatch_date = Column(Date, nullable=False)
+    qty_issued = Column(Float, nullable=False)
+    surat_jalan_no = Column(String(100), nullable=True)                    # 'CJM-2608.100' (Sheet25)
+
+    sales_order = relationship("SalesOrder", foreign_keys=[so_id])
+    item = relationship("InventoryItem", foreign_keys=[item_id])
+
+# 8.4 Cutting, Consumption & Preparation Tasks
+class CuttingRecord(Base):
+    __tablename__ = "cutting_records"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
+    cutting_date = Column(Date, nullable=False)
+    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    qty_cut = Column(Integer, nullable=False)
+    size_breakdown_cut = Column(JSON, default={})
+    main_fabric_used = Column(Float, nullable=False)
+    puring_used = Column(Float, default=0.0)
+    puring_jala_used = Column(Float, default=0.0)
+    main_consumption_rate = Column(Float, default=0.0)                     # main_fabric_used / qty_cut
+    puring_consumption_rate = Column(Float, default=0.0)                   # puring_used / qty_cut
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    sales_order = relationship("SalesOrder", foreign_keys=[so_id])
+    operator = relationship("Karyawan", foreign_keys=[operator_id])
+
+class CuttingPrepTask(Base):
+    __tablename__ = "cutting_prep_tasks"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
+    task_type = Column(String(50), nullable=False)                         # 'NUMBERING', 'PRESS_INTERLINING'
+    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    task_date = Column(Date, nullable=False)
+    qty_done = Column(Integer, nullable=False)
+    size_breakdown = Column(JSON, default={})
+    piece_rate = Column(Float, default=0.0)
+    total_wage = Column(Float, default=0.0)
+
+    sales_order = relationship("SalesOrder", foreign_keys=[so_id])
+    operator = relationship("Karyawan", foreign_keys=[operator_id])
+
+# 8.5 Sequential WIP Pipeline Movements (Print M -> Bordir M -> Sewing -> Washing -> Bordir J -> Finishing)
+class WIPMovement(Base):
+    __tablename__ = "wip_movements"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
+    stage_name = Column(String(50), nullable=False)                        # 'PRINT_MENTAH', 'EMBROIDERY_MENTAH', 'SEWING_INTERNAL', 'SEWING_MAKLUN', 'WASHING', 'EMBROIDERY_JADI', 'FINISHING'
+    sequence_order = Column(Integer, nullable=False, default=1)            # 1: Print, 2: Bordir M, 3: Sewing, 4: Washing, 5: Bordir J, 6: Finishing
+    partner_id = Column(String(50), ForeignKey("partners.id"), nullable=True) # Subcon / Maklun Vendor (NULL jika internal)
+    internal_supervisor_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    surat_jalan_no = Column(String(100), nullable=True)
+    dispatch_date = Column(Date, nullable=False)
+    qty_dispatched = Column(Integer, nullable=False)
+    size_breakdown_dispatched = Column(JSON, default={})
+    received_date = Column(Date, nullable=True)
+    qty_received = Column(Integer, default=0)
+    qty_reject = Column(Integer, default=0)
+    size_breakdown_received = Column(JSON, default={})
+    balance_discrepancy = Column(Integer, default=0)                       # qty_dispatched - (qty_received + qty_reject)
+    status = Column(String(30), default="IN_PROCESS")                      # 'IN_PROCESS', 'COMPLETED', 'DISCREPANCY_FLAG'
+    remarks = Column(Text, nullable=True)
+
+    sales_order = relationship("SalesOrder", foreign_keys=[so_id])
+    partner = relationship("Partner", foreign_keys=[partner_id])
+    supervisor = relationship("Karyawan", foreign_keys=[internal_supervisor_id])
+
+class RejectLog(Base):
+    __tablename__ = "reject_logs"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    wip_movement_id = Column(String(50), ForeignKey("wip_movements.id"), nullable=True)
+    so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
+    stage_name = Column(String(50), nullable=False)                        # 'EMBROIDERY_DEFECT', 'SEWING_DEFECT', 'WASHING_DEFECT'
+    defect_reason = Column(String(100), nullable=False)                    # 'JARUM PATAH', 'BELANG WARNA', 'SOBEK'
+    qty_reject = Column(Integer, nullable=False)
+    unit_cost_loss = Column(Float, default=0.0)
+    total_loss = Column(Float, default=0.0)
+
+    sales_order = relationship("SalesOrder", foreign_keys=[so_id])
+
+# 8.6 Finishing Borongan, Expedisi Shipping & Billing Form WI
+class PieceRateWage(Base):
+    __tablename__ = "piece_rate_wages"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
+    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    operation_type = Column(String(50), nullable=False)                    # 'STIM', 'LUBANG_KANCING', 'PASANG_KANCING', 'LIPAT', 'PACKING'
+    work_date = Column(Date, nullable=False)
+    qty_completed = Column(Integer, nullable=False)
+    wage_per_piece = Column(Float, nullable=False)                         # misal Rp500 atau Rp600
+    total_wage = Column(Float, default=0.0)
+
+    sales_order = relationship("SalesOrder", foreign_keys=[so_id])
+    operator = relationship("Karyawan", foreign_keys=[operator_id])
+
+class Shipment(Base):
+    __tablename__ = "shipments"
+
+    id = Column(String(50), primary_key=True, default=generate_uuid)
+    so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
+    shipment_date = Column(Date, nullable=False)
+    surat_jalan_no = Column(String(100), unique=True, nullable=False)      # 'SJP-2608.0001'
+    driver_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    total_qty_shipped = Column(Integer, nullable=False)
+    size_breakdown_shipped = Column(JSON, default={})
+    unit_price = Column(Float, default=0.0)
+    total_invoice_amount = Column(Float, default=0.0)
+    invoice_number = Column(String(100), nullable=True)
+    is_invoiced = Column(Boolean, default=False)
+    remarks = Column(Text, nullable=True)
+
+    sales_order = relationship("SalesOrder", foreign_keys=[so_id])
+    driver = relationship("Karyawan", foreign_keys=[driver_id])

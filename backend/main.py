@@ -9,9 +9,10 @@ import models
 # 🟢 1. Helper Security dari core
 from core.security import get_password_hash
 
-# 🟢 2. Import Routers (Termasuk audit)
+# 🟢 2. Import Routers (Termasuk audit & modul garment blueprint)
 from routers import auth, karyawan, mesin, inventaris, dashboard, audit, payroll
 from routers import produksi_master, produksi_output
+from routers import ppic_so, warehouse_fabric, cutting_prep, wip_subcon, finishing_shipping
 
 from sqlalchemy import text
 
@@ -148,6 +149,13 @@ app.include_router(produksi_output.router)
 
 # 🟢 Router Audit & Keamanan (Baru Ditambahkan)
 app.include_router(audit.router)
+
+# 🟢 Router Blueprint PT. Chikal Jaya Makmur (7 Fase Terintegrasi)
+app.include_router(ppic_so.router)
+app.include_router(warehouse_fabric.router)
+app.include_router(cutting_prep.router)
+app.include_router(wip_subcon.router)
+app.include_router(finishing_shipping.router)
 
 @app.get("/")
 def root_check():

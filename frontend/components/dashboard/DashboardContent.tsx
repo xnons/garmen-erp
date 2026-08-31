@@ -13,6 +13,15 @@ import ProduksiPage from '@/components/produksi/ProduksiPage';
 import TabAuditLog from '@/components/audit/TabAuditLog';
 import PayrollModule from '@/components/payroll/PayrollModule';
 
+// 🟢 7 Modul PT. Chikal Jaya Makmur (Master Garment Blueprint)
+import MasterControlTower from '@/components/wip/MasterControlTower';
+import PPICModule from '@/components/ppic/PPICModule';
+import WarehouseFabricModule from '@/components/warehouse/WarehouseFabricModule';
+import CuttingPrepModule from '@/components/cutting/CuttingPrepModule';
+import WIPSubconModule from '@/components/wip/WIPSubconModule';
+import FinishingWagesModule from '@/components/finishing/FinishingWagesModule';
+import ShippingBillingModule from '@/components/shipping/ShippingBillingModule';
+
 interface DashboardContentProps {
   activeMenu: string;
   setActiveMenu?: (menu: string) => void;
@@ -32,13 +41,20 @@ export default function DashboardContent({
 
   const getMenuTitle = (menu: string) => {
     switch (menu) {
+      case 'wip-control-tower': return 'Master Control Tower — Live WIP Matrix';
+      case 'ppic-so': return 'Fase 1: PPIC & Sales Order (SO)';
+      case 'warehouse-fabric': return 'Fase 2: Gudang Bahan Baku & QC 4-Point';
+      case 'cutting-prep': return 'Fase 3: Cutting & Persiapan';
+      case 'wip-subcon': return 'Fase 4: Distribusi Subcon & Lini Jahit';
+      case 'finishing-wages': return 'Fase 5: Finishing & Upah Satuan';
+      case 'shipping-billing': return 'Fase 6: Shipping & Form WI Billing';
       case 'dashboard': return 'Ringkasan Dashboard';
       case 'karyawan': return 'Kelola Karyawan';
       case 'inventaris': return 'Inventaris & Stok';
       case 'mesin': return 'Inventaris Mesin';
       case 'produksi': return 'Produksi Borongan';
       case 'payroll': return 'Payroll & Gaji';
-      case 'audit-log': return 'Log Keamanan';
+      case 'audit-log': return 'Log Audit Keamanan';
       case 'setting': return 'Akun Saya';
       default: return 'Master Garment ERP';
     }
@@ -46,7 +62,48 @@ export default function DashboardContent({
 
   // Helper untuk memilih modul yang ditampilkan berdasarkan RBAC
   const renderActiveModule = () => {
-    // 1. Dashboard Ringkasan
+    // 0. Master Control Tower (Live WIP Matrix Telemetry)
+    if (activeMenu === 'wip-control-tower') {
+      return (
+        <MasterControlTower
+          onSelectSO={(soId) => {
+            if (setActiveMenu) setActiveMenu('ppic-so');
+          }}
+        />
+      );
+    }
+
+    // 1. PPIC & Sales Order
+    if (activeMenu === 'ppic-so') {
+      return <PPICModule />;
+    }
+
+    // 2. Gudang Bahan Baku & QC 4-Point ASTM
+    if (activeMenu === 'warehouse-fabric') {
+      return <WarehouseFabricModule />;
+    }
+
+    // 3. Meja Potong & Persiapan
+    if (activeMenu === 'cutting-prep') {
+      return <CuttingPrepModule />;
+    }
+
+    // 4. Distribusi Subcon & Lini Jahit
+    if (activeMenu === 'wip-subcon') {
+      return <WIPSubconModule />;
+    }
+
+    // 5. Finishing & Upah Borongan Satuan
+    if (activeMenu === 'finishing-wages') {
+      return <FinishingWagesModule />;
+    }
+
+    // 6. Ekspedisi Pengiriman SJP & Form WI
+    if (activeMenu === 'shipping-billing') {
+      return <ShippingBillingModule />;
+    }
+
+    // 7. Dashboard Ringkasan
     if (activeMenu === 'dashboard') {
       return (
         <DashboardOverview

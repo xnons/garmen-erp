@@ -12,7 +12,13 @@ import {
   User,
   ShieldAlert,
   Wallet,
-  X
+  X,
+  Layers,
+  FileSpreadsheet,
+  PackageCheck,
+  Truck,
+  Sparkles,
+  FileText
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -46,16 +52,22 @@ export default function Sidebar({
     }
   };
 
-  // 🛡️ RBAC & Lucide Icons Navigation
+  // 🛡️ RBAC & Lucide Icons Navigation (PT. Chikal Jaya Makmur Master Garment)
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI', 'GUDANG'] },
-    { id: 'karyawan', label: 'Kelola Karyawan', icon: Users, roles: ['OWNER', 'ADMIN'] },
-    { id: 'inventaris', label: 'Inventaris & Stok', icon: Package, roles: ['OWNER', 'ADMIN', 'GUDANG'] },
-    { id: 'mesin', label: 'Inventaris Mesin', icon: Cpu, roles: ['OWNER', 'ADMIN', 'PRODUKSI'] },
-    { id: 'produksi', label: 'Produksi Borongan', icon: Scissors, roles: ['OWNER', 'ADMIN', 'PRODUKSI'] },
-    { id: 'payroll', label: 'Payroll & Penggajian', icon: Wallet, roles: ['OWNER', 'FINANCE'] },
-    { id: 'audit-log', label: 'Log Keamanan', icon: ShieldAlert, roles: ['OWNER'] },
-    { id: 'setting', label: 'Akun Saya', icon: User, roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI', 'GUDANG'] },
+    { id: 'wip-control-tower', label: 'Master Control Tower', icon: Layers, roles: ['*'], badge: 'LIVE' },
+    { id: 'ppic-so', label: '1. PPIC & Sales Order', icon: FileSpreadsheet, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'PPIC'] },
+    { id: 'warehouse-fabric', label: '2. Gudang & QC 4-Point', icon: PackageCheck, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'GUDANG', 'QC_INSPECTOR'] },
+    { id: 'cutting-prep', label: '3. Cutting & Persiapan', icon: Scissors, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'CUTTING_OPERATOR', 'PRESS_OPERATOR', 'PRODUKSI'] },
+    { id: 'wip-subcon', label: '4. Distribusi Subcon', icon: Truck, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'LINE_SUPERVISOR', 'PRODUKSI'] },
+    { id: 'finishing-wages', label: '5. Finishing Borongan', icon: Sparkles, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINISHING_OPERATOR', 'PRODUKSI'] },
+    { id: 'shipping-billing', label: '6. Shipping & Form WI', icon: FileText, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINANCE', 'EXPEDITION_DRIVER'] },
+    { id: 'dashboard', label: 'Ringkasan Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINANCE', 'PRODUKSI', 'GUDANG'] },
+    { id: 'karyawan', label: 'Kelola Karyawan', icon: Users, roles: ['OWNER', 'ADMIN', 'DEVELOPER'] },
+    { id: 'inventaris', label: 'Stok Aksesoris & Trims', icon: Package, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'GUDANG'] },
+    { id: 'mesin', label: 'Inventaris Mesin', icon: Cpu, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'PRODUKSI'] },
+    { id: 'payroll', label: 'Payroll & Gaji', icon: Wallet, roles: ['OWNER', 'FINANCE', 'DEVELOPER'] },
+    { id: 'audit-log', label: 'Log Audit Keamanan', icon: ShieldAlert, roles: ['OWNER', 'DEVELOPER'] },
+    { id: 'setting', label: 'Akun Saya', icon: User, roles: ['*'] },
   ];
 
   // Normalisasi string role ke UPPERCASE
