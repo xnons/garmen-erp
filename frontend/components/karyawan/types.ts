@@ -40,6 +40,9 @@ export interface LogPelanggaran {
     tanggal: string;
 }
 
+export type ViewMode = 'TABLE' | 'CARDS' | 'COMPACT';
+export type DepartmentFilter = 'ALL' | 'SEWING' | 'CUTTING' | 'FINISHING' | 'DRIVER' | 'STAFF';
+
 export interface KaryawanModuleProps {
     activeUser?: {
         id_karyawan?: string;

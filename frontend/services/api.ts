@@ -1,20 +1,41 @@
 import axios from 'axios';
 
-// Gunakan 127.0.0.1 secara eksplisit untuk mencegah kendala DNS/IPv6 di browser lokal, atau URL Cloud di Render
+const getBaseURL = (): string => {
+    if (typeof window !== 'undefined') {
+        const customUrl = localStorage.getItem('custom_api_url');
+        if (customUrl) return customUrl;
+
+        // Jika frontend dibuka di domain Cloud Render/Vercel dan env kosong atau salah domain
+        const envUrl = process.env.NEXT_PUBLIC_API_URL;
+        if (envUrl && envUrl.startsWith('http')) {
+            return envUrl;
+        }
+
+        if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+            return window.location.origin;
+        }
+    }
+    return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+};
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000',
+    baseURL: getBaseURL(),
+    timeout: 30000,
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
-// Interceptor Request: Menyertakan JWT Token
+// Interceptor Request: Menyertakan JWT Token & Refresh dynamic baseURL
 api.interceptors.request.use(
     (config) => {
         if (typeof window !== 'undefined') {
             const token = localStorage.getItem('token') || localStorage.getItem('access_token');
             if (token && config.headers) {
                 config.headers['Authorization'] = `Bearer ${token}`;
+            }
+            if (!config.baseURL || config.baseURL === 'http://127.0.0.1:8000') {
+                config.baseURL = getBaseURL();
             }
         }
         return config;

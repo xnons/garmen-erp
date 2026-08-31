@@ -12,6 +12,9 @@ import { KaryawanHeader } from './KaryawanHeader';
 import { useKaryawan, generateIdKaryawan, generateRandomPassword } from './useKaryawan';
 
 export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) => {
+    const [viewMode, setViewMode] = React.useState<any>('TABLE');
+    const [deptFilter, setDeptFilter] = React.useState<any>('ALL');
+
     const {
         karyawanList, filteredKaryawan, searchQuery, setSearchQuery, loading, errorMsg, successMsg,
         viewTab, setViewTab, totalAktif, totalArchived,
@@ -41,7 +44,7 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
                 </div>
             )}
 
-            {/* Header & Controls dengan Tombol Refresh */}
+            {/* Header & Controls dengan Layout Switcher & Divisi Filter */}
             <KaryawanHeader
                 viewTab={viewTab}
                 setViewTab={setViewTab}
@@ -52,6 +55,10 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
                 setSearchQuery={setSearchQuery}
                 onRefresh={fetchKaryawan}
                 loading={loading}
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+                deptFilter={deptFilter}
+                setDeptFilter={setDeptFilter}
                 onOpenAddModal={() => {
                     setFormData(prev => ({
                         ...prev,
@@ -62,10 +69,12 @@ export const KaryawanModule: React.FC<KaryawanModuleProps> = ({ activeUser }) =>
                 }}
             />
 
-            {/* Tabel Utama */}
+            {/* Tabel Utama dengan Dukungan Table / Cards / Compact View & Pagination */}
             <KaryawanTable
                 loading={loading}
                 karyawanList={filteredKaryawan}
+                viewMode={viewMode}
+                deptFilter={deptFilter}
                 onEdit={(k) => { setEditFormData({ ...k }); setShowEditModal(true); }}
                 onSanksi={(k) => {
                     setSelectedKaryawan(k);

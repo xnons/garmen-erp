@@ -115,11 +115,22 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
       const aiReply = res.data?.reply || 'Tidak ada respon dari model AI.';
       setMessages((prev) => [...prev, { role: 'assistant', content: aiReply }]);
     } catch (err: any) {
-      const errMsg = err.response?.data?.detail || err.message || 'Gagal menghubungi server AI.';
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: `⚠️ Terjadi kendala: ${errMsg}` }
-      ]);
+      const isNetworkErr = !err.response || err.message?.includes('Network Error') || err.message?.includes('ERR_FAILED');
+      if (isNetworkErr) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: `⏳ **Backend Sedang Menyambung Ulang (Render Spin-up / Cold-Start)**\n\nLayanan backend cloud sedang dalam proses start/rebuild. Anda tetap dapat menggunakan menu-menu ERP seperti biasa. Silakan tekan tombol kirim kembali dalam beberapa detik.`
+          }
+        ]);
+      } else {
+        const errMsg = err.response?.data?.detail || err.message || 'Gagal menghubungi server AI.';
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `⚠️ Terjadi kendala: ${errMsg}` }
+        ]);
+      }
     } finally {
       setIsChatLoading(false);
     }
