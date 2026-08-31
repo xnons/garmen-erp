@@ -359,6 +359,12 @@ async def lifespan(app: FastAPI):
             print("🟢 Akun Developer 'developer' berhasil dipersiapkan!")
 
         # Seed pipeline data secara otomatis
+        from scripts.seed_production_sql import seed_production_database
+        try:
+            seed_production_database()
+        except Exception as seed_err:
+            print(f"⚠️ Seeder Production: {seed_err}")
+            
         seed_pipeline_data(db)
 
     except Exception as e:
