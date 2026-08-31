@@ -33,6 +33,15 @@ class AIForensicSnapshotRequest(BaseModel):
     screen_name: Optional[str] = "DASHBOARD"
 
 
+@router.get("/test")
+def ai_test_endpoint(db: Session = Depends(get_db)):
+    import traceback
+    try:
+        reply = chat_with_persona("Test prompt", "EXECUTIVE", db)
+        return {"status": "OK", "reply": reply[:200]}
+    except Exception as e:
+        return {"status": "ERROR", "error": str(e), "traceback": traceback.format_exc()}
+
 @router.post("/chat")
 def ai_chat_endpoint(
     payload: AIChatRequest,

@@ -187,5 +187,5 @@ def root_check():
     return {
         "status": "Online",
         "system": "Nexora ERP Engine",
-        "version": "1.2.0"
+        "version": "1.2.1-live"
     }
