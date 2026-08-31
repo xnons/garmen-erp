@@ -78,7 +78,19 @@ def get_wip_movements(
         if so_id:
             query = query.filter(models.WIPMovement.so_id == so_id)
         if stage_name:
-            query = query.filter(models.WIPMovement.stage_name == stage_name.upper())
+            stg = stage_name.upper()
+            if "SEWING" in stg or "JAHIT" in stg:
+                query = query.filter(models.WIPMovement.stage_name.ilike("%SEWING%") | models.WIPMovement.stage_name.ilike("%JAHIT%"))
+            elif "PRINT" in stg:
+                query = query.filter(models.WIPMovement.stage_name.ilike("%PRINT%"))
+            elif "EMBROIDERY" in stg or "BORDIR" in stg:
+                query = query.filter(models.WIPMovement.stage_name.ilike("%EMB%") | models.WIPMovement.stage_name.ilike("%BORDIR%"))
+            elif "WASH" in stg:
+                query = query.filter(models.WIPMovement.stage_name.ilike("%WASH%"))
+            elif "FINISH" in stg:
+                query = query.filter(models.WIPMovement.stage_name.ilike("%FINISH%"))
+            else:
+                query = query.filter(models.WIPMovement.stage_name == stg)
         if status_filter:
             query = query.filter(models.WIPMovement.status == status_filter.upper())
             

@@ -278,11 +278,14 @@ def seed_production_database():
                     receipt_id=r1.id,
                     inspector_id=fitrah_id,
                     inspection_date=date(2026, 4, 2),
-                    total_points=8,
-                    inspected_yards=120.0,
-                    points_per_100_sq_yd=13.3,
-                    grade="PASS",
-                    notes="Kualitas kain sangat baik, tidak ada cacat benang mayor"
+                    lot_number="LOT-2604-01",
+                    length_before=120.0,
+                    length_after=120.0,
+                    width_inch=58.0,
+                    total_defect_points=8,
+                    summary_point=13.3,
+                    grade="GRADE_A",
+                    defect_remarks="Kualitas kain sangat baik, lolos standar 4-point ASTM"
                 )
                 db.add(insp1)
 
@@ -291,11 +294,9 @@ def seed_production_database():
                 alloc1 = models.MaterialAllocation(
                     so_id=so_target,
                     item_id=sample_item_id,
-                    allocation_date=date(2026, 4, 4),
-                    qty_allocated_yards=250.0,
-                    qty_actual_used_yards=245.0,
-                    allocated_by=fitrah_id,
-                    status="CONSUMED"
+                    dispatch_date=date(2026, 4, 4),
+                    qty_issued=250.0,
+                    surat_jalan_no="SJ-MAT-2604.01"
                 )
                 db.add(alloc1)
             db.commit()

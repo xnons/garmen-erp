@@ -140,10 +140,14 @@ INSERT INTO sales_orders (id, so_number, buyer_id, style_name, item_category, co
 (COALESCE(NULL, gen_random_uuid()::text), 'SO-MG260078', (SELECT id FROM partners WHERE name = 'WARNING' LIMIT 1), 'SKIVE LN#5 REG-FIT', 'SS KEMEJA', 'BROWN', 78, 'FINISHING', '2026-05-20', 'CMT', 33000.0, 2574000.0)
 ON CONFLICT (so_number) DO NOTHING;
 
--- 5. INSERT MATERIAL RECEIPTS & INSPECTIONS
+-- 5. INSERT MATERIAL RECEIPTS, INSPECTIONS & ALLOCATIONS
 INSERT INTO material_receipts (id, item_id, supplier_id, receipt_date, roll_number, qty_received, unit, contract_type, inspection_status) VALUES
 (gen_random_uuid()::text, (SELECT id FROM inventory_items WHERE item_code = 'MG-2604-BH0001' LIMIT 1), (SELECT id FROM partners WHERE category = 'BUYER' LIMIT 1), '2026-04-02', 'ROLL-2604-001', 500.0, 'YARD', 'FOB', 'PASS'),
 (gen_random_uuid()::text, (SELECT id FROM inventory_items WHERE item_code = 'MG-2604-BH0002' LIMIT 1), (SELECT id FROM partners WHERE category = 'BUYER' LIMIT 1), '2026-04-03', 'ROLL-2604-002', 800.0, 'YARD', 'FOB', 'PASS')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO material_allocations (id, so_id, item_id, dispatch_date, qty_issued, surat_jalan_no) VALUES
+(gen_random_uuid()::text, (SELECT id FROM sales_orders WHERE so_number = 'SO-MG260004' LIMIT 1), (SELECT id FROM inventory_items WHERE item_code = 'MG-2604-BH0001' LIMIT 1), '2026-04-04', 250.0, 'SJ-MAT-2604.01')
 ON CONFLICT DO NOTHING;
 
 -- 6. INSERT CUTTING LOGS & PREP TASKS
