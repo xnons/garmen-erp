@@ -57,36 +57,67 @@ def get_payroll_summary(
         total_pcs = 0
         gaji_kalkulasi = 0.0
 
-        if tipe == "BORONGAN":
-            # Ambil output borongan yang sudah diapprove QC pada periode bulan ini
-            output_stats = db.query(
-                func.coalesce(func.sum(models.LogOutputBorongan.qty_pass), 0).label("total_pcs"),
-                func.coalesce(func.sum(models.LogOutputBorongan.subtotal_rp), 0.0).label("total_subtotal")
-            ).filter(
-                models.LogOutputBorongan.karyawan_id == k.id_karyawan,
-                models.LogOutputBorongan.is_deleted == False,
-                models.LogOutputBorongan.status_verifikasi == "APPROVED",
-                extract('year', models.LogOutputBorongan.tanggal) == year,
-                extract('month', models.LogOutputBorongan.tanggal) == month
-            ).first()
+        # 1. Agregasi dari PieceRateWage (Garment Blueprint: Sewing, Obras, Steam, Kancing, Potong, Lipat, Packing, Press)
+        piece_stats = db.query(
+            func.coalesce(func.sum(models.PieceRateWage.qty_completed), 0).label("total_pcs"),
+            func.coalesce(func.sum(models.PieceRateWage.total_wage), 0.0).label("total_wage")
+        ).filter(
+            models.PieceRateWage.operator_id == k.id_karyawan,
+            extract('year', models.PieceRateWage.work_date) == year,
+            extract('month', models.PieceRateWage.work_date) == month
+        ).first()
 
-            if output_stats:
-                total_pcs = int(output_stats.total_pcs or 0)
-                subtotal_rp = float(output_stats.total_subtotal or 0.0)
-                # Gunakan total subtotal dari transaksi atau fallback tarif
-                if subtotal_rp > 0:
-                    gaji_kalkulasi = subtotal_rp
-                else:
-                    tarif = float(k.tarif_borongan_pcs or 0)
-                    gaji_kalkulasi = total_pcs * tarif
+        piece_pcs = int(piece_stats.total_pcs or 0) if piece_stats else 0
+        piece_wage = float(piece_stats.total_wage or 0.0) if piece_stats else 0.0
+
+        # 2. Agregasi dari CuttingPrepTask (Numbering, Press Interlining Silma/Anzani)
+        prep_stats = db.query(
+            func.coalesce(func.sum(models.CuttingPrepTask.qty_done), 0).label("total_pcs"),
+            func.coalesce(func.sum(models.CuttingPrepTask.total_wage), 0.0).label("total_wage")
+        ).filter(
+            models.CuttingPrepTask.operator_id == k.id_karyawan,
+            extract('year', models.CuttingPrepTask.task_date) == year,
+            extract('month', models.CuttingPrepTask.task_date) == month
+        ).first()
+
+        prep_pcs = int(prep_stats.total_pcs or 0) if prep_stats else 0
+        prep_wage = float(prep_stats.total_wage or 0.0) if prep_stats else 0.0
+
+        # 3. Agregasi dari LogOutputBorongan (Legacy system)
+        legacy_stats = db.query(
+            func.coalesce(func.sum(models.LogOutputBorongan.qty_pass), 0).label("total_pcs"),
+            func.coalesce(func.sum(models.LogOutputBorongan.subtotal_rp), 0.0).label("total_subtotal")
+        ).filter(
+            models.LogOutputBorongan.karyawan_id == k.id_karyawan,
+            models.LogOutputBorongan.is_deleted == False,
+            models.LogOutputBorongan.status_verifikasi == "APPROVED",
+            extract('year', models.LogOutputBorongan.tanggal) == year,
+            extract('month', models.LogOutputBorongan.tanggal) == month
+        ).first()
+
+        legacy_pcs = int(legacy_stats.total_pcs or 0) if legacy_stats else 0
+        legacy_subtotal = float(legacy_stats.total_subtotal or 0.0) if legacy_stats else 0.0
+
+        total_pcs = piece_pcs + prep_pcs + legacy_pcs
+        total_borongan_wage = piece_wage + prep_wage + legacy_subtotal
+
+        if tipe == "BORONGAN":
+            if total_borongan_wage > 0:
+                gaji_kalkulasi = total_borongan_wage
+            else:
+                tarif = float(k.tarif_borongan_pcs or 0)
+                gaji_kalkulasi = total_pcs * tarif
 
         elif tipe == "BULANAN":
             gaji_kalkulasi = float(k.gaji_pokok or 0)
+            # Jika karyawan bulanan juga dapat upah borongan tambahan
+            if total_borongan_wage > 0:
+                gaji_kalkulasi += total_borongan_wage
 
         elif tipe == "HARIAN":
             total_hadir = int(k.total_hadir or 0)
             tarif_harian = float(k.gaji_pokok or 0)
-            gaji_kalkulasi = total_hadir * tarif_harian
+            gaji_kalkulasi = (total_hadir * tarif_harian) + total_borongan_wage
 
         total_output_pcs_all += total_pcs
         total_pengeluaran_gaji_all += gaji_kalkulasi

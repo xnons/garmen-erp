@@ -17,8 +17,10 @@ export default function PrepWagesModal({
   onSuccess,
   orders
 }: PrepWagesModalProps) {
+  const [employees, setEmployees] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     so_id: orders.length > 0 ? orders[0].id : "",
+    operator_id: "",
     task_type: "PRESS_INTERLINING",
     task_date: new Date().toISOString().split('T')[0],
     qty_done: 300,
@@ -27,6 +29,25 @@ export default function PrepWagesModal({
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchEmployees();
+    }
+  }, [isOpen]);
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await api.get('/api/karyawan/list');
+      const list = res.data?.data || res.data || [];
+      setEmployees(list);
+      if (list.length > 0 && !formData.operator_id) {
+        setFormData(prev => ({ ...prev, operator_id: list[0].id_karyawan }));
+      }
+    } catch (err) {
+      console.error("Gagal mengambil daftar karyawan:", err);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -41,6 +62,10 @@ export default function PrepWagesModal({
     e.preventDefault();
     setErrorMsg("");
 
+    if (!formData.operator_id) {
+      setErrorMsg("Pilih nama pekerja.");
+      return;
+    }
     if (!formData.so_id) {
       setErrorMsg("Pilih Sales Order target.");
       return;
@@ -54,6 +79,7 @@ export default function PrepWagesModal({
     try {
       await api.post('/api/cutting/prep-tasks', {
         so_id: formData.so_id,
+        operator_id: formData.operator_id,
         task_type: formData.task_type,
         task_date: formData.task_date,
         qty_done: Number(formData.qty_done),
@@ -100,6 +126,25 @@ export default function PrepWagesModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Pilih Nama Pekerja / Operator <span className="text-rose-400">*</span>
+            </label>
+            <select
+              required
+              value={formData.operator_id}
+              onChange={(e) => setFormData({ ...formData, operator_id: e.target.value })}
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white font-semibold focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">-- Pilih Pekerja Pabrik --</option>
+              {employees.map(emp => (
+                <option key={emp.id_karyawan} value={emp.id_karyawan}>
+                  {emp.nama} ({emp.jabatan || 'Operator'})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
               Sales Order Target <span className="text-rose-400">*</span>

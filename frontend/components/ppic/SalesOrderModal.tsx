@@ -45,6 +45,13 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess }: SalesOrd
   const [errorMsg, setErrorMsg] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // State Tambah Buyer / Brand Baru Dinamis
+  const [showNewBuyerModal, setShowNewBuyerModal] = useState<boolean>(false);
+  const [newBuyerName, setNewBuyerName] = useState<string>("");
+  const [newBuyerPhone, setNewBuyerPhone] = useState<string>("");
+  const [newBuyerAddress, setNewBuyerAddress] = useState<string>("");
+  const [creatingBuyer, setCreatingBuyer] = useState<boolean>(false);
+
   useEffect(() => {
     if (isOpen) {
       fetchBuyers();
@@ -63,6 +70,36 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess }: SalesOrd
       console.error("Gagal mengambil daftar buyer:", err);
     } finally {
       setLoadingBuyers(false);
+    }
+  };
+
+  const handleCreateNewBuyer = async () => {
+    if (!newBuyerName.trim()) {
+      alert("Nama Brand / Buyer tidak boleh kosong.");
+      return;
+    }
+    setCreatingBuyer(true);
+    try {
+      const randomNum = Math.floor(Math.random() * 900 + 100);
+      const code = `BYR-${newBuyerName.trim().substring(0, 3).toUpperCase()}${randomNum}`;
+      const res = await api.post('/api/ppic/partners', {
+        name: newBuyerName.trim().toUpperCase(),
+        code: code,
+        category: 'BUYER',
+        phone: newBuyerPhone || null,
+        address: newBuyerAddress || null
+      });
+      const created = res.data;
+      setBuyers(prev => [...prev, created]);
+      setFormData(prev => ({ ...prev, buyer_id: created.id }));
+      setShowNewBuyerModal(false);
+      setNewBuyerName("");
+      setNewBuyerPhone("");
+      setNewBuyerAddress("");
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Gagal menambahkan brand baru.");
+    } finally {
+      setCreatingBuyer(false);
     }
   };
 
@@ -203,9 +240,19 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess }: SalesOrd
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Buyer / Brand Pemesan <span className="text-rose-400">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Buyer / Brand Pemesan <span className="text-rose-400">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowNewBuyerModal(true)}
+                  className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 hover:underline"
+                >
+                  <Plus className="w-3 h-3" />
+                  + Brand Baru
+                </button>
+              </div>
               <select
                 value={formData.buyer_id}
                 onChange={(e) => setFormData({ ...formData, buyer_id: e.target.value })}
@@ -413,6 +460,87 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess }: SalesOrd
         </form>
 
       </div>
+
+      {/* 🟢 MODAL POPUP TAMBAH BRAND / BUYER BARU */}
+      {showNewBuyerModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-base">
+                <Plus className="w-4 h-4 text-indigo-400" />
+                Tambah Brand / Buyer Pemesan Baru
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewBuyerModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nama Brand / Perusahaan Buyer <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: ZARA, ERIGO, UNIQLO, CARDINAL"
+                  value={newBuyerName}
+                  onChange={(e) => setNewBuyerName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nomor Kontak / WhatsApp (Opsional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="0812xxxxxxx"
+                  value={newBuyerPhone}
+                  onChange={(e) => setNewBuyerPhone(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Alamat Kantor / Gudang Buyer (Opsional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Alamat penyerahan barang buyer..."
+                  value={newBuyerAddress}
+                  onChange={(e) => setNewBuyerAddress(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowNewBuyerModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={creatingBuyer || !newBuyerName.trim()}
+                onClick={handleCreateNewBuyer}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+              >
+                {creatingBuyer ? "Menyimpan..." : "Simpan & Pilih Brand"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

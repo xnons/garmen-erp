@@ -58,10 +58,14 @@ def create_cutting_record(
     main_rate = round(payload.main_fabric_used / payload.qty_cut, 4)
     puring_rate = round((payload.puring_used or 0.0) / payload.qty_cut, 4) if (payload.puring_used and payload.puring_used > 0) else 0.0
 
+    assigned_operator_id = payload.operator_id or current_user.id_karyawan
+    operator_obj = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == assigned_operator_id).first()
+    operator_name = operator_obj.nama if operator_obj else current_user.nama
+
     cutting = models.CuttingRecord(
         so_id=payload.so_id,
         cutting_date=payload.cutting_date,
-        operator_id=current_user.id_karyawan,
+        operator_id=assigned_operator_id,
         qty_cut=payload.qty_cut,
         size_breakdown_cut=payload.size_breakdown_cut or {},
         main_fabric_used=payload.main_fabric_used,
@@ -83,11 +87,11 @@ def create_cutting_record(
         actor_id=current_user.id_karyawan,
         aksi="CUTTING_RECORD",
         target_id=cutting.id,
-        catatan=f"Potong {payload.qty_cut} pcs untuk SO '{so.so_number}'. Konsumsi Utama: {main_rate} Yd/Pcs, Puring: {puring_rate} Yd/Pcs."
+        catatan=f"Potong {payload.qty_cut} pcs oleh '{operator_name}' untuk SO '{so.so_number}'. Konsumsi Utama: {main_rate} Yd/Pcs, Puring: {puring_rate} Yd/Pcs."
     )
 
     resp = CuttingRecordResponse.from_orm(cutting)
-    resp.operator_name = current_user.nama
+    resp.operator_name = operator_name
     return resp
 
 
@@ -128,13 +132,17 @@ def create_prep_task(
     if not so:
         raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
 
+    assigned_operator_id = payload.operator_id or current_user.id_karyawan
+    operator_obj = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == assigned_operator_id).first()
+    operator_name = operator_obj.nama if operator_obj else current_user.nama
+
     rate = payload.piece_rate or (150.0 if payload.task_type.upper() == "NUMBERING" else 250.0)
     total_gaji = round(payload.qty_done * rate, 2)
 
     task = models.CuttingPrepTask(
         so_id=payload.so_id,
         task_type=payload.task_type.upper(),
-        operator_id=current_user.id_karyawan,
+        operator_id=assigned_operator_id,
         task_date=payload.task_date,
         qty_done=payload.qty_done,
         size_breakdown=payload.size_breakdown or {},
@@ -146,5 +154,5 @@ def create_prep_task(
     db.refresh(task)
 
     resp = CuttingPrepTaskResponse.from_orm(task)
-    resp.operator_name = current_user.nama
+    resp.operator_name = operator_name
     return resp

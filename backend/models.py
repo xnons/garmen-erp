@@ -592,8 +592,11 @@ class PieceRateWage(Base):
     operation_type = Column(String(50), nullable=False)                    # 'STIM', 'LUBANG_KANCING', 'PASANG_KANCING', 'LIPAT', 'PACKING'
     work_date = Column(Date, nullable=False)
     qty_completed = Column(Integer, nullable=False)
+    qty_reject = Column(Integer, default=0)                                # Jumlah cacat / rijek
+    size_breakdown = Column(JSON, default={})                              # {'28': 50, '30': 100}
     wage_per_piece = Column(Float, nullable=False)                         # misal Rp500 atau Rp600
     total_wage = Column(Float, default=0.0)
+    notes = Column(Text, nullable=True)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
     operator = relationship("Karyawan", foreign_keys=[operator_id])

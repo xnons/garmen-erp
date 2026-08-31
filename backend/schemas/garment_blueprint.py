@@ -150,6 +150,7 @@ class MaterialAllocationResponse(MaterialAllocationCreate):
 # ===========================================================================
 class CuttingRecordCreate(BaseModel):
     so_id: str
+    operator_id: Optional[str] = None
     cutting_date: date
     qty_cut: int
     size_breakdown_cut: Optional[Dict[str, int]] = {}
@@ -173,6 +174,7 @@ class CuttingRecordResponse(CuttingRecordCreate):
 
 class CuttingPrepTaskCreate(BaseModel):
     so_id: str
+    operator_id: Optional[str] = None
     task_type: str # NUMBERING / PRESS_INTERLINING
     task_date: date
     qty_done: int
@@ -241,10 +243,14 @@ class WIPMovementResponse(BaseModel):
 # ===========================================================================
 class PieceRateWageCreate(BaseModel):
     so_id: str
-    operation_type: str # STIM, LUBANG_KANCING, PASANG_KANCING, LIPAT, PACKING
+    operator_id: Optional[str] = None
+    operation_type: str # JAHIT_SEWING, OBRAS, STIM, LUBANG_KANCING, PASANG_KANCING, BUANG_BENANG, LIPAT, PACKING, PRESS_INTERLINING, POTONG_POLA
     work_date: date
     qty_completed: int
-    wage_per_piece: float # e.g. 500 or 600
+    qty_reject: Optional[int] = 0
+    size_breakdown: Optional[dict] = {}
+    wage_per_piece: float # e.g. 550 or 2500
+    notes: Optional[str] = None
 
 class PieceRateWageResponse(PieceRateWageCreate):
     id: str

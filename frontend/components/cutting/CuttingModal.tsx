@@ -12,8 +12,10 @@ interface CuttingModalProps {
 }
 
 export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: CuttingModalProps) {
+  const [employees, setEmployees] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     so_id: orders.length > 0 ? orders[0].id : "",
+    operator_id: "",
     cutting_date: new Date().toISOString().split('T')[0],
     qty_cut: 500,
     main_fabric_used: 650,
@@ -34,6 +36,25 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchEmployees();
+    }
+  }, [isOpen]);
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await api.get('/api/karyawan/list');
+      const list = res.data?.data || res.data || [];
+      setEmployees(list);
+      if (list.length > 0 && !formData.operator_id) {
+        setFormData(prev => ({ ...prev, operator_id: list[0].id_karyawan }));
+      }
+    } catch (err) {
+      console.error("Gagal mengambil daftar karyawan:", err);
+    }
+  };
 
   const totalMatrixQty = Object.values(sizeMatrix).reduce((acc, q) => acc + (Number(q) || 0), 0);
 
@@ -68,6 +89,7 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
     try {
       await api.post('/api/cutting/records', {
         so_id: formData.so_id,
+        operator_id: formData.operator_id || null,
         cutting_date: formData.cutting_date,
         qty_cut: formData.qty_cut,
         size_breakdown_cut: sizeMatrix,
@@ -122,7 +144,26 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Pilih Operator Potong / Meja Pola <span className="text-rose-400">*</span>
+              </label>
+              <select
+                required
+                value={formData.operator_id}
+                onChange={(e) => setFormData({ ...formData, operator_id: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white font-semibold focus:outline-none focus:border-amber-500"
+              >
+                <option value="">-- Pilih Pekerja / Bu Nani --</option>
+                {employees.map(emp => (
+                  <option key={emp.id_karyawan} value={emp.id_karyawan}>
+                    {emp.nama} ({emp.jabatan || 'Cutting'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                 Sales Order Target <span className="text-rose-400">*</span>

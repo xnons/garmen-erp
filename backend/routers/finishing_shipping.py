@@ -52,23 +52,30 @@ def create_piece_rate_wage(
     if not so:
         raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
 
+    assigned_operator_id = payload.operator_id or current_user.id_karyawan
+    operator_obj = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == assigned_operator_id).first()
+    operator_name = operator_obj.nama if operator_obj else current_user.nama
+
     total_wage = round(payload.qty_completed * payload.wage_per_piece, 2)
 
     wage = models.PieceRateWage(
         so_id=payload.so_id,
-        operator_id=current_user.id_karyawan,
+        operator_id=assigned_operator_id,
         operation_type=payload.operation_type.upper(),
         work_date=payload.work_date,
         qty_completed=payload.qty_completed,
+        qty_reject=payload.qty_reject or 0,
+        size_breakdown=payload.size_breakdown or {},
         wage_per_piece=payload.wage_per_piece,
-        total_wage=total_wage
+        total_wage=total_wage,
+        notes=payload.notes
     )
     db.add(wage)
     db.commit()
     db.refresh(wage)
 
     resp = PieceRateWageResponse.from_orm(wage)
-    resp.operator_name = current_user.nama
+    resp.operator_name = operator_name
     return resp
 
 
