@@ -52,22 +52,42 @@ export default function Sidebar({
     }
   };
 
-  // 🛡️ RBAC & Lucide Icons Navigation (PT. Chikal Jaya Makmur Master Garment)
-  const menuItems = [
-    { id: 'wip-control-tower', label: 'Master Control Tower', icon: Layers, roles: ['*'], badge: 'LIVE' },
-    { id: 'ppic-so', label: '1. PPIC & Sales Order', icon: FileSpreadsheet, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'PPIC'] },
-    { id: 'warehouse-fabric', label: '2. Gudang & QC 4-Point', icon: PackageCheck, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'GUDANG', 'QC_INSPECTOR'] },
-    { id: 'cutting-prep', label: '3. Cutting & Persiapan', icon: Scissors, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'CUTTING_OPERATOR', 'PRESS_OPERATOR', 'PRODUKSI'] },
-    { id: 'wip-subcon', label: '4. Distribusi Subcon', icon: Truck, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'LINE_SUPERVISOR', 'PRODUKSI'] },
-    { id: 'finishing-wages', label: '5. Finishing Borongan', icon: Sparkles, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINISHING_OPERATOR', 'PRODUKSI'] },
-    { id: 'shipping-billing', label: '6. Shipping & Form WI', icon: FileText, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINANCE', 'EXPEDITION_DRIVER'] },
-    { id: 'dashboard', label: 'Ringkasan Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINANCE', 'PRODUKSI', 'GUDANG'] },
-    { id: 'karyawan', label: 'Kelola Karyawan', icon: Users, roles: ['OWNER', 'ADMIN', 'DEVELOPER'] },
-    { id: 'inventaris', label: 'Stok Aksesoris & Trims', icon: Package, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'GUDANG'] },
-    { id: 'mesin', label: 'Inventaris Mesin', icon: Cpu, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'PRODUKSI'] },
-    { id: 'payroll', label: 'Payroll & Gaji', icon: Wallet, roles: ['OWNER', 'FINANCE', 'DEVELOPER'] },
-    { id: 'audit-log', label: 'Log Audit Keamanan', icon: ShieldAlert, roles: ['OWNER', 'DEVELOPER'] },
-    { id: 'setting', label: 'Akun Saya', icon: User, roles: ['*'] },
+  // 🛡️ RBAC & Categorized Navigation (PT. Chikal Jaya Makmur Master Garment)
+  const menuCategories = [
+    {
+      categoryTitle: 'UTAMA & MONITORING',
+      items: [
+        { id: 'dashboard', label: 'Ringkasan Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINANCE', 'PRODUKSI', 'GUDANG', 'PPIC', 'QC_INSPECTOR', 'LINE_SUPERVISOR', 'CUTTING_OPERATOR', 'FINISHING_OPERATOR'] },
+        { id: 'wip-control-tower', label: 'Master Control Tower', icon: Layers, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'PPIC', 'LINE_SUPERVISOR', 'PRODUKSI'], badge: 'LIVE' },
+      ]
+    },
+    {
+      categoryTitle: 'ALUR PRODUKSI GARMEN',
+      items: [
+        { id: 'ppic-so', label: '1. PPIC & Sales Order', icon: FileSpreadsheet, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'PPIC'] },
+        { id: 'warehouse-fabric', label: '2. Gudang & QC 4-Point', icon: PackageCheck, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'GUDANG', 'QC_INSPECTOR', 'PPIC'] },
+        { id: 'cutting-prep', label: '3. Cutting & Persiapan', icon: Scissors, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'CUTTING_OPERATOR', 'PRESS_OPERATOR', 'PRODUKSI'] },
+        { id: 'wip-subcon', label: '4. Distribusi Subcon', icon: Truck, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'LINE_SUPERVISOR', 'PRODUKSI'] },
+        { id: 'finishing-wages', label: '5. Finishing Borongan', icon: Sparkles, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINISHING_OPERATOR', 'PRODUKSI'] },
+        { id: 'shipping-billing', label: '6. Shipping & Form WI', icon: FileText, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINANCE', 'EXPEDITION_DRIVER'] },
+      ]
+    },
+    {
+      categoryTitle: 'MANAJEMEN PABRIK & ASET',
+      items: [
+        { id: 'karyawan', label: 'Kelola Karyawan', icon: Users, roles: ['OWNER', 'ADMIN', 'DEVELOPER'] },
+        { id: 'inventaris', label: 'Stok Aksesoris & Trims', icon: Package, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'GUDANG'] },
+        { id: 'mesin', label: 'Inventaris Mesin', icon: Cpu, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'PRODUKSI'] },
+        { id: 'payroll', label: 'Payroll & Gaji', icon: Wallet, roles: ['OWNER', 'FINANCE', 'DEVELOPER'] },
+      ]
+    },
+    {
+      categoryTitle: 'SISTEM & KEAMANAN',
+      items: [
+        { id: 'audit-log', label: 'Log Audit Keamanan', icon: ShieldAlert, roles: ['OWNER', 'DEVELOPER'] },
+        { id: 'setting', label: 'Profil & Akun Saya', icon: User, roles: ['*'] },
+      ]
+    }
   ];
 
   // Normalisasi string role ke UPPERCASE
@@ -156,49 +176,76 @@ export default function Sidebar({
               </button>
             </div>
 
-            {/* LIST NAVIGASI RBAC */}
-            <nav className="p-3 space-y-1.5">
-              {menuItems.map((item) => {
-                // Bypass akses DEVELOPER atau cek role di dalam array roles
-                const hasAccess = userRole === 'DEVELOPER' || item.roles.includes(userRole);
-                if (!hasAccess) return null;
+            {/* LIST NAVIGASI TERKATEGORISASI (RBAC FILTERED) */}
+            <nav className="p-3 space-y-4">
+              {menuCategories.map((cat, catIdx) => {
+                // Filter item yang boleh diakses role aktif
+                const accessibleItems = cat.items.filter((item) => {
+                  return userRole === 'DEVELOPER' || item.roles.includes('*') || item.roles.includes(userRole);
+                });
 
-                const isActive = activeMenu === item.id;
-                const IconComponent = item.icon;
+                if (accessibleItems.length === 0) return null;
 
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleSelectMenu(item.id)}
-                    title={isCollapsed ? item.label : undefined}
-                    className={`relative w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-3 cursor-pointer group ${
-                      isCollapsed ? 'md:justify-center md:px-0' : ''
-                    } ${
-                      isActive
-                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/25 scale-[1.02]'
-                        : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-                    }`}
-                  >
-                    {/* Glowing Active Line Accent */}
-                    {isActive && (
-                      <span className={`absolute left-0 top-1.5 bottom-1.5 w-1 bg-indigo-300 rounded-r-full shadow-sm ${isCollapsed ? 'md:hidden' : 'block'}`} />
+                  <div key={catIdx} className="space-y-1">
+                    {/* Header Kategori Section */}
+                    {!isCollapsed ? (
+                      <p className="px-3 pt-1 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <span className="w-1 h-1 rounded-full bg-slate-600" />
+                        {cat.categoryTitle}
+                      </p>
+                    ) : (
+                      catIdx > 0 && <div className="border-t border-slate-800/80 my-2 mx-1" />
                     )}
 
-                    <IconComponent
-                      className={`w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-400'
-                      }`}
-                    />
+                    <div className="space-y-1">
+                      {accessibleItems.map((item) => {
+                        const isActive = activeMenu === item.id;
+                        const IconComponent = item.icon;
 
-                    <span className={`truncate tracking-wide ${isCollapsed ? 'md:hidden' : 'block'}`}>
-                      {item.label}
-                    </span>
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => handleSelectMenu(item.id)}
+                            title={isCollapsed ? item.label : undefined}
+                            className={`relative w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-3 cursor-pointer group ${
+                              isCollapsed ? 'md:justify-center md:px-0' : ''
+                            } ${
+                              isActive
+                                ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/25 scale-[1.01]'
+                                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                            }`}
+                          >
+                            {/* Glowing Active Line Accent */}
+                            {isActive && (
+                              <span className={`absolute left-0 top-1.5 bottom-1.5 w-1 bg-indigo-300 rounded-r-full shadow-sm ${isCollapsed ? 'md:hidden' : 'block'}`} />
+                            )}
 
-                    {/* Active Indicator Pulse Dot */}
-                    {isActive && (
-                      <span className={`ml-auto w-1.5 h-1.5 rounded-full bg-indigo-200 shadow-sm animate-pulse ${isCollapsed ? 'md:hidden' : 'block'}`} />
-                    )}
-                  </button>
+                            <IconComponent
+                              className={`w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                                isActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-400'
+                              }`}
+                            />
+
+                            <span className={`truncate tracking-wide ${isCollapsed ? 'md:hidden' : 'block'}`}>
+                              {item.label}
+                            </span>
+
+                            {/* Badge atau Active Indicator */}
+                            {item.badge && !isCollapsed && (
+                              <span className="ml-auto text-[9px] px-1.5 py-0.2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-mono font-bold">
+                                {item.badge}
+                              </span>
+                            )}
+
+                            {isActive && !item.badge && (
+                              <span className={`ml-auto w-1.5 h-1.5 rounded-full bg-indigo-200 shadow-sm animate-pulse ${isCollapsed ? 'md:hidden' : 'block'}`} />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </nav>

@@ -43,10 +43,24 @@ async def create_karyawan(
             detail=f"Akses Ditolak! Admin atau Owner tidak diperbolehkan mendaftarkan akun ber-role '{target_role}'. Fitur ini khusus DEVELOPER."
         )
 
+    data_dict = input_data.model_dump()
+    can_login = data_dict.get("can_login", True)
+    if can_login is None:
+        can_login = True
+
+    # Jika karyawan offline (can_login = False), auto-generate username & password dummy jika tidak diisi
+    if not can_login:
+        if not data_dict.get("username"):
+            import secrets
+            data_dict["username"] = f"emp_{data_dict.get('id_karyawan') or secrets.token_hex(4)}"
+        if not data_dict.get("password"):
+            import secrets
+            data_dict["password"] = secrets.token_urlsafe(32)
+
     # Cek duplikasi Username / ID Karyawan
     existing_user = db.query(models.Karyawan).filter(
-        (models.Karyawan.username == input_data.username) | 
-        (models.Karyawan.id_karyawan == input_data.id_karyawan)
+        (models.Karyawan.username == data_dict.get("username")) | 
+        (models.Karyawan.id_karyawan == data_dict.get("id_karyawan"))
     ).first()
     
     if existing_user:
@@ -55,9 +69,8 @@ async def create_karyawan(
             detail="Username atau ID Karyawan sudah terdaftar di sistem!"
         )
 
-    # Hash password baru
-    data_dict = input_data.model_dump()
-    raw_password = data_dict.pop("password")
+    # Hash password
+    raw_password = data_dict.pop("password", "SecretDummy123!")
     hashed_pwd = get_password_hash(raw_password)
 
     new_karyawan = models.Karyawan(
@@ -93,17 +106,22 @@ async def get_all_karyawan(
             "nama": p.nama,
             "username": p.username,
             "role": p.role,
+            "can_login": getattr(p, "can_login", True),
             "jabatan": p.jabatan,
             "tanggal_lahir": p.tanggal_lahir,
             "no_hp": p.no_hp,
             "alamat": p.alamat,
             "status_karyawan": p.status_karyawan,
             "tanggal_masuk": p.tanggal_masuk,
-            "is_active": p.is_active,
             "tipe_pay": p.tipe_pay,
             "gaji_pokok": p.gaji_pokok,
             "tarif_borongan_pcs": p.tarif_borongan_pcs,
-            "poin_pelanggaran": p.poin_pelanggaran
+            "is_active": p.is_active,
+            "poin_pelanggaran": p.poin_pelanggaran,
+            "total_hadir": p.total_hadir,
+            "total_terlambat": p.total_terlambat,
+            "total_izin": p.total_izin,
+            "total_alpa": p.total_alpa
         }
         for p in daftar_pekerja
     ]

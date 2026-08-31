@@ -91,15 +91,59 @@ export const AddKaryawanModal: React.FC<AddKaryawanModalProps> = ({
 
                 <form onSubmit={onSubmit} className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
 
+                    {/* PILIHAN TIPE AKSES KARYAWAN */}
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+                        <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                            <span>Tipe Akses Karyawan</span>
+                            <span className="text-[10px] text-slate-400 font-normal">
+                                {formData?.can_login === false ? 'Hanya Pendataan Profil & Upah' : 'Memiliki Akun Login Web'}
+                            </span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, can_login: false })}
+                                className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                                    formData?.can_login === false
+                                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-sm'
+                                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                }`}
+                            >
+                                <span className="flex items-center gap-1.5">
+                                    🏢 Karyawan Operasional
+                                </span>
+                                <span className="text-[10px] font-normal text-slate-400">Offline / Tanpa Login Web</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setFormData({ ...formData, can_login: true });
+                                    if (!formData?.password) onGeneratePassword();
+                                }}
+                                className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                                    formData?.can_login !== false
+                                        ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300 shadow-sm'
+                                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                }`}
+                            >
+                                <span className="flex items-center gap-1.5">
+                                    💻 Pengguna Aplikasi
+                                </span>
+                                <span className="text-[10px] font-normal text-slate-400">Akses Dashboard Web</span>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* SECTION 1: Akun & Kredensial Login */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider">
                             <User className="w-4 h-4" />
-                            <span>1. Akun & Kredensial Login</span>
+                            <span>1. Profil {formData?.can_login !== false ? '& Kredensial Login' : 'Karyawan'}</span>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
+                            <div className={formData?.can_login === false ? 'md:col-span-2' : ''}>
                                 <label className="text-xs font-medium text-slate-400 mb-1 block">Nama Lengkap *</label>
                                 <input
                                     type="text"
@@ -111,41 +155,45 @@ export const AddKaryawanModal: React.FC<AddKaryawanModalProps> = ({
                                 />
                             </div>
 
-                            <div>
-                                <label className="text-xs font-medium text-slate-400 mb-1 block">Username Login *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="budisantoso"
-                                    value={formData?.username ?? ''}
-                                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:border-indigo-500 outline-none transition-all"
-                                />
-                            </div>
+                            {formData?.can_login !== false && (
+                                <>
+                                    <div>
+                                        <label className="text-xs font-medium text-slate-400 mb-1 block">Username Login *</label>
+                                        <input
+                                            type="text"
+                                            required={formData?.can_login !== false}
+                                            placeholder="budisantoso"
+                                            value={formData?.username ?? ''}
+                                            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:border-indigo-500 outline-none transition-all"
+                                        />
+                                    </div>
 
-                            <div className="md:col-span-2">
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-                                        <Key className="w-3.5 h-3.5 text-emerald-400" />
-                                        <span>Password Auto-Generate *</span>
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={onGeneratePassword}
-                                        className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 cursor-pointer transition-colors"
-                                    >
-                                        <RefreshCw className="w-3 h-3" />
-                                        <span>Acak Password</span>
-                                    </button>
-                                </div>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData?.password ?? ''}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-emerald-400 font-mono font-bold tracking-wider focus:border-indigo-500 outline-none transition-all"
-                                />
-                            </div>
+                                    <div className="md:col-span-2">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                                                <Key className="w-3.5 h-3.5 text-emerald-400" />
+                                                <span>Password Auto-Generate *</span>
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={onGeneratePassword}
+                                                className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                                            >
+                                                <RefreshCw className="w-3 h-3" />
+                                                <span>Acak Password</span>
+                                            </button>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            required={formData?.can_login !== false}
+                                            value={formData?.password ?? ''}
+                                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-emerald-400 font-mono font-bold tracking-wider focus:border-indigo-500 outline-none transition-all"
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
 

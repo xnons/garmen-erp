@@ -55,6 +55,7 @@ class Karyawan(Base):
     pin = Column(String(10), default="123456")  # Security PIN 6-Digit khusus otorisasi
     role = Column(String, default="PRODUKSI")   # PRODUKSI, ADMIN, FINANCE, GUDANG, OWNER, DEVELOPER
     is_active = Column(Boolean, default=True)   # Status Aktif Bekerja
+    can_login = Column(Boolean, default=True)   # 👈 Hak akses login ke sistem web (False = Offline Worker)
     
     # BIODATA & DETAIL PEKERJAAN
     jabatan = Column(String, default="Operator Produksi")  # Operator Sewing, Potong, QC, Mekanik, dll.

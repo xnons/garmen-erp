@@ -10,7 +10,7 @@ from schemas.garment_blueprint import (
     PartnerCreate, PartnerResponse,
     SalesOrderCreate, SalesOrderUpdate, SalesOrderResponse
 )
-from core.security import get_current_user
+from core.security import get_current_user, require_role
 from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/ppic", tags=["PPIC & Sales Order (SO)"])
@@ -33,7 +33,7 @@ def get_all_partners(
 def create_partner(
     payload: PartnerCreate,
     db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(get_current_user)
+    current_user: models.Karyawan = Depends(require_role(["PPIC", "ADMIN", "OWNER", "DEVELOPER"]))
 ):
     partner = models.Partner(
         code=payload.code or f"PTR-{int(datetime.utcnow().timestamp()) % 10000}",
@@ -74,7 +74,7 @@ def get_all_sales_orders(
 def create_sales_order(
     payload: SalesOrderCreate,
     db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(get_current_user)
+    current_user: models.Karyawan = Depends(require_role(["PPIC", "ADMIN", "OWNER", "DEVELOPER"]))
 ):
     existing = db.query(models.SalesOrder).filter(models.SalesOrder.so_number == payload.so_number).first()
     if existing:
@@ -141,7 +141,7 @@ def update_sales_order(
     so_id: str,
     payload: SalesOrderUpdate,
     db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(get_current_user)
+    current_user: models.Karyawan = Depends(require_role(["PPIC", "ADMIN", "OWNER", "DEVELOPER"]))
 ):
     so = db.query(models.SalesOrder).filter(models.SalesOrder.id == so_id).first()
     if not so:

@@ -10,6 +10,7 @@ export interface Karyawan {
     nama: string;
     username: string;
     role: string;
+    can_login?: boolean;
     jabatan: string;
     tanggal_lahir?: string;
     no_hp?: string;

@@ -6,10 +6,11 @@ from typing import Optional
 class RegisterInput(BaseModel):
     id_karyawan: Optional[str] = None
     nama: str
-    username: str
-    password: str
+    username: Optional[str] = None
+    password: Optional[str] = None
     pin: Optional[str] = "1234"
     role: str = "PRODUKSI"
+    can_login: Optional[bool] = True  # True: Pengguna Web, False: Karyawan Offline
     
     # BIODATA & PEKERJAAN
     jabatan: str = "Operator Produksi"
@@ -41,6 +42,7 @@ class UpdateKaryawanInput(BaseModel):
     gaji_pokok: Optional[int] = None
     tarif_borongan_pcs: Optional[int] = None
     is_active: Optional[bool] = None
+    can_login: Optional[bool] = None
     password: Optional[str] = None
 
 

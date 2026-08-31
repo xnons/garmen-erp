@@ -199,7 +199,7 @@ async def login(credentials: LoginInput, request: Request, db: Session = Depends
         )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kombinasi Username atau Password salah!")
     
-    # 2️⃣ Validasi Status Aktif Akun
+    # 2️⃣ Validasi Status Aktif Akun & Izin Akses Login
     if not user.is_active:
         record_login_log(
             db, 
@@ -212,6 +212,22 @@ async def login(credentials: LoginInput, request: Request, db: Session = Depends
             "Akun nonaktif/diarsipkan"
         )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Akun Anda dalam status nonaktif/diarsipkan.")
+
+    if not getattr(user, 'can_login', True):
+        record_login_log(
+            db,
+            user.id_karyawan,
+            credentials.username,
+            "BLOCKED_OFFLINE_USER",
+            client_ip,
+            device_info,
+            lokasi,
+            "Karyawan terdaftar sebagai non-sistem (tanpa akun web)"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses Ditolak: Karyawan ini terdaftar sebagai staf operasional non-sistem (tanpa izin masuk web)."
+        )
 
     # 3️⃣ 🛡️ Login Time Guard (Blokir Akses di Luar Jam Kerja, Kecuali Owner/Developer)
     user_role_upper = str(user.role or "").upper()

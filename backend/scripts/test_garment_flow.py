@@ -53,17 +53,22 @@ def test_full_garment_workflow():
         print(f"✅ SO Terdaftar: {so.so_number} ({so.style_name}) - Target: {so.order_qty} Pcs")
 
         print("\n🚀 [TEST 2/8] Penerimaan Kain & Uji Mutu 4-Point ASTM...")
-        item = models.InventoryItem(
-            item_code="MG-2604-BH0001",
-            description="DENIM 13 OZ STRETCH BLACK",
-            item_type="FABRIC_MAIN",
-            unit="YARD",
-            unit_price=28000.0,
-            current_stock=700.0
-        )
-        db.add(item)
-        db.commit()
-        db.refresh(item)
+        item = db.query(models.InventoryItem).filter(models.InventoryItem.item_code == "MG-2604-BH0001").first()
+        if not item:
+            item = models.InventoryItem(
+                item_code="MG-2604-BH0001",
+                description="DENIM 13 OZ STRETCH BLACK",
+                item_type="FABRIC_MAIN",
+                unit="YARD",
+                unit_price=28000.0,
+                current_stock=700.0
+            )
+            db.add(item)
+            db.commit()
+            db.refresh(item)
+        else:
+            item.current_stock = 700.0
+            db.commit()
 
         receipt = models.MaterialReceipt(
             item_id=item.id,

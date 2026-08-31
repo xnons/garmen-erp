@@ -59,10 +59,27 @@ export const EditKaryawanModal: React.FC<EditKaryawanModalProps> = ({
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white"
                             >
                                 <option value="PRODUKSI">PRODUKSI</option>
+                                <option value="PPIC">PPIC</option>
                                 <option value="GUDANG">GUDANG</option>
+                                <option value="QC_INSPECTOR">QC INSPECTOR</option>
+                                <option value="LINE_SUPERVISOR">LINE SUPERVISOR</option>
+                                <option value="CUTTING_OPERATOR">CUTTING OPERATOR</option>
+                                <option value="FINISHING_OPERATOR">FINISHING OPERATOR</option>
+                                <option value="EXPEDITION_DRIVER">DRIVER EKSPEDISI</option>
                                 <option value="FINANCE">FINANCE</option>
                                 <option value="ADMIN">ADMIN</option>
                                 <option value="OWNER">OWNER</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-slate-400 mb-1 block">Hak Akses Login Web</label>
+                            <select
+                                value={editFormData.can_login !== false ? 'TRUE' : 'FALSE'}
+                                onChange={(e) => setEditFormData({ ...editFormData, can_login: e.target.value === 'TRUE' })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white"
+                            >
+                                <option value="TRUE">AKTIF (Bisa Login Web)</option>
+                                <option value="FALSE">OFFLINE (Non-Login)</option>
                             </select>
                         </div>
                         <div>

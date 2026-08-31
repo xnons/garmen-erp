@@ -49,6 +49,7 @@ def auto_migrate_db():
             ("mesin", "tanggal_pembelian", "VARCHAR(20)"),
             ("mesin", "garansi_hingga", "VARCHAR(20)"),
             ("mesin", "riwayat_pembayaran", "TEXT DEFAULT '[]'"),
+            ("karyawan", "can_login", "BOOLEAN DEFAULT TRUE"),
         ]
         for tbl_name, col_name, col_type in columns_to_add:
             try:

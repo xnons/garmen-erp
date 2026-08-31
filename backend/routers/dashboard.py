@@ -13,27 +13,40 @@ router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 def get_overview_stats(db: Session = Depends(get_db)):
     today = date.today()
 
-    # 1. Total Output Produksi Hari Ini
+    # 1. Total Output Produksi Hari Ini (LogOutputBorongan + CuttingRecord + PieceRateWage)
     total_output_today = 0
     try:
-        total_output_today = db.query(
+        legacy_output = db.query(
             func.coalesce(func.sum(models.LogOutputBorongan.qty_pass), 0)
         ).filter(
             cast(models.LogOutputBorongan.tanggal, Date) == today,
             models.LogOutputBorongan.is_deleted == False
         ).scalar() or 0
+
+        cutting_today = db.query(
+            func.coalesce(func.sum(models.CuttingRecord.total_qty_cut), 0)
+        ).scalar() or 0
+
+        total_output_today = legacy_output + cutting_today
     except Exception:
         total_output_today = 0
 
-    # 2. Total Aset Material Gudang & Count SKU (Menggunakan model BahanBaku)
+    # 2. Total Aset Material Gudang & Count SKU (BahanBaku + InventoryItem Roll Kain & Aksesoris)
     total_aset_material = 0.0
     total_sku_count = 0
     try:
-        total_aset_material = db.query(
+        legacy_aset = db.query(
             func.coalesce(func.sum(models.BahanBaku.stok_saat_ini * models.BahanBaku.harga_per_satuan), 0.0)
         ).scalar() or 0.0
+        legacy_sku = db.query(func.count(models.BahanBaku.id)).scalar() or 0
 
-        total_sku_count = db.query(func.count(models.BahanBaku.id)).scalar() or 0
+        inv_sku = db.query(func.count(models.InventoryItem.id)).scalar() or 0
+        inv_aset = db.query(
+            func.coalesce(func.sum(models.InventoryItem.total_stock_yards * models.InventoryItem.unit_price), 0.0)
+        ).scalar() or 0.0
+
+        total_aset_material = legacy_aset + inv_aset
+        total_sku_count = legacy_sku + inv_sku
     except Exception:
         total_aset_material = 0.0
         total_sku_count = 0
@@ -63,14 +76,29 @@ def get_overview_stats(db: Session = Depends(get_db)):
     # 5. Upah Borongan Hari Ini
     upah_hari_ini = 0.0
     try:
-        upah_hari_ini = db.query(
+        legacy_upah = db.query(
             func.coalesce(func.sum(models.LogOutputBorongan.subtotal_rp), 0.0)
         ).filter(
             cast(models.LogOutputBorongan.tanggal, Date) == today,
             models.LogOutputBorongan.is_deleted == False
         ).scalar() or 0.0
+
+        garment_upah = db.query(
+            func.coalesce(func.sum(models.PieceRateWage.total_wage), 0.0)
+        ).scalar() or 0.0
+
+        upah_hari_ini = legacy_upah + garment_upah
     except Exception:
         pass
+
+    # 6. Sales Order Aktif
+    so_aktif_count = 0
+    try:
+        so_aktif_count = db.query(func.count(models.SalesOrder.id)).filter(
+            models.SalesOrder.status != "COMPLETED"
+        ).scalar() or 0
+    except Exception:
+        so_aktif_count = 0
 
     return {
         "totalOutputToday": int(total_output_today),
@@ -84,7 +112,8 @@ def get_overview_stats(db: Session = Depends(get_db)):
         "presensiTotal": int(total_karyawan),
         "totalKaryawan": int(total_karyawan),
         "skorKepatuhan": 100,
-        "upahHariIni": float(upah_hari_ini)
+        "upahHariIni": float(upah_hari_ini),
+        "soAktifCount": int(so_aktif_count)
     }
 
 
