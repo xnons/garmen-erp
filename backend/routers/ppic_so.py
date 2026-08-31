@@ -153,14 +153,36 @@ def create_sales_order(
         if matrix_sum > 0:
             calculated_qty = matrix_sum
 
+    # Kalkulasi Otomatis Total Nilai Order
+    unit_price = payload.unit_price or 0.0
+    discount = payload.discount_amount or 0.0
+    tax_pct = payload.tax_ppn_pct or 0.0
+    subtotal = calculated_qty * unit_price
+    tax_val = (subtotal - discount) * (tax_pct / 100.0)
+    calculated_total_value = payload.total_order_value if (payload.total_order_value and payload.total_order_value > 0) else max(0.0, subtotal - discount + tax_val)
+
     new_so = models.SalesOrder(
         so_number=payload.so_number.upper(),
         buyer_id=payload.buyer_id,
+        buyer_po_number=payload.buyer_po_number,
+        customer_pic_name=payload.customer_pic_name,
+        customer_pic_phone=payload.customer_pic_phone,
+        customer_email=payload.customer_email,
+        delivery_address=payload.delivery_address,
         style_name=payload.style_name.upper(),
         item_category=payload.item_category or "LONG JEANS",
         color=payload.color,
+        fabric_type=payload.fabric_type,
+        target_shrinkage_pct=payload.target_shrinkage_pct or 0.0,
+        special_instructions=payload.special_instructions,
+        contract_type=(payload.contract_type or "CMT").upper(),
         order_qty=calculated_qty,
-        unit_price=payload.unit_price or 0.0,
+        unit_price=unit_price,
+        total_order_value=calculated_total_value,
+        dp_amount=payload.dp_amount or 0.0,
+        payment_terms=payload.payment_terms or "NET_30",
+        tax_ppn_pct=tax_pct,
+        discount_amount=discount,
         size_breakdown_target=payload.size_breakdown_target or {},
         bom_accessories=payload.bom_accessories or [],
         status="REGISTERED",
@@ -176,7 +198,7 @@ def create_sales_order(
         actor_id=current_user.id_karyawan,
         aksi="CREATE_SALES_ORDER",
         target_id=new_so.so_number,
-        catatan=f"Sales Order '{new_so.so_number}' ({new_so.style_name} - {new_so.order_qty} pcs) dibuat oleh {current_user.nama}."
+        catatan=f"Sales Order '{new_so.so_number}' ({new_so.style_name} - {new_so.order_qty} pcs, Kontrak: {new_so.contract_type}, Nilai: Rp {new_so.total_order_value:,.0f}) dibuat oleh {current_user.nama}."
     )
 
     resp = SalesOrderResponse.from_orm(new_so)
@@ -216,7 +238,7 @@ def update_sales_order(
     update_data = payload.model_dump(exclude_unset=True)
     for k, v in update_data.items():
         if v is not None:
-            if k in ["style_name", "item_category"]:
+            if k in ["style_name", "item_category", "contract_type"]:
                 setattr(so, k, str(v).upper())
             else:
                 setattr(so, k, v)
@@ -225,6 +247,13 @@ def update_sales_order(
         matrix_sum = sum(payload.size_breakdown_target.values())
         if matrix_sum > 0:
             so.order_qty = matrix_sum
+
+    # Recalculate total_order_value jika tidak dispesifikasikan manual
+    if "total_order_value" not in update_data:
+        subtotal = (so.order_qty or 0) * (so.unit_price or 0.0)
+        disc = so.discount_amount or 0.0
+        tax = (subtotal - disc) * ((so.tax_ppn_pct or 0.0) / 100.0)
+        so.total_order_value = max(0.0, subtotal - disc + tax)
 
     db.commit()
     db.refresh(so)

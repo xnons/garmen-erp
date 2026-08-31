@@ -418,11 +418,28 @@ class SalesOrder(Base):
     id = Column(String(50), primary_key=True, default=generate_uuid)
     so_number = Column(String(50), unique=True, index=True, nullable=False) # e.g. 'SO-MG260004'
     buyer_id = Column(String(50), ForeignKey("partners.id"), nullable=True)
+    buyer_po_number = Column(String(100), nullable=True, index=True)        # e.g. 'PO-ZARA-2026/089'
+    customer_pic_name = Column(String(100), nullable=True)                  # PIC Merchandiser Buyer
+    customer_pic_phone = Column(String(50), nullable=True)                  # No WA / Telepon Buyer
+    customer_email = Column(String(100), nullable=True)                     # Email Buyer
+    delivery_address = Column(Text, nullable=True)                          # Alamat Gudang Tujuan Pengiriman Buyer
     style_name = Column(String(150), nullable=False, index=True)           # e.g. 'WIND MILD BLACK'
     item_category = Column(String(100), default="LONG JEANS")              # 'LONG JEANS', 'SS KEMEJA', 'OUTER'
     color = Column(String(50), nullable=True)
+    fabric_type = Column(String(150), nullable=True)                       # e.g. 'Denim 13.5 Oz Non-Stretch'
+    target_shrinkage_pct = Column(Float, default=0.0)                      # Toleransi susut pola (%)
+    special_instructions = Column(Text, nullable=True)                     # Catatan khusus jahit/finishing
+    
+    # 💰 Finansial & Termin Pembayaran
+    contract_type = Column(String(20), default="CMT")                      # 'CMT' / 'FOB'
     order_qty = Column(Integer, default=0, nullable=False)
-    unit_price = Column(Float, default=0.0)
+    unit_price = Column(Float, default=0.0)                                # Harga per Pcs
+    total_order_value = Column(Float, default=0.0)                         # Total Nilai Kontrak (Qty x Harga - Diskon + PPN)
+    dp_amount = Column(Float, default=0.0)                                 # Uang Muka DP
+    payment_terms = Column(String(50), default="NET_30")                   # 'CBD', 'NET_14', 'NET_30', 'DP_50_PELUNASAN'
+    tax_ppn_pct = Column(Float, default=0.0)                               # Pajak PPN (%)
+    discount_amount = Column(Float, default=0.0)                           # Potongan Harga (Rp)
+
     size_breakdown_target = Column(JSON, default={})                       # {"28": 170, "30": 200, "32": 179} atau {"S": 20, "M": 50}
     bom_accessories = Column(JSON, default=[])                             # [{"item": "Kancing 24L", "qty_per_pcs": 5}]
     status = Column(String(50), default="REGISTERED")                      # REGISTERED, CUTTING, WIP_SUBCON, SEWING, WASHING, FINISHING, SHIPPED, CLOSED

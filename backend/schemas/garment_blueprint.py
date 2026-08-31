@@ -37,11 +37,25 @@ class PartnerResponse(PartnerBase):
 class SalesOrderBase(BaseModel):
     so_number: str
     buyer_id: Optional[str] = None
+    buyer_po_number: Optional[str] = None
+    customer_pic_name: Optional[str] = None
+    customer_pic_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    delivery_address: Optional[str] = None
     style_name: str
     item_category: Optional[str] = "LONG JEANS"
     color: Optional[str] = None
+    fabric_type: Optional[str] = None
+    target_shrinkage_pct: Optional[float] = 0.0
+    special_instructions: Optional[str] = None
+    contract_type: Optional[str] = "CMT" # CMT / FOB
     order_qty: int
     unit_price: Optional[float] = 0.0
+    total_order_value: Optional[float] = 0.0
+    dp_amount: Optional[float] = 0.0
+    payment_terms: Optional[str] = "NET_30"
+    tax_ppn_pct: Optional[float] = 0.0
+    discount_amount: Optional[float] = 0.0
     size_breakdown_target: Optional[Dict[str, int]] = {}
     bom_accessories: Optional[List[Dict[str, Any]]] = []
     order_date: Optional[date] = None
@@ -52,10 +66,25 @@ class SalesOrderCreate(SalesOrderBase):
 
 class SalesOrderUpdate(BaseModel):
     style_name: Optional[str] = None
+    buyer_id: Optional[str] = None
+    buyer_po_number: Optional[str] = None
+    customer_pic_name: Optional[str] = None
+    customer_pic_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    delivery_address: Optional[str] = None
     item_category: Optional[str] = None
     color: Optional[str] = None
+    fabric_type: Optional[str] = None
+    target_shrinkage_pct: Optional[float] = None
+    special_instructions: Optional[str] = None
+    contract_type: Optional[str] = None
     order_qty: Optional[int] = None
     unit_price: Optional[float] = None
+    total_order_value: Optional[float] = None
+    dp_amount: Optional[float] = None
+    payment_terms: Optional[str] = None
+    tax_ppn_pct: Optional[float] = None
+    discount_amount: Optional[float] = None
     size_breakdown_target: Optional[Dict[str, int]] = None
     bom_accessories: Optional[List[Dict[str, Any]]] = None
     status: Optional[str] = None

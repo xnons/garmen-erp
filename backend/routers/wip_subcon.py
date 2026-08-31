@@ -7,7 +7,7 @@ from datetime import datetime
 from database import get_db
 import models
 from schemas.garment_blueprint import (
-    WIPDispatchCreate, WIPReceiveCreate, WIPMovementResponse, WIPMatrixRow
+    WIPDispatchCreate, WIPReceiveCreate, WIPMovementResponse, WIPMovementUpdate, WIPMatrixRow
 )
 from core.security import get_current_user, require_role
 from core.audit_helper import record_audit

@@ -70,6 +70,21 @@ def auto_migrate_db():
             ("shipments", "vehicle_plate_no", "VARCHAR(50)"),
             ("shipments", "carton_box_count", "INTEGER DEFAULT 0"),
             ("shipments", "destination_address", "TEXT"),
+            # Kolom baru Sales Order (PPIC)
+            ("sales_orders", "buyer_po_number", "VARCHAR(100)"),
+            ("sales_orders", "customer_pic_name", "VARCHAR(100)"),
+            ("sales_orders", "customer_pic_phone", "VARCHAR(50)"),
+            ("sales_orders", "customer_email", "VARCHAR(100)"),
+            ("sales_orders", "delivery_address", "TEXT"),
+            ("sales_orders", "fabric_type", "VARCHAR(150)"),
+            ("sales_orders", "target_shrinkage_pct", "FLOAT DEFAULT 0.0"),
+            ("sales_orders", "special_instructions", "TEXT"),
+            ("sales_orders", "contract_type", "VARCHAR(20) DEFAULT 'CMT'"),
+            ("sales_orders", "total_order_value", "FLOAT DEFAULT 0.0"),
+            ("sales_orders", "dp_amount", "FLOAT DEFAULT 0.0"),
+            ("sales_orders", "payment_terms", "VARCHAR(50) DEFAULT 'NET_30'"),
+            ("sales_orders", "tax_ppn_pct", "FLOAT DEFAULT 0.0"),
+            ("sales_orders", "discount_amount", "FLOAT DEFAULT 0.0"),
         ]
         for tbl_name, col_name, col_type in columns_to_add:
             try:
