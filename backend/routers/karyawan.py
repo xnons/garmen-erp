@@ -128,6 +128,36 @@ async def get_all_karyawan(
 
 
 # ---------------------------------------------------------------------------
+# 1️⃣.B GET LIST KARYAWAN UNTUK SELECTOR DROPDOWN (SEMUA ROLE) -> GET /api/karyawan/list
+# ---------------------------------------------------------------------------
+@router.get("/karyawan/list")
+@router.get("/karyawan/list/")
+async def get_karyawan_dropdown_list(
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(get_current_user)
+):
+    """
+    Endpoint ringan untuk dropdown selector pekerja di form Meja Potong, Borongan Finishing, dll.
+    Dapat diakses oleh semua pengguna terotentikasi.
+    """
+    pekerja = db.query(models.Karyawan).filter(models.Karyawan.is_active == True).order_by(models.Karyawan.nama.asc()).all()
+    return [
+        {
+            "id_karyawan": p.id_karyawan,
+            "nama": p.nama,
+            "username": p.username,
+            "role": p.role,
+            "jabatan": p.jabatan or "Operator Pabrik",
+            "tipe_pay": p.tipe_pay or "BORONGAN",
+            "gaji_pokok": float(p.gaji_pokok or 0.0),
+            "tarif_borongan_pcs": float(p.tarif_borongan_pcs or 0.0),
+            "is_active": p.is_active
+        }
+        for p in pekerja
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 2️⃣ TAMBAH SANKSI PELANGGARAN -> POST /api/karyawan/{id_karyawan}/pelanggaran
 # ---------------------------------------------------------------------------
 @router.post("/karyawan/{id_karyawan}/pelanggaran")

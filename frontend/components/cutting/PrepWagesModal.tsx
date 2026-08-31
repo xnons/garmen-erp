@@ -133,16 +133,56 @@ export default function PrepWagesModal({
             <select
               required
               value={formData.operator_id}
-              onChange={(e) => setFormData({ ...formData, operator_id: e.target.value })}
+              onChange={(e) => {
+                const empId = e.target.value;
+                const emp = employees.find(x => x.id_karyawan === empId);
+                setFormData(prev => ({
+                  ...prev,
+                  operator_id: empId,
+                  piece_rate: emp && emp.tipe_pay === "BORONGAN" && emp.tarif_borongan_pcs > 0 ? emp.tarif_borongan_pcs : prev.piece_rate
+                }));
+              }}
               className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white font-semibold focus:outline-none focus:border-indigo-500"
             >
               <option value="">-- Pilih Pekerja Pabrik --</option>
               {employees.map(emp => (
                 <option key={emp.id_karyawan} value={emp.id_karyawan}>
-                  {emp.nama} ({emp.jabatan || 'Operator'})
+                  {emp.nama} ({emp.jabatan || 'Operator'} - {emp.tipe_pay || 'BORONGAN'})
                 </option>
               ))}
             </select>
+
+            {(() => {
+              const emp = employees.find(e => e.id_karyawan === formData.operator_id);
+              if (!emp) return null;
+              return (
+                <div className="mt-2 p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      emp.tipe_pay === 'BORONGAN' 
+                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    }`}>
+                      {emp.tipe_pay || 'BORONGAN'}
+                    </span>
+                    <span className="text-slate-300 font-medium">{emp.jabatan || 'Operator'}</span>
+                  </div>
+                  <div>
+                    {emp.tipe_pay === 'BORONGAN' && emp.tarif_borongan_pcs > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, piece_rate: emp.tarif_borongan_pcs }))}
+                        className="text-[11px] text-indigo-400 hover:underline font-semibold cursor-pointer"
+                      >
+                        Tarif: Rp {emp.tarif_borongan_pcs.toLocaleString('id-ID')}/pcs ⚡
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-emerald-400 font-semibold">Gaji Pokok: Rp {emp.gaji_pokok?.toLocaleString('id-ID')}/bln</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div>

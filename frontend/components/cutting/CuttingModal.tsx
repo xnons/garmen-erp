@@ -158,7 +158,7 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders }: Cut
                 <option value="">-- Pilih Pekerja / Bu Nani --</option>
                 {employees.map(emp => (
                   <option key={emp.id_karyawan} value={emp.id_karyawan}>
-                    {emp.nama} ({emp.jabatan || 'Cutting'})
+                    {emp.nama} ({emp.jabatan || 'Cutting'} - {emp.tipe_pay || 'BORONGAN'})
                   </option>
                 ))}
               </select>

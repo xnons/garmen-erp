@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Sparkles, X, Send, Bot, User, ShieldAlert, TrendingUp, Cpu, Factory,
   FileText, Camera, Upload, CheckCircle2, AlertTriangle, RefreshCw, Copy, Check,
-  Minimize2, Maximize2, MessageSquare, ChevronUp, ChevronDown, Zap
+  Minimize2, Maximize2, MessageSquare, ChevronUp, ChevronDown, Zap, Trash2
 } from 'lucide-react';
 import api from '@/services/api';
 
@@ -18,6 +18,8 @@ interface FloatingAICopilotProps {
   activeUser?: any;
 }
 
+const STORAGE_KEY = 'garment_enterprise_ai_chat_v2';
+
 export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -25,16 +27,54 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
   const [activeTab, setActiveTab] = useState<'CHAT' | 'AUTOFILL' | 'VISION'>('CHAT');
   const [selectedPersona, setSelectedPersona] = useState<'EXECUTIVE' | 'FINANCE' | 'PRODUCTION' | 'SECURITY'>('EXECUTIVE');
 
-  // Chat States
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: `Halo ${activeUser?.nama || 'Owner'}! Saya **Master Garment Enterprise AI Co-Pilot** bertenaga Gemini & Claude Large-Context. Saya terhubung langsung dengan live data Sales Order, pergerakan subkon, stok kain, dan upah borongan pabrik. Apa yang ingin Anda analisis hari ini?`
+  // Chat States with LocalStorage Persistence
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {
+        console.error("Gagal memuat riwayat chat AI:", e);
+      }
     }
-  ]);
+    return [
+      {
+        role: 'assistant',
+        content: `Halo ${activeUser?.nama || 'Owner'}! Saya **Master Garment Enterprise AI Co-Pilot** bertenaga Gemini & Claude Large-Context. Saya terhubung langsung dengan live data Sales Order, pergerakan subkon, stok kain, dan upah borongan pabrik. Apa yang ingin Anda analisis hari ini?`
+      }
+    ];
+  });
+
   const [inputPrompt, setInputPrompt] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-save chat history
+  useEffect(() => {
+    if (typeof window !== 'undefined' && messages.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      } catch (e) {
+        console.error("Gagal menyimpan riwayat chat:", e);
+      }
+    }
+  }, [messages]);
+
+  const handleClearHistory = () => {
+    if (confirm("Hapus seluruh riwayat percakapan AI Co-Pilot?")) {
+      const initMsg: Message = {
+        role: 'assistant',
+        content: `Halo ${activeUser?.nama || 'Owner'}! Riwayat percakapan telah dibersihkan. Apa yang ingin Anda analisis hari ini?`
+      };
+      setMessages([initMsg]);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  };
 
   // Auto-fill States
   const [rawText, setRawText] = useState('');
@@ -247,6 +287,16 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
             </div>
 
             <div className="flex items-center gap-1">
+              {!isMinimized && (
+                <button
+                  onClick={handleClearHistory}
+                  className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors cursor-pointer"
+                  title="Hapus Riwayat Chat"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+
               <button
                 onClick={() => setIsMinimized(!isMinimized)}
                 className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"

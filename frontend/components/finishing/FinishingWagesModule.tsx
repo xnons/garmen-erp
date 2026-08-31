@@ -77,13 +77,31 @@ export default function FinishingWagesModule() {
         setFormData(prev => ({ ...prev, so_id: oRes.data[0].id }));
       }
       if (empList.length > 0 && !formData.operator_id) {
-        setFormData(prev => ({ ...prev, operator_id: empList[0].id_karyawan }));
+        const first = empList[0];
+        setFormData(prev => ({
+          ...prev,
+          operator_id: first.id_karyawan,
+          wage_per_piece: first.tipe_pay === "BORONGAN" && first.tarif_borongan_pcs > 0 ? first.tarif_borongan_pcs : prev.wage_per_piece
+        }));
       }
     } catch (err) {
       console.error("Gagal mengambil data upah borongan:", err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOperatorChange = (empId: string) => {
+    const emp = employees.find(e => e.id_karyawan === empId);
+    let newRate = formData.wage_per_piece;
+    if (emp && emp.tipe_pay === "BORONGAN" && emp.tarif_borongan_pcs > 0) {
+      newRate = emp.tarif_borongan_pcs;
+    }
+    setFormData(prev => ({
+      ...prev,
+      operator_id: empId,
+      wage_per_piece: newRate
+    }));
   };
 
   const handleOpChange = (opId: string) => {
@@ -445,7 +463,7 @@ export default function FinishingWagesModule() {
                 <select
                   required
                   value={formData.operator_id}
-                  onChange={(e) => setFormData({ ...formData, operator_id: e.target.value })}
+                  onChange={(e) => handleOperatorChange(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-semibold focus:outline-none focus:border-cyan-500"
                 >
                   <option value="">-- Pilih Pekerja Pabrik --</option>
@@ -455,7 +473,43 @@ export default function FinishingWagesModule() {
                     </option>
                   ))}
                 </select>
-                <p className="text-[11px] text-slate-400 mt-1">
+
+                {(() => {
+                  const emp = employees.find(e => e.id_karyawan === formData.operator_id);
+                  if (!emp) return null;
+                  return (
+                    <div className="mt-2 p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          emp.tipe_pay === 'BORONGAN' 
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                            : emp.tipe_pay === 'BULANAN'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        }`}>
+                          {emp.tipe_pay || 'BORONGAN'}
+                        </span>
+                        <span className="text-slate-300 font-medium">{emp.jabatan || 'Operator'}</span>
+                      </div>
+                      <div>
+                        {emp.tipe_pay === 'BORONGAN' && emp.tarif_borongan_pcs > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, wage_per_piece: emp.tarif_borongan_pcs }))}
+                            className="text-[11px] text-cyan-400 hover:underline font-semibold cursor-pointer"
+                          >
+                            Tarif Profil: Rp {emp.tarif_borongan_pcs.toLocaleString('id-ID')}/pcs ⚡
+                          </button>
+                        ) : emp.tipe_pay === 'BULANAN' ? (
+                          <span className="text-[11px] text-emerald-400 font-semibold">Gaji Pokok: Rp {emp.gaji_pokok?.toLocaleString('id-ID')}/bln</span>
+                        ) : (
+                          <span className="text-[11px] text-amber-400 font-semibold">Tarif Harian: Rp {emp.gaji_pokok?.toLocaleString('id-ID')}/hari</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+                <p className="text-[11px] text-slate-400 mt-1.5">
                   💡 Upah yang dicatat di sini otomatis mengalir dan menjumlah ke slip gaji pekerja di modul <b>Payroll & Gaji</b>.
                 </p>
               </div>

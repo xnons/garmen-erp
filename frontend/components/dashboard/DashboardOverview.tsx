@@ -152,14 +152,15 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
         setEmailStatusMsg(null);
         try {
             const res = await api.post('/api/reports/send-briefing', {
-                recipient_email: 'muhammadtegarsaputra@gmail.com',
+                recipient_email: 'muhammadtegarsaputra24@gmail.com',
                 recipient_name: activeUser?.nama || 'Muhammad Tegar Saputra'
             });
             setEmailStatusMsg(res.data?.message || 'Laporan eksekutif berhasil dikirim!');
-            setTimeout(() => setEmailStatusMsg(null), 5000);
+            setTimeout(() => setEmailStatusMsg(null), 6000);
         } catch (err: any) {
-            setEmailStatusMsg('⚠️ Terjadi kendala saat mengirim email.');
-            setTimeout(() => setEmailStatusMsg(null), 5000);
+            const errDetail = err.response?.data?.detail || err.message || 'Gagal mengirim email.';
+            setEmailStatusMsg(`⚠️ ${errDetail}`);
+            setTimeout(() => setEmailStatusMsg(null), 6000);
         } finally {
             setIsSendingEmail(false);
         }
@@ -258,6 +259,26 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                     </button>
                 </div>
             </div>
+
+            {/* Email Status Notification Banner */}
+            {emailStatusMsg && (
+                <div className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-lg transition-all animate-fadeIn ${
+                    emailStatusMsg.startsWith('⚠️')
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                        : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                }`}>
+                    <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 shrink-0" />
+                        <span>{emailStatusMsg}</span>
+                    </div>
+                    <button
+                        onClick={() => setEmailStatusMsg(null)}
+                        className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded-lg hover:bg-slate-800"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
 
             {/* ⚡ 1-CLICK QUICK ACTION BAR */}
             <div className="bg-slate-900/60 backdrop-blur-md p-3.5 rounded-2xl border border-slate-800/80 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">

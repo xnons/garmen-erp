@@ -12,8 +12,13 @@ SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
-EMAIL_FROM = os.getenv("EMAIL_FROM", "PT. Chikal Jaya Makmur ERP <notifikasi.mastergarment@gmail.com>")
-DEFAULT_RECIPIENT = os.getenv("EXECUTIVE_REPORT_EMAIL_TO", "muhammadtegarsaputra@gmail.com")
+DEFAULT_RECIPIENT = os.getenv("EXECUTIVE_REPORT_EMAIL_TO", "muhammadtegarsaputra24@gmail.com")
+
+def get_email_from() -> str:
+    user = os.getenv("SMTP_USER", "").strip()
+    if user:
+        return f"PT. Chikal Jaya Makmur ERP <{user}>"
+    return os.getenv("EMAIL_FROM", "PT. Chikal Jaya Makmur ERP <muhammadtegarsaputra24@gmail.com>")
 
 
 def generate_executive_html_report(db: Session, recipient_name: str = "Muhammad Tegar Saputra") -> str:
@@ -170,9 +175,10 @@ def send_executive_email_briefing(
         }
 
     try:
+        from_email = get_email_from()
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"📊 Executive Daily Briefing PT. Chikal Jaya Makmur — {datetime.now().strftime('%d/%m/%Y')}"
-        msg["From"] = EMAIL_FROM
+        msg["From"] = from_email
         msg["To"] = target_email
 
         part = MIMEText(html_body, "html")
@@ -181,7 +187,7 @@ def send_executive_email_briefing(
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
             server.starttls()
             server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(EMAIL_FROM, [target_email], msg.as_string())
+            server.sendmail(SMTP_USER or from_email, [target_email], msg.as_string())
 
         return {
             "status": "SENT_SUCCESSFULLY",
