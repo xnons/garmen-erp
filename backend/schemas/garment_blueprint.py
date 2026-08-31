@@ -61,10 +61,10 @@ class SalesOrderBase(BaseModel):
     payment_terms: Optional[str] = "NET_30"
     tax_ppn_pct: Optional[float] = 0.0
     discount_amount: Optional[float] = 0.0
-    size_breakdown_target: Optional[Dict[str, int]] = {}
-    bom_accessories: Optional[List[Dict[str, Any]]] = []
-    order_date: Optional[date] = None
-    deadline: Optional[date] = None
+    size_breakdown_target: Optional[Any] = {}
+    bom_accessories: Optional[Any] = []
+    order_date: Optional[Any] = None
+    deadline: Optional[Any] = None
 
 class SalesOrderCreate(SalesOrderBase):
     pass

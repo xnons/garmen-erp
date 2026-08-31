@@ -111,10 +111,23 @@ def delete_partner(
     return {"message": f"Partner '{p_name}' berhasil dihapus."}
 
 
+def parse_json_safely(val, default):
+    if val is None:
+        return default
+    if isinstance(val, (dict, list)):
+        return val
+    if isinstance(val, str):
+        try:
+            import json
+            return json.loads(val)
+        except Exception:
+            return default
+    return default
+
 def format_sales_order_response(so: models.SalesOrder) -> SalesOrderResponse:
-    b_name = so.buyer.name if so.buyer else getattr(so, "buyer_name", None)
+    b_name = so.buyer.name if (hasattr(so, "buyer") and so.buyer) else getattr(so, "buyer_name", None)
     return SalesOrderResponse(
-        id=so.id,
+        id=str(so.id),
         so_number=so.so_number or "",
         buyer_id=so.buyer_id,
         buyer_name=b_name,
@@ -137,8 +150,8 @@ def format_sales_order_response(so: models.SalesOrder) -> SalesOrderResponse:
         payment_terms=so.payment_terms or "NET_30",
         tax_ppn_pct=so.tax_ppn_pct or 0.0,
         discount_amount=so.discount_amount or 0.0,
-        size_breakdown_target=so.size_breakdown_target or {},
-        bom_accessories=so.bom_accessories or [],
+        size_breakdown_target=parse_json_safely(so.size_breakdown_target, {}),
+        bom_accessories=parse_json_safely(so.bom_accessories, []),
         status=so.status or "REGISTERED",
         order_date=so.order_date,
         deadline=so.deadline,
@@ -154,12 +167,23 @@ def get_all_sales_orders(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    query = db.query(models.SalesOrder).options(joinedload(models.SalesOrder.buyer))
-    if status_filter:
-        query = query.filter(models.SalesOrder.status == status_filter.upper())
-    orders = query.order_by(models.SalesOrder.created_at.desc()).all()
-    
-    return [format_sales_order_response(so) for so in orders]
+    try:
+        query = db.query(models.SalesOrder).options(joinedload(models.SalesOrder.buyer))
+        if status_filter:
+            query = query.filter(models.SalesOrder.status == status_filter.upper())
+        orders = query.order_by(models.SalesOrder.created_at.desc()).all()
+        
+        result = []
+        for so in orders:
+            try:
+                result.append(format_sales_order_response(so))
+            except Exception as row_err:
+                print(f"⚠️ Error formatting SO {getattr(so, 'id', 'unknown')}: {row_err}")
+                continue
+        return result
+    except Exception as e:
+        print(f"⚠️ Error fetching Sales Orders: {e}")
+        return []
 
 @router.post("/orders", response_model=SalesOrderResponse, status_code=status.HTTP_201_CREATED)
 def create_sales_order(

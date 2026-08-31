@@ -127,6 +127,24 @@ def delete_inventory_item(
     return {"message": f"Item '{code}' berhasil dihapus."}
 
 
+def format_material_receipt_response(r: models.MaterialReceipt) -> MaterialReceiptResponse:
+    item_desc = r.item.description if (hasattr(r, "item") and r.item) else None
+    supp_name = r.supplier.name if (hasattr(r, "supplier") and r.supplier) else None
+    return MaterialReceiptResponse(
+        id=str(r.id),
+        item_id=r.item_id,
+        supplier_id=r.supplier_id,
+        receipt_date=r.receipt_date,
+        roll_number=r.roll_number,
+        qty_received=r.qty_received or 0.0,
+        unit=r.unit or "YARD",
+        contract_type=r.contract_type or "FOB",
+        inspection_status=r.inspection_status or "PENDING",
+        item_description=item_desc,
+        supplier_name=supp_name,
+        created_at=r.created_at
+    )
+
 # ---------------------------------------------------------------------------
 # 2. GOODS RECEIPT NOTE (BARANG MASUK)
 # ---------------------------------------------------------------------------
@@ -135,20 +153,16 @@ def get_material_receipts(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    receipts = db.query(models.MaterialReceipt).options(
-        joinedload(models.MaterialReceipt.item),
-        joinedload(models.MaterialReceipt.supplier)
-    ).order_by(models.MaterialReceipt.receipt_date.desc()).all()
+    try:
+        receipts = db.query(models.MaterialReceipt).options(
+            joinedload(models.MaterialReceipt.item),
+            joinedload(models.MaterialReceipt.supplier)
+        ).order_by(models.MaterialReceipt.receipt_date.desc()).all()
 
-    result = []
-    for r in receipts:
-        r_dict = MaterialReceiptResponse.from_orm(r)
-        if r.item:
-            r_dict.item_description = r.item.description
-        if r.supplier:
-            r_dict.supplier_name = r.supplier.name
-        result.append(r_dict)
-    return result
+        return [format_material_receipt_response(r) for r in receipts]
+    except Exception as e:
+        print(f"⚠️ Error get_material_receipts: {e}")
+        return []
 
 @router.post("/receipts", response_model=MaterialReceiptResponse, status_code=status.HTTP_201_CREATED)
 def create_material_receipt(
@@ -185,10 +199,7 @@ def create_material_receipt(
         catatan=f"Penerimaan roll kain {payload.roll_number or '-'} ({payload.qty_received} {receipt.unit}) dicatat oleh {current_user.nama}."
     )
 
-    resp = MaterialReceiptResponse.from_orm(receipt)
-    if receipt.item:
-        resp.item_description = receipt.item.description
-    return resp
+    return format_material_receipt_response(receipt)
 
 @router.put("/receipts/{receipt_id}", response_model=MaterialReceiptResponse)
 def update_material_receipt(
@@ -228,12 +239,7 @@ def update_material_receipt(
         catatan=f"Penerimaan roll {receipt.roll_number or receipt_id} dikoreksi oleh {current_user.nama} (Qty: {old_qty} -> {receipt.qty_received} {receipt.unit})."
     )
 
-    resp = MaterialReceiptResponse.from_orm(receipt)
-    if receipt.item:
-        resp.item_description = receipt.item.description
-    if receipt.supplier:
-        resp.supplier_name = receipt.supplier.name
-    return resp
+    return format_material_receipt_response(receipt)
 
 @router.delete("/receipts/{receipt_id}")
 def delete_material_receipt(

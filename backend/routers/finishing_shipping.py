@@ -15,10 +15,23 @@ from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/shipping", tags=["Finishing Borongan, Expedisi & Billing Form WI"])
 
+def parse_json_safely(val, default):
+    if val is None:
+        return default
+    if isinstance(val, (dict, list)):
+        return val
+    if isinstance(val, str):
+        try:
+            import json
+            return json.loads(val)
+        except Exception:
+            return default
+    return default
+
 def format_piece_rate_wage_response(w: models.PieceRateWage, default_op_name: Optional[str] = None) -> PieceRateWageResponse:
     op_name = w.operator.nama if (hasattr(w, "operator") and w.operator) else default_op_name
     return PieceRateWageResponse(
-        id=w.id,
+        id=str(w.id),
         so_id=w.so_id,
         operator_id=w.operator_id,
         operator_name=op_name,
@@ -26,7 +39,7 @@ def format_piece_rate_wage_response(w: models.PieceRateWage, default_op_name: Op
         work_date=w.work_date,
         qty_completed=w.qty_completed or 0,
         qty_reject=w.qty_reject or 0,
-        size_breakdown=w.size_breakdown or {},
+        size_breakdown=parse_json_safely(w.size_breakdown, {}),
         wage_per_piece=w.wage_per_piece or 0.0,
         total_wage=w.total_wage or 0.0,
         notes=w.notes,
@@ -36,7 +49,7 @@ def format_piece_rate_wage_response(w: models.PieceRateWage, default_op_name: Op
 def format_shipment_response(s: models.Shipment, default_driver_name: Optional[str] = None) -> ShipmentResponse:
     drv_name = s.driver.nama if (hasattr(s, "driver") and s.driver) else (s.driver_name or default_driver_name)
     return ShipmentResponse(
-        id=s.id,
+        id=str(s.id),
         so_id=s.so_id,
         shipment_date=s.shipment_date,
         surat_jalan_no=s.surat_jalan_no or "-",
@@ -46,7 +59,7 @@ def format_shipment_response(s: models.Shipment, default_driver_name: Optional[s
         carton_box_count=s.carton_box_count or 0,
         destination_address=s.destination_address,
         total_qty_shipped=s.total_qty_shipped or 0,
-        size_breakdown_shipped=s.size_breakdown_shipped or {},
+        size_breakdown_shipped=parse_json_safely(s.size_breakdown_shipped, {}),
         unit_price=s.unit_price or 0.0,
         total_invoice_amount=s.total_invoice_amount or 0.0,
         invoice_number=s.invoice_number,

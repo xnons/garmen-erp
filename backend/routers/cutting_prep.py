@@ -15,16 +15,29 @@ from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/cutting", tags=["Cutting, Consumption & Preparation"])
 
+def parse_json_safely(val, default):
+    if val is None:
+        return default
+    if isinstance(val, (dict, list)):
+        return val
+    if isinstance(val, str):
+        try:
+            import json
+            return json.loads(val)
+        except Exception:
+            return default
+    return default
+
 def format_cutting_record_response(cr: models.CuttingRecord, default_op_name: Optional[str] = None) -> CuttingRecordResponse:
     op_name = cr.operator.nama if (hasattr(cr, "operator") and cr.operator) else default_op_name
     return CuttingRecordResponse(
-        id=cr.id,
+        id=str(cr.id),
         so_id=cr.so_id,
         cutting_date=cr.cutting_date,
         operator_id=cr.operator_id,
         operator_name=op_name,
         qty_cut=cr.qty_cut or 0,
-        size_breakdown_cut=cr.size_breakdown_cut or {},
+        size_breakdown_cut=parse_json_safely(cr.size_breakdown_cut, {}),
         main_fabric_used=cr.main_fabric_used or 0.0,
         puring_used=cr.puring_used or 0.0,
         puring_jala_used=cr.puring_jala_used or 0.0,
@@ -40,14 +53,14 @@ def format_cutting_record_response(cr: models.CuttingRecord, default_op_name: Op
 def format_prep_task_response(t: models.CuttingPrepTask, default_op_name: Optional[str] = None) -> CuttingPrepTaskResponse:
     op_name = t.operator.nama if (hasattr(t, "operator") and t.operator) else default_op_name
     return CuttingPrepTaskResponse(
-        id=t.id,
+        id=str(t.id),
         so_id=t.so_id,
         task_type=t.task_type or "NUMBERING",
         operator_id=t.operator_id,
         operator_name=op_name,
         task_date=t.task_date,
         qty_done=t.qty_done or 0,
-        size_breakdown=t.size_breakdown or {},
+        size_breakdown=parse_json_safely(t.size_breakdown, {}),
         piece_rate=t.piece_rate or 0.0,
         total_wage=t.total_wage or 0.0,
         created_at=t.created_at

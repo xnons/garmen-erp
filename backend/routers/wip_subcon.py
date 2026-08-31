@@ -14,6 +14,19 @@ from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/wip", tags=["WIP & Subcon Pipeline Movements"])
 
+def parse_json_safely(val, default):
+    if val is None:
+        return default
+    if isinstance(val, (dict, list)):
+        return val
+    if isinstance(val, str):
+        try:
+            import json
+            return json.loads(val)
+        except Exception:
+            return default
+    return default
+
 def format_wip_movement_response(m: models.WIPMovement, current_user_name: Optional[str] = None) -> WIPMovementResponse:
     so_num = m.sales_order.so_number if m.sales_order else None
     style_nm = m.sales_order.style_name if m.sales_order else None
@@ -21,7 +34,7 @@ def format_wip_movement_response(m: models.WIPMovement, current_user_name: Optio
     spv_nm = m.supervisor.nama if (hasattr(m, "supervisor") and m.supervisor) else current_user_name
 
     return WIPMovementResponse(
-        id=m.id,
+        id=str(m.id),
         so_id=m.so_id,
         so_number=so_num,
         style_name=style_nm,
@@ -34,11 +47,11 @@ def format_wip_movement_response(m: models.WIPMovement, current_user_name: Optio
         surat_jalan_no=m.surat_jalan_no,
         dispatch_date=m.dispatch_date,
         qty_dispatched=m.qty_dispatched or 0,
-        size_breakdown_dispatched=m.size_breakdown_dispatched or {},
+        size_breakdown_dispatched=parse_json_safely(m.size_breakdown_dispatched, {}),
         received_date=m.received_date,
         qty_received=m.qty_received or 0,
         qty_reject=m.qty_reject or 0,
-        size_breakdown_received=m.size_breakdown_received or {},
+        size_breakdown_received=parse_json_safely(m.size_breakdown_received, {}),
         balance_discrepancy=m.balance_discrepancy or 0,
         status=m.status or "IN_PROCESS",
         remarks=m.remarks,
