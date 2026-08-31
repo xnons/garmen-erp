@@ -1,6 +1,6 @@
 -- =====================================================
 -- PT. CHIKAL JAYA MAKMUR (MASTER GARMENT ERP)
--- BULLETPROOF PRODUCTION SEED (NO ON CONFLICT CONSTRAINT REQUIRED)
+-- BULLETPROOF PRODUCTION SEED (WITH STRICT DUPLICATE GUARDS)
 -- Target: PostgreSQL / Supabase SQL Editor
 -- =====================================================
 
@@ -51,7 +51,9 @@ SELECT * FROM (VALUES
   (gen_random_uuid()::text, 'EMB-CJM', 'CJM EMBROIDERY', 'SUBCON_EMBROIDERY', 'Internal Pabrik CJM', '08188990001'),
   (gen_random_uuid()::text, 'EMB-KODEDE', 'KO DEDE EMBRO', 'SUBCON_EMBROIDERY', 'Kopo, Bandung', '08188990002')
 ) AS v(id, code, name, category, address, phone)
-WHERE NOT EXISTS (SELECT 1 FROM partners WHERE partners.name = v.name);
+WHERE NOT EXISTS (
+  SELECT 1 FROM partners WHERE partners.code = v.code OR partners.name = v.name
+);
 
 -- 2. INSERT KARYAWAN
 INSERT INTO karyawan (
@@ -81,7 +83,9 @@ SELECT * FROM (VALUES
   ('KRY-EXP-06', 'Ronny', 'ronny.driver', '$2b$12$4417iL1B4XWqjPkWbI9z/eR0H/fD6kL3lA9V3wZ0yW6nJ3kX1yC.y', 'EXPEDITION_DRIVER', 'Driver Distribusi Kain', '123456', TRUE, 'TETAP', 'BULANAN', 3800000, 0),
   ('KRY-EXP-07', 'Arendi', 'arendi.driver', '$2b$12$4417iL1B4XWqjPkWbI9z/eR0H/fD6kL3lA9V3wZ0yW6nJ3kX1yC.y', 'EXPEDITION_DRIVER', 'Driver Ekspedisi Buyer', '123456', TRUE, 'TETAP', 'BULANAN', 3800000, 0)
 ) AS v(id_karyawan, nama, username, hashed_password, role, jabatan, pin, is_active, status_karyawan, tipe_pay, gaji_pokok, tarif_borongan_pcs)
-WHERE NOT EXISTS (SELECT 1 FROM karyawan WHERE karyawan.username = v.username);
+WHERE NOT EXISTS (
+  SELECT 1 FROM karyawan WHERE karyawan.username = v.username OR karyawan.id_karyawan = v.id_karyawan
+);
 
 -- 3. INSERT INVENTORY ITEMS
 INSERT INTO inventory_items (id, item_code, description, item_type, unit, unit_price, current_stock)
@@ -107,38 +111,42 @@ SELECT * FROM (VALUES
   (gen_random_uuid()::text, 'MG-2604-BH0019', 'TWILL STRETCH BLACK', 'FABRIC_MAIN', 'YARD', 33000.0, 1250.0),
   (gen_random_uuid()::text, 'MG-2604-BH0020', 'TWILL STRETCH BLUE', 'FABRIC_MAIN', 'YARD', 33000.0, 1150.0)
 ) AS v(id, item_code, description, item_type, unit, unit_price, current_stock)
-WHERE NOT EXISTS (SELECT 1 FROM inventory_items WHERE inventory_items.item_code = v.item_code);
+WHERE NOT EXISTS (
+  SELECT 1 FROM inventory_items WHERE inventory_items.item_code = v.item_code
+);
 
 -- 4. INSERT 20 SALES ORDERS
 INSERT INTO sales_orders (id, so_number, buyer_id, style_name, item_category, color, order_qty, status, order_date, contract_type, unit_price, total_order_value, size_breakdown_target)
 SELECT 
   gen_random_uuid()::text, v.so_number, 
-  (SELECT id FROM partners WHERE partners.name = v.buyer_name LIMIT 1),
+  (SELECT id FROM partners WHERE partners.name = v.buyer_name OR partners.code = v.buyer_code LIMIT 1),
   v.style_name, v.item_category, v.color, v.order_qty, v.status, 
   v.order_date::date, 'CMT', v.unit_price, v.total_order_value, v.size_breakdown_target::json
 FROM (VALUES
-  ('SO-MG260001', 'WILMER STUDIOS', 'KEMEJA PIQUE SAKU HITAM', 'GARMENT', 'BLACK', 500, 'SHIPPED', '2026-04-01', 35000.0, 17500000.0, '{"28": 100, "30": 150, "32": 150, "34": 100}'),
-  ('SO-MG260002', 'WILMER STUDIOS', 'KEMEJA PIQUE SAKU PUTIH', 'GARMENT', 'WHITE', 400, 'FINISHING', '2026-04-01', 35000.0, 14000000.0, '{"28": 80, "30": 120, "32": 120, "34": 80}'),
-  ('SO-MG260003', 'INSIGHT ( SMBU )', 'FLANELLA LONG SHIRT', 'GARMENT', 'RED PLAID', 600, 'WASHING', '2026-04-01', 38000.0, 22800000.0, '{"28": 120, "30": 180, "32": 180, "34": 120}'),
-  ('SO-MG260004', 'VOXFLY ( SMBU )', 'WIND MILD BLACK', 'LONG JEANS', 'BLACK', 1060, 'SHIPPED', '2026-04-01', 35000.0, 37100000.0, '{"28": 212, "30": 318, "32": 318, "34": 212}'),
-  ('SO-MG260005', 'VOXFLY ( SMBU )', 'WIND MILD BLUE', 'LONG JEANS', 'NAVY', 1494, 'CUTTING', '2026-04-01', 35000.0, 52290000.0, '{"28": 300, "30": 450, "32": 450, "34": 294}'),
-  ('SO-MG260006', 'VOXFLY ( SMBU )', 'WIND MILD BLUE', 'GARMENT', 'LIGHT BLUE', 300, 'REGISTERED', '2026-04-01', 35000.0, 10500000.0, '{"28": 60, "30": 90, "32": 90, "34": 60}'),
-  ('SO-MG260007', 'WARNING', 'DECOTTON 2.433', 'GARMENT', 'BLACK', 250, 'SEWING', '2026-04-01', 32000.0, 8000000.0, '{"28": 50, "30": 75, "32": 75, "34": 50}'),
-  ('SO-MG260008', 'WARNING', 'DECOTTON 2.434', 'GARMENT', 'WHITE', 250, 'SEWING', '2026-04-01', 32000.0, 8000000.0, '{"28": 50, "30": 75, "32": 75, "34": 50}'),
-  ('SO-MG260009', 'WARNING', 'DECOTTON 2.435', 'GARMENT', 'GREY', 250, 'CUTTING', '2026-04-01', 32000.0, 8000000.0, '{"28": 50, "30": 75, "32": 75, "34": 50}'),
-  ('SO-MG260010', 'VOXFLY ( SMBU )', 'SKULLY SHIRT BENDERA PUTIH', 'GARMENT', 'WHITE', 300, 'REGISTERED', '2026-04-01', 30000.0, 9000000.0, '{"28": 60, "30": 90, "32": 90, "34": 60}'),
-  ('SO-MG260025', 'VOXFLY ( SMBU )', 'SAMURAI', 'SS KEMEJA', 'BIRU', 1163, 'SHIPPED', '2026-04-13', 32000.0, 37216000.0, '{"28": 232, "30": 348, "32": 348, "34": 235}'),
-  ('SO-MG260028', 'NEVER SURENDER', 'DENIM BLUE WHISKER', 'LONG JEANS', 'BLUE', 200, 'SHIPPED', '2026-04-21', 38000.0, 7600000.0, '{"28": 40, "30": 60, "32": 60, "34": 40}'),
-  ('SO-MG260029', 'NEVER SURENDER', 'DENIM BLACK WHISKER', 'LONG JEANS', 'BLACK', 200, 'SHIPPED', '2026-04-21', 38000.0, 7600000.0, '{"28": 40, "30": 60, "32": 60, "34": 40}'),
-  ('SO-MG260048', 'TRAVEOLOGY', 'JEANS JACKET INDIGO BLUE', 'LONG JAKET', 'INDIGO', 189, 'SHIPPED', '2026-04-28', 45000.0, 8505000.0, '{"28": 38, "30": 56, "32": 56, "34": 39}'),
-  ('SO-MG260049', 'TRAVEOLOGY', 'JEANS JACKET LIGHT BLUE', 'LONG JAKET', 'LIGHT BLUE', 189, 'SHIPPED', '2026-04-28', 45000.0, 8505000.0, '{"28": 38, "30": 56, "32": 56, "34": 39}'),
-  ('SO-MG260062', 'OXFOORD', 'NEW OUTER BUTTON BEIGE', 'OUTER BUTTON', 'BEIGE', 166, 'SHIPPED', '2026-05-11', 36000.0, 5976000.0, '{"28": 33, "30": 50, "32": 50, "34": 33}'),
-  ('SO-MG260063', 'OXFOORD', 'NEW OUTER BUTTON DARK GREY', 'OUTER BUTTON', 'DARK GREY', 167, 'SHIPPED', '2026-05-11', 36000.0, 6012000.0, '{"28": 33, "30": 50, "32": 50, "34": 34}'),
-  ('SO-MG260064', 'OXFOORD', 'NEW OUTER BUTTON BLACK', 'OUTER BUTTON', 'BLACK', 164, 'SHIPPED', '2026-05-11', 36000.0, 5904000.0, '{"28": 33, "30": 49, "32": 49, "34": 33}'),
-  ('SO-MG260076', 'WARNING', 'ARVYN LN#1 18', 'SS KEMEJA', 'BLACK', 120, 'SHIPPED', '2026-05-20', 33000.0, 3960000.0, '{"28": 24, "30": 36, "32": 36, "34": 24}'),
-  ('SO-MG260078', 'WARNING', 'SKIVE LN#5 REG-FIT', 'SS KEMEJA', 'BROWN', 78, 'FINISHING', '2026-05-20', 33000.0, 2574000.0, '{"28": 15, "30": 24, "32": 24, "34": 15}')
-) AS v(so_number, buyer_name, style_name, item_category, color, order_qty, status, order_date, unit_price, total_order_value, size_breakdown_target)
-WHERE NOT EXISTS (SELECT 1 FROM sales_orders WHERE sales_orders.so_number = v.so_number);
+  ('SO-MG260001', 'BYR-WILMER', 'WILMER STUDIOS', 'KEMEJA PIQUE SAKU HITAM', 'GARMENT', 'BLACK', 500, 'SHIPPED', '2026-04-01', 35000.0, 17500000.0, '{"28": 100, "30": 150, "32": 150, "34": 100}'),
+  ('SO-MG260002', 'BYR-WILMER', 'WILMER STUDIOS', 'KEMEJA PIQUE SAKU PUTIH', 'GARMENT', 'WHITE', 400, 'FINISHING', '2026-04-01', 35000.0, 14000000.0, '{"28": 80, "30": 120, "32": 120, "34": 80}'),
+  ('SO-MG260003', 'BYR-INSIGHT', 'INSIGHT ( SMBU )', 'FLANELLA LONG SHIRT', 'GARMENT', 'RED PLAID', 600, 'WASHING', '2026-04-01', 38000.0, 22800000.0, '{"28": 120, "30": 180, "32": 180, "34": 120}'),
+  ('SO-MG260004', 'BYR-VOXFLY', 'VOXFLY ( SMBU )', 'WIND MILD BLACK', 'LONG JEANS', 'BLACK', 1060, 'SHIPPED', '2026-04-01', 35000.0, 37100000.0, '{"28": 212, "30": 318, "32": 318, "34": 212}'),
+  ('SO-MG260005', 'BYR-VOXFLY', 'VOXFLY ( SMBU )', 'WIND MILD BLUE', 'LONG JEANS', 'NAVY', 1494, 'CUTTING', '2026-04-01', 35000.0, 52290000.0, '{"28": 300, "30": 450, "32": 450, "34": 294}'),
+  ('SO-MG260006', 'BYR-VOXFLY', 'VOXFLY ( SMBU )', 'WIND MILD BLUE', 'GARMENT', 'LIGHT BLUE', 300, 'REGISTERED', '2026-04-01', 35000.0, 10500000.0, '{"28": 60, "30": 90, "32": 90, "34": 60}'),
+  ('SO-MG260007', 'BYR-WARNING', 'WARNING', 'DECOTTON 2.433', 'GARMENT', 'BLACK', 250, 'SEWING', '2026-04-01', 32000.0, 8000000.0, '{"28": 50, "30": 75, "32": 75, "34": 50}'),
+  ('SO-MG260008', 'BYR-WARNING', 'WARNING', 'DECOTTON 2.434', 'GARMENT', 'WHITE', 250, 'SEWING', '2026-04-01', 32000.0, 8000000.0, '{"28": 50, "30": 75, "32": 75, "34": 50}'),
+  ('SO-MG260009', 'BYR-WARNING', 'WARNING', 'DECOTTON 2.435', 'GARMENT', 'GREY', 250, 'CUTTING', '2026-04-01', 32000.0, 8000000.0, '{"28": 50, "30": 75, "32": 75, "34": 50}'),
+  ('SO-MG260010', 'BYR-VOXFLY', 'VOXFLY ( SMBU )', 'SKULLY SHIRT BENDERA PUTIH', 'GARMENT', 'WHITE', 300, 'REGISTERED', '2026-04-01', 30000.0, 9000000.0, '{"28": 60, "30": 90, "32": 90, "34": 60}'),
+  ('SO-MG260025', 'BYR-VOXFLY', 'VOXFLY ( SMBU )', 'SAMURAI', 'SS KEMEJA', 'BIRU', 1163, 'SHIPPED', '2026-04-13', 32000.0, 37216000.0, '{"28": 232, "30": 348, "32": 348, "34": 235}'),
+  ('SO-MG260028', 'BYR-NEVERSUR', 'NEVER SURENDER', 'DENIM BLUE WHISKER', 'LONG JEANS', 'BLUE', 200, 'SHIPPED', '2026-04-21', 38000.0, 7600000.0, '{"28": 40, "30": 60, "32": 60, "34": 40}'),
+  ('SO-MG260029', 'BYR-NEVERSUR', 'NEVER SURENDER', 'DENIM BLACK WHISKER', 'LONG JEANS', 'BLACK', 200, 'SHIPPED', '2026-04-21', 38000.0, 7600000.0, '{"28": 40, "30": 60, "32": 60, "34": 40}'),
+  ('SO-MG260048', 'BYR-TRAVEOLOGY', 'TRAVEOLOGY', 'JEANS JACKET INDIGO BLUE', 'LONG JAKET', 'INDIGO', 189, 'SHIPPED', '2026-04-28', 45000.0, 8505000.0, '{"28": 38, "30": 56, "32": 56, "34": 39}'),
+  ('SO-MG260049', 'BYR-TRAVEOLOGY', 'TRAVEOLOGY', 'JEANS JACKET LIGHT BLUE', 'LONG JAKET', 'LIGHT BLUE', 189, 'SHIPPED', '2026-04-28', 45000.0, 8505000.0, '{"28": 38, "30": 56, "32": 56, "34": 39}'),
+  ('SO-MG260062', 'BYR-OXFOORD', 'OXFOORD', 'NEW OUTER BUTTON BEIGE', 'OUTER BUTTON', 'BEIGE', 166, 'SHIPPED', '2026-05-11', 36000.0, 5976000.0, '{"28": 33, "30": 50, "32": 50, "34": 33}'),
+  ('SO-MG260063', 'BYR-OXFOORD', 'OXFOORD', 'NEW OUTER BUTTON DARK GREY', 'OUTER BUTTON', 'DARK GREY', 167, 'SHIPPED', '2026-05-11', 36000.0, 6012000.0, '{"28": 33, "30": 50, "32": 50, "34": 34}'),
+  ('SO-MG260064', 'BYR-OXFOORD', 'OXFOORD', 'NEW OUTER BUTTON BLACK', 'OUTER BUTTON', 'BLACK', 164, 'SHIPPED', '2026-05-11', 36000.0, 5904000.0, '{"28": 33, "30": 49, "32": 49, "34": 33}'),
+  ('SO-MG260076', 'BYR-WARNING', 'WARNING', 'ARVYN LN#1 18', 'SS KEMEJA', 'BLACK', 120, 'SHIPPED', '2026-05-20', 33000.0, 3960000.0, '{"28": 24, "30": 36, "32": 36, "34": 24}'),
+  ('SO-MG260078', 'BYR-WARNING', 'WARNING', 'SKIVE LN#5 REG-FIT', 'SS KEMEJA', 'BROWN', 78, 'FINISHING', '2026-05-20', 33000.0, 2574000.0, '{"28": 15, "30": 24, "32": 24, "34": 15}')
+) AS v(so_number, buyer_code, buyer_name, style_name, item_category, color, order_qty, status, order_date, unit_price, total_order_value, size_breakdown_target)
+WHERE NOT EXISTS (
+  SELECT 1 FROM sales_orders WHERE sales_orders.so_number = v.so_number
+);
 
 -- 5. INSERT MATERIAL RECEIPTS & ALLOCATIONS
 INSERT INTO material_receipts (id, item_id, supplier_id, receipt_date, roll_number, qty_received, unit, contract_type, inspection_status)
@@ -152,7 +160,9 @@ FROM (VALUES
   ('MG-2604-BH0002', '2026-04-03', 'ROLL-2604-002', 800.0),
   ('MG-2604-BH0003', '2026-04-03', 'ROLL-2604-003', 1500.0)
 ) AS v(item_code, receipt_date, roll_number, qty_received)
-WHERE NOT EXISTS (SELECT 1 FROM material_receipts WHERE material_receipts.roll_number = v.roll_number);
+WHERE NOT EXISTS (
+  SELECT 1 FROM material_receipts WHERE material_receipts.roll_number = v.roll_number
+);
 
 INSERT INTO material_allocations (id, so_id, item_id, dispatch_date, qty_issued, surat_jalan_no)
 SELECT 
@@ -164,7 +174,10 @@ FROM (VALUES
   ('SO-MG260004', 'MG-2604-BH0001', '2026-04-04', 250.0, 'SJ-MAT-2604.01'),
   ('SO-MG260005', 'MG-2604-BH0002', '2026-04-04', 350.0, 'SJ-MAT-2604.02')
 ) AS v(so_number, item_code, dispatch_date, qty_issued, surat_jalan_no)
-WHERE NOT EXISTS (SELECT 1 FROM material_allocations WHERE material_allocations.surat_jalan_no = v.surat_jalan_no);
+WHERE EXISTS (SELECT 1 FROM sales_orders WHERE sales_orders.so_number = v.so_number)
+AND NOT EXISTS (
+  SELECT 1 FROM material_allocations WHERE material_allocations.surat_jalan_no = v.surat_jalan_no
+);
 
 -- 6. INSERT CUTTING LOGS & PREP TASKS
 INSERT INTO cutting_records (id, so_id, cutting_date, operator_id, qty_cut, size_breakdown_cut, main_fabric_used, puring_used, main_consumption_rate, puring_consumption_rate, gelaran_layers, fabric_waste_yards)
