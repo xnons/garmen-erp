@@ -1,10 +1,229 @@
 -- =====================================================
 -- PT. CHIKAL JAYA MAKMUR (MASTER GARMENT ERP)
--- BULLETPROOF PRODUCTION SEED (WITH STRICT DUPLICATE GUARDS)
+-- FULL SCHEMA MIGRATION & BULLETPROOF SEED SCRIPT
 -- Target: PostgreSQL / Supabase SQL Editor
 -- =====================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- -----------------------------------------------------
+-- PHASE 0: AUTO-SCHEMA SYNC (CREATE / ALTER TABLES)
+-- -----------------------------------------------------
+
+-- 1. Partners Table
+CREATE TABLE IF NOT EXISTS partners (
+    id VARCHAR(50) PRIMARY KEY,
+    code VARCHAR(50) UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    address TEXT,
+    phone VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS code VARCHAR(50);
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+
+-- 2. Karyawan Table
+CREATE TABLE IF NOT EXISTS karyawan (
+    id_karyawan VARCHAR(50) PRIMARY KEY,
+    nama VARCHAR(100) NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    hashed_password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL,
+    jabatan VARCHAR(100),
+    pin VARCHAR(10),
+    is_active BOOLEAN DEFAULT TRUE,
+    status_karyawan VARCHAR(50) DEFAULT 'TETAP',
+    tipe_pay VARCHAR(50) DEFAULT 'BULANAN',
+    gaji_pokok FLOAT DEFAULT 0.0,
+    tarif_borongan_pcs FLOAT DEFAULT 0.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Inventory Items Table
+CREATE TABLE IF NOT EXISTS inventory_items (
+    id VARCHAR(50) PRIMARY KEY,
+    item_code VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT NOT NULL,
+    item_type VARCHAR(30) NOT NULL,
+    unit VARCHAR(20) DEFAULT 'YARD',
+    unit_price FLOAT DEFAULT 0.0,
+    current_stock FLOAT DEFAULT 0.0,
+    color_shade_lot VARCHAR(50),
+    width_inch FLOAT DEFAULT 58.0,
+    gramasi_gsm FLOAT DEFAULT 0.0,
+    min_stock_alert FLOAT DEFAULT 50.0,
+    rack_location VARCHAR(50) DEFAULT 'GUDANG_UTAMA',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS color_shade_lot VARCHAR(50);
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS width_inch FLOAT DEFAULT 58.0;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS gramasi_gsm FLOAT DEFAULT 0.0;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS min_stock_alert FLOAT DEFAULT 50.0;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS rack_location VARCHAR(50) DEFAULT 'GUDANG_UTAMA';
+
+-- 4. Sales Orders Table
+CREATE TABLE IF NOT EXISTS sales_orders (
+    id VARCHAR(50) PRIMARY KEY,
+    so_number VARCHAR(50) UNIQUE NOT NULL,
+    buyer_id VARCHAR(50) REFERENCES partners(id),
+    buyer_po_number VARCHAR(100),
+    customer_pic_name VARCHAR(100),
+    customer_pic_phone VARCHAR(50),
+    customer_email VARCHAR(100),
+    delivery_address TEXT,
+    style_name VARCHAR(150) NOT NULL,
+    item_category VARCHAR(100) DEFAULT 'LONG JEANS',
+    color VARCHAR(50),
+    fabric_type VARCHAR(150),
+    target_shrinkage_pct FLOAT DEFAULT 0.0,
+    special_instructions TEXT,
+    contract_type VARCHAR(20) DEFAULT 'CMT',
+    order_qty INTEGER DEFAULT 0 NOT NULL,
+    unit_price FLOAT DEFAULT 0.0,
+    total_order_value FLOAT DEFAULT 0.0,
+    dp_amount FLOAT DEFAULT 0.0,
+    payment_terms VARCHAR(50) DEFAULT 'NET_30',
+    tax_ppn_pct FLOAT DEFAULT 0.0,
+    discount_amount FLOAT DEFAULT 0.0,
+    size_breakdown_target JSON DEFAULT '{}'::json,
+    bom_accessories JSON DEFAULT '[]'::json,
+    status VARCHAR(50) DEFAULT 'REGISTERED',
+    order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    deadline DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS buyer_po_number VARCHAR(100);
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS customer_pic_name VARCHAR(100);
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS customer_pic_phone VARCHAR(50);
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS customer_email VARCHAR(100);
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS delivery_address TEXT;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS fabric_type VARCHAR(150);
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS target_shrinkage_pct FLOAT DEFAULT 0.0;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS special_instructions TEXT;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS contract_type VARCHAR(20) DEFAULT 'CMT';
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS unit_price FLOAT DEFAULT 0.0;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS total_order_value FLOAT DEFAULT 0.0;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS dp_amount FLOAT DEFAULT 0.0;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS payment_terms VARCHAR(50) DEFAULT 'NET_30';
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS tax_ppn_pct FLOAT DEFAULT 0.0;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS discount_amount FLOAT DEFAULT 0.0;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS size_breakdown_target JSON DEFAULT '{}'::json;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS bom_accessories JSON DEFAULT '[]'::json;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS deadline DATE;
+
+-- 5. Material Receipts & Allocations
+CREATE TABLE IF NOT EXISTS material_receipts (
+    id VARCHAR(50) PRIMARY KEY,
+    item_id VARCHAR(50) REFERENCES inventory_items(id) NOT NULL,
+    supplier_id VARCHAR(50) REFERENCES partners(id),
+    receipt_date DATE NOT NULL,
+    roll_number VARCHAR(50),
+    qty_received FLOAT NOT NULL,
+    unit VARCHAR(20) DEFAULT 'YARD',
+    contract_type VARCHAR(20) DEFAULT 'FOB',
+    inspection_status VARCHAR(30) DEFAULT 'PENDING'
+);
+ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS contract_type VARCHAR(20) DEFAULT 'FOB';
+ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS inspection_status VARCHAR(30) DEFAULT 'PENDING';
+
+CREATE TABLE IF NOT EXISTS material_allocations (
+    id VARCHAR(50) PRIMARY KEY,
+    so_id VARCHAR(50) REFERENCES sales_orders(id) NOT NULL,
+    item_id VARCHAR(50) REFERENCES inventory_items(id) NOT NULL,
+    dispatch_date DATE NOT NULL,
+    qty_issued FLOAT NOT NULL,
+    surat_jalan_no VARCHAR(100)
+);
+
+-- 6. Cutting Records & Tasks
+CREATE TABLE IF NOT EXISTS cutting_records (
+    id VARCHAR(50) PRIMARY KEY,
+    so_id VARCHAR(50) REFERENCES sales_orders(id) NOT NULL,
+    cutting_date DATE NOT NULL,
+    operator_id VARCHAR(50) REFERENCES karyawan(id_karyawan),
+    qty_cut INTEGER NOT NULL,
+    size_breakdown_cut JSON DEFAULT '{}'::json,
+    main_fabric_used FLOAT NOT NULL,
+    puring_used FLOAT DEFAULT 0.0,
+    puring_jala_used FLOAT DEFAULT 0.0,
+    main_consumption_rate FLOAT DEFAULT 0.0,
+    puring_consumption_rate FLOAT DEFAULT 0.0,
+    marker_length_yard FLOAT DEFAULT 0.0,
+    marker_efficiency_pct FLOAT DEFAULT 0.0,
+    gelaran_layers INTEGER DEFAULT 1,
+    fabric_waste_yards FLOAT DEFAULT 0.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS marker_length_yard FLOAT DEFAULT 0.0;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS marker_efficiency_pct FLOAT DEFAULT 0.0;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS gelaran_layers INTEGER DEFAULT 1;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS fabric_waste_yards FLOAT DEFAULT 0.0;
+
+-- 7. WIP Sequential Pipeline Movements
+CREATE TABLE IF NOT EXISTS wip_movements (
+    id VARCHAR(50) PRIMARY KEY,
+    so_id VARCHAR(50) REFERENCES sales_orders(id) NOT NULL,
+    stage_name VARCHAR(50) NOT NULL,
+    sequence_order INTEGER NOT NULL DEFAULT 1,
+    partner_id VARCHAR(50) REFERENCES partners(id),
+    internal_supervisor_id VARCHAR(50) REFERENCES karyawan(id_karyawan),
+    surat_jalan_no VARCHAR(100),
+    dispatch_date DATE NOT NULL,
+    qty_dispatched INTEGER NOT NULL,
+    size_breakdown_dispatched JSON DEFAULT '{}'::json,
+    received_date DATE,
+    qty_received INTEGER DEFAULT 0,
+    qty_reject INTEGER DEFAULT 0,
+    size_breakdown_received JSON DEFAULT '{}'::json,
+    balance_discrepancy INTEGER DEFAULT 0,
+    status VARCHAR(30) DEFAULT 'IN_PROCESS',
+    remarks TEXT
+);
+
+-- 8. Piece Rate Wages & Shipments
+CREATE TABLE IF NOT EXISTS piece_rate_wages (
+    id VARCHAR(50) PRIMARY KEY,
+    so_id VARCHAR(50) REFERENCES sales_orders(id) NOT NULL,
+    operator_id VARCHAR(50) REFERENCES karyawan(id_karyawan),
+    operation_type VARCHAR(50) NOT NULL,
+    work_date DATE NOT NULL,
+    qty_completed INTEGER NOT NULL,
+    qty_reject INTEGER DEFAULT 0,
+    size_breakdown JSON DEFAULT '{}'::json,
+    wage_per_piece FLOAT NOT NULL,
+    total_wage FLOAT DEFAULT 0.0,
+    notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS shipments (
+    id VARCHAR(50) PRIMARY KEY,
+    so_id VARCHAR(50) REFERENCES sales_orders(id) NOT NULL,
+    shipment_date DATE NOT NULL,
+    surat_jalan_no VARCHAR(100) UNIQUE NOT NULL,
+    driver_id VARCHAR(50) REFERENCES karyawan(id_karyawan),
+    driver_name VARCHAR(100),
+    vehicle_plate_no VARCHAR(50),
+    carton_box_count INTEGER DEFAULT 0,
+    destination_address TEXT,
+    total_qty_shipped INTEGER NOT NULL,
+    size_breakdown_shipped JSON DEFAULT '{}'::json,
+    unit_price FLOAT DEFAULT 0.0,
+    total_invoice_amount FLOAT DEFAULT 0.0,
+    invoice_number VARCHAR(100),
+    is_invoiced BOOLEAN DEFAULT FALSE,
+    remarks TEXT
+);
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS driver_name VARCHAR(100);
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS vehicle_plate_no VARCHAR(50);
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS carton_box_count INTEGER DEFAULT 0;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS destination_address TEXT;
+
+
+-- -----------------------------------------------------
+-- PHASE 1: DATA INGESTION (WITH COMPOUND DUPLICATE GUARDS)
+-- -----------------------------------------------------
 
 -- 1. INSERT PARTNERS (BUYERS & SUBCONS)
 INSERT INTO partners (id, code, name, category, address, phone)
