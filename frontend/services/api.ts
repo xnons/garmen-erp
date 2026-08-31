@@ -3,26 +3,22 @@ import axios from 'axios';
 const getBaseURL = (): string => {
     if (typeof window !== 'undefined') {
         const customUrl = localStorage.getItem('custom_api_url');
-        if (customUrl) return customUrl;
-
-        // 1. Jika frontend dibuka di domain Render (*.onrender.com),
-        // selalu prioritaskan origin aktif browser agar sinkron dengan domain backend aktif (misal garmen-erp-1.onrender.com)
-        if (window.location.hostname.includes('onrender.com')) {
-            return window.location.origin;
-        }
-
-        // 2. Jika ada NEXT_PUBLIC_API_URL yang valid
-        const envUrl = process.env.NEXT_PUBLIC_API_URL;
-        if (envUrl && envUrl.startsWith('http') && !envUrl.includes('127.0.0.1') && !envUrl.includes('localhost')) {
-            return envUrl;
-        }
-
-        // 3. Jika di browser production non-local
-        if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
-            return window.location.origin;
-        }
+        if (customUrl) return customUrl.replace(/\/$/, '');
     }
-    return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+    // 1. Ambil dari Environment Variable Build/Runtime
+    const envUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (envUrl && envUrl.startsWith('http')) {
+        return envUrl.replace(/\/$/, '');
+    }
+
+    // 2. Default URL backend live di Render jika dibuka di browser production
+    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+        return 'https://garmen-erp.onrender.com';
+    }
+
+    // 3. Fallback dev localhost
+    return 'http://127.0.0.1:8000';
 };
 
 const api = axios.create({

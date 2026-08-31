@@ -7,30 +7,7 @@ import MesinFormModal from './MesinFormModal';
 import MesinDetailModal from './MesinDetailModal';
 import MesinPaymentModal from './MesinPaymentModal';
 import MesinArchiveModal from './MesinArchiveModal';
-
-// 🟢 KONFIGURASI REST API FASTAPI DENGAN DYNAMIC ORIGIN DETECTION
-const getAPIBase = (): string => {
-    if (typeof window !== 'undefined') {
-        const customUrl = localStorage.getItem('custom_api_url');
-        if (customUrl) return `${customUrl.replace(/\/$/, '')}/api`;
-        if (window.location.hostname.includes('onrender.com')) {
-            return `${window.location.origin}/api`;
-        }
-    }
-    const rawBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-    return rawBase.endsWith('/api') ? rawBase : `${rawBase.replace(/\/$/, '')}/api`;
-};
-
-const getAuthHeader = () => {
-    const token = typeof window !== 'undefined'
-        ? (localStorage.getItem('access_token') || localStorage.getItem('token') || '')
-        : '';
-
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-    };
-};
+import api from '@/services/api';
 
 interface MesinPageProps {
     activeUser?: any;
@@ -81,20 +58,12 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
     const fetchMachines = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${getAPIBase()}/mesin`, {
-                headers: getAuthHeader()
-            });
-
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.detail || 'Gagal mengambil data mesin dari server');
-            }
-
-            const data = await res.json();
-            setMachines(data);
+            const res = await api.get('/api/mesin');
+            setMachines(res.data || []);
         } catch (err: any) {
-            console.error('Error fetching machines:', err.message);
-            showToastError(err.message || 'Gagal menghubungkan ke server.');
+            console.error('Error fetching machines:', err);
+            const msg = err.response?.data?.detail || err.message || 'Gagal menghubungkan ke server.';
+            showToastError(msg);
         } finally {
             setIsLoading(false);
         }
@@ -147,33 +116,20 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
 
             if (selectedEdit) {
                 // 🔄 PUT /api/mesin/{kode_mesin}
-                const res = await fetch(`${getAPIBase()}/mesin/${selectedEdit.kode_mesin}`, {
-                    method: 'PUT',
-                    headers: getAuthHeader(),
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || 'Gagal memperbarui data mesin');
+                await api.put(`/api/mesin/${selectedEdit.kode_mesin}`, payload);
                 showToastSuccess(`Data mesin "${formData.nama_mesin}" berhasil diperbarui.`);
             } else {
                 // ➕ POST /api/mesin
-                const res = await fetch(`${getAPIBase()}/mesin`, {
-                    method: 'POST',
-                    headers: getAuthHeader(),
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.detail || 'Gagal mendaftarkan mesin baru');
+                await api.post('/api/mesin', payload);
                 showToastSuccess(`Mesin baru "${formData.nama_mesin}" berhasil didaftarkan.`);
             }
 
             fetchMachines();
             setIsFormOpen(false);
         } catch (err: any) {
-            console.error('Error saving machine:', err.message);
-            showToastError(`Gagal menyimpan data mesin: ${err.message}`);
+            console.error('Error saving machine:', err);
+            const msg = err.response?.data?.detail || err.message || 'Gagal menyimpan data mesin';
+            showToastError(`Gagal menyimpan data mesin: ${msg}`);
         }
     };
 
@@ -189,25 +145,19 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
             const hargaBeli = Number(target.harga_beli) || 0;
             const newStatus = (hargaBeli > 0 && newTerbayar >= hargaBeli) ? 'LUNAS' : (newTerbayar > 0 ? 'DICICIL' : 'BELUM_BAYAR');
 
-            const res = await fetch(`${getAPIBase()}/mesin/${target.kode_mesin}`, {
-                method: 'PUT',
-                headers: getAuthHeader(),
-                body: JSON.stringify({
-                    jumlah_terbayar: newTerbayar,
-                    status_pembayaran: newStatus,
-                    riwayat_pembayaran: updatedHistory
-                })
+            await api.put(`/api/mesin/${target.kode_mesin}`, {
+                jumlah_terbayar: newTerbayar,
+                status_pembayaran: newStatus,
+                riwayat_pembayaran: updatedHistory
             });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Gagal memperbarui data pembayaran');
 
             showToastSuccess(`Pembayaran cicilan Rp ${record.jumlah.toLocaleString('id-ID')} berhasil dicatat.`);
             fetchMachines();
             setSelectedPayment(null);
         } catch (err: any) {
-            console.error('Error payment:', err.message);
-            showToastError(`Gagal mencatat pembayaran: ${err.message}`);
+            console.error('Error payment:', err);
+            const msg = err.response?.data?.detail || err.message || 'Gagal mencatat pembayaran';
+            showToastError(`Gagal mencatat pembayaran: ${msg}`);
         }
     };
 
@@ -217,24 +167,18 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
         if (!target) return;
 
         try {
-            const res = await fetch(`${getAPIBase()}/mesin/${target.kode_mesin}`, {
-                method: 'PUT',
-                headers: getAuthHeader(),
-                body: JSON.stringify({
-                    status: 'ARCHIVED',
-                    keterangan: `Diarsipkan: ${archiveData.alasan || '-'}`
-                })
+            await api.put(`/api/mesin/${target.kode_mesin}`, {
+                status: 'ARCHIVED',
+                keterangan: `Diarsipkan: ${archiveData.alasan || '-'}`
             });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Gagal mengarsipkan mesin');
 
             showToastSuccess(`Mesin "${target.nama_mesin}" berhasil diarsipkan.`);
             fetchMachines();
             setSelectedArchive(null);
         } catch (err: any) {
-            console.error('Error archive:', err.message);
-            showToastError(`Gagal mengarsipkan mesin: ${err.message}`);
+            console.error('Error archive:', err);
+            const msg = err.response?.data?.detail || err.message || 'Gagal mengarsipkan mesin';
+            showToastError(`Gagal mengarsipkan mesin: ${msg}`);
         }
     };
 
