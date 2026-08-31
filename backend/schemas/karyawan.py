@@ -41,6 +41,7 @@ class UpdateKaryawanInput(BaseModel):
     gaji_pokok: Optional[int] = None
     tarif_borongan_pcs: Optional[int] = None
     is_active: Optional[bool] = None
+    password: Optional[str] = None
 
 
 # 🟢 3. SCHEMA LOGIN USER & GEOLOCATION

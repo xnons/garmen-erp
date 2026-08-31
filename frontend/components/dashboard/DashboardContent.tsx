@@ -114,7 +114,7 @@ export default function DashboardContent({
 
     // 8. Pengaturan & Akun
     if (activeMenu === 'setting') {
-      return <SettingModule activeUser={activeUser} onLogout={onLogout} />;
+      return <SettingModule activeUser={activeUser} onLogout={onLogout} onNavigateMenu={setActiveMenu} />;
     }
 
     // Fallback View

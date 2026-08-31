@@ -59,6 +59,11 @@ def create_mesin(
 
     kode = payload.kode_mesin or generate_kode_mesin(payload.kategori, db)
     
+    harga = payload.harga_beli or 0.0
+    terbayar = payload.jumlah_terbayar or 0.0
+    sisa = max(0.0, harga - terbayar)
+    status_bayar = "LUNAS" if (harga > 0 and terbayar >= harga) else ("DICICIL" if terbayar > 0 else "BELUM_BAYAR")
+
     mesin_baru = models.Mesin(
         kode_mesin=kode,
         nama_mesin=payload.nama_mesin,
@@ -67,14 +72,23 @@ def create_mesin(
         lokasi_line=payload.lokasi_line,
         status=(payload.status or "OPERASIONAL").upper(),
         operator_id=payload.operator_id,
-        keterangan=payload.keterangan
+        keterangan=payload.keterangan,
+        harga_beli=harga,
+        jumlah_terbayar=terbayar,
+        sisa_pembayaran=sisa,
+        status_pembayaran=payload.status_pembayaran or status_bayar,
+        vendor_supplier=payload.vendor_supplier,
+        no_seri=payload.no_seri,
+        tanggal_pembelian=payload.tanggal_pembelian,
+        garansi_hingga=payload.garansi_hingga,
+        riwayat_pembayaran=payload.riwayat_pembayaran or []
     )
     db.add(mesin_baru)
     db.commit()
     db.refresh(mesin_baru)
     return {"message": f"Mesin {mesin_baru.nama_mesin} ({kode}) berhasil didaftarkan!"}
 
-# 3. UPDATE MESIN / STATUS MAINTENANCE
+# 3. UPDATE MESIN / STATUS MAINTENANCE & PEMBAYARAN CICILAN
 @router.put("/{kode_mesin}")
 def update_mesin(
     kode_mesin: str,
@@ -86,12 +100,22 @@ def update_mesin(
     if not mesin:
         raise HTTPException(status_code=404, detail="Mesin tidak ditemukan!")
 
-    update_data = payload.dict(exclude_unset=True)
+    update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         if key in ["kategori", "status"] and value:
             setattr(mesin, key, value.upper())
         else:
             setattr(mesin, key, value)
+
+    # Otomatisasi hitung sisa pembayaran dan status lunas
+    if mesin.harga_beli and mesin.harga_beli > 0:
+        mesin.sisa_pembayaran = max(0.0, float(mesin.harga_beli) - float(mesin.jumlah_terbayar or 0.0))
+        if mesin.jumlah_terbayar >= mesin.harga_beli:
+            mesin.status_pembayaran = "LUNAS"
+        elif mesin.jumlah_terbayar > 0:
+            mesin.status_pembayaran = "DICICIL"
+        else:
+            mesin.status_pembayaran = "BELUM_BAYAR"
 
     db.commit()
     return {"message": f"Data mesin {kode_mesin} berhasil diperbarui!"}

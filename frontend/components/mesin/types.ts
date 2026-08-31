@@ -47,6 +47,7 @@ export interface MesinAsset {
     terakhir_servis?: string;
     jadwal_servis_berikutnya?: string;
     catatan?: string;
+    keterangan?: string;
 
     // Info Pengarsipan
     arsip_info?: ArchiveInfo;

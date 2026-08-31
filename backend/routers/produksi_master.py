@@ -23,8 +23,9 @@ from schemas.produksi import (
 )
 from core.security import get_current_user
 
-# 🟢 Import Helper dari deps.py (Solusi Circular Import & RBAC Guard)
+# 🟢 Import Helper dari deps.py & audit_helper.py
 from core.deps import require_roles, get_enum_val
+from core.audit_helper import record_audit
 
 # Router Master Produksi
 router = APIRouter(prefix="/api/produksi", tags=["Produksi - Master & SPK"])
@@ -102,17 +103,27 @@ def create_spk(
         size_matrix=payload.size_matrix or {},
         target_qty=calculated_qty,
         realisasi_potong=0,
+        tipe_order=payload.tipe_order or "CMT",
+        penyedia_kain=payload.penyedia_kain or "CUSTOMER",
+        penyedia_aksesoris=payload.penyedia_aksesoris or "CUSTOMER",
         jenis_kain=payload.jenis_kain,
         warna_kain=payload.warna_kain,
         aksesoris=payload.aksesoris,
         spesifikasi_sablon_bordir=payload.spesifikasi_sablon_bordir,
-        toleransi_defect_pct=payload.toleransi_defect_pct,
+        toleransi_defect_pct=payload.toleransi_defect_pct or 2.0,
+        biaya_kain_per_pcs=payload.biaya_kain_per_pcs or 0.0,
+        biaya_aksesoris_per_pcs=payload.biaya_aksesoris_per_pcs or 0.0,
+        biaya_maklon_luar_per_pcs=payload.biaya_maklon_luar_per_pcs or 0.0,
+        konsumsi_kain_per_pcs=payload.konsumsi_kain_per_pcs or 0.0,
         tanggal_mulai=payload.tanggal_mulai,
         target_cutting=payload.target_cutting,
         target_sewing=payload.target_sewing,
         deadline=payload.deadline,
+        dp_nominal=payload.dp_nominal or 0.0,
+        link_google_drive=payload.link_google_drive,
+        status_acc_sampel=payload.status_acc_sampel or "APPROVED",
         status=StatusSPK.ON_PROGRESS.value,
-        harga_jual_per_pcs=payload.harga_jual_per_pcs,
+        harga_jual_per_pcs=payload.harga_jual_per_pcs or 0.0,
         is_deleted=False
     )
     db.add(new_spk)
@@ -149,6 +160,15 @@ def owner_finish_spk(
 
     spk.status = StatusSPK.FINISHED.value
     db.commit()
+
+    actor_name = getattr(current_user, "nama", None) or current_user.id_karyawan
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="OWNER_FINISH_SPK",
+        target_id=spk_id,
+        catatan=f"SPK '{spk_id}' ({spk.nama_artikel}) diselesaikan paksa oleh {actor_name}."
+    )
 
     return {
         "message": f"SPK '{spk_id}' berhasil diselesaikan secara eksklusif oleh Owner/Developer.",
@@ -265,6 +285,7 @@ def archive_spk(
 @router.post("/spk/{spk_id}/delete")
 def delete_spk(
     spk_id: str,
+    alasan_hapus: Optional[str] = Query("Pembatalan SPK", description="Alasan penghapusan"),
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(require_roles(["OWNER", "DEVELOPER", "ADMIN"]))
 ):
@@ -275,10 +296,19 @@ def delete_spk(
     if not spk:
         raise HTTPException(status_code=404, detail=f"SPK ID '{spk_id}' tidak ditemukan.")
 
+    actor_name = getattr(current_user, "nama", None) or current_user.id_karyawan
     spk.is_deleted = True
     spk.deleted_at = datetime.utcnow()
-    spk.deleted_by = getattr(current_user, "nama", None) or current_user.id_karyawan
+    spk.deleted_by = actor_name
     db.commit()
+
+    record_audit(
+        db=db,
+        actor_id=current_user.id_karyawan,
+        aksi="DELETE_SPK",
+        target_id=spk_id,
+        catatan=f"SPK '{spk_id}' ({spk.nama_artikel}) dihapus oleh {actor_name}. Alasan: {alasan_hapus}"
+    )
 
     return {"message": f"SPK '{spk_id}' berhasil dihapus dari sistem.", "spk_id": spk_id}
 

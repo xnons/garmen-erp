@@ -12,6 +12,7 @@ from schemas.karyawan import (
     UpdateKaryawanInput
 )
 from core.security import get_current_user, get_password_hash
+from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api", tags=["Karyawan & Pelanggaran"])
 
@@ -142,6 +143,29 @@ async def tambah_pelanggaran_karyawan(
 # ---------------------------------------------------------------------------
 # 3️⃣ AMBIL RIWAYAT LOG PELANGGARAN -> GET /api/karyawan/{id_karyawan}/pelanggaran
 # ---------------------------------------------------------------------------
+@router.get("/karyawan/me/pelanggaran")
+async def ambil_riwayat_pelanggaran_saya(
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(get_current_user)
+):
+    """Mengambil riwayat sanksi/kedisiplinan akun user yang sedang login."""
+    logs = db.query(models.LogPelanggaran).filter(
+        models.LogPelanggaran.id_karyawan == current_user.id_karyawan
+    ).order_by(models.LogPelanggaran.id.desc()).all()
+    
+    return [
+        {
+            "id": log.id,
+            "id_karyawan": log.id_karyawan,
+            "jenis": log.jenis,
+            "poin": log.poin,
+            "keterangan": log.keterangan,
+            "tanggal": log.tanggal
+        }
+        for log in logs
+    ]
+
+
 @router.get("/karyawan/{id_karyawan}/pelanggaran")
 async def ambil_riwayat_pelanggaran(
     id_karyawan: str,
@@ -151,7 +175,7 @@ async def ambil_riwayat_pelanggaran(
     if current_user.role not in ["OWNER", "ADMIN", "DEVELOPER"]:
         raise HTTPException(status_code=403, detail="Akses ditolak!")
         
-    logs = db.query(models.LogPelanggaran).filter(models.LogPelanggaran.id_karyawan == id_karyawan).all()
+    logs = db.query(models.LogPelanggaran).filter(models.LogPelanggaran.id_karyawan == id_karyawan).order_by(models.LogPelanggaran.id.desc()).all()
     
     return [
         {
@@ -247,6 +271,20 @@ async def edit_data_karyawan(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Akses Ditolak! Hanya DEVELOPER yang bisa mengubah role karyawan menjadi '{new_role}'."
             )
+
+    # 🔒 Handle Reset Password oleh Atasan (Owner / Developer / Admin)
+    if "password" in update_data and update_data["password"]:
+        raw_pwd = update_data.pop("password")
+        target_karyawan.hashed_password = get_password_hash(raw_pwd)
+        
+        actor_name = getattr(current_user, "nama", None) or current_user.id_karyawan
+        record_audit(
+            db=db,
+            actor_id=current_user.id_karyawan,
+            aksi="RESET_PASSWORD_KARYAWAN",
+            target_id=id_karyawan,
+            catatan=f"Password akun {target_karyawan.nama} ({id_karyawan}) direset oleh atasan {actor_name}."
+        )
         
     for field, value in update_data.items():
         setattr(target_karyawan, field, value)

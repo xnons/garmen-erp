@@ -48,14 +48,14 @@ export default function Sidebar({
 
   // 🛡️ RBAC & Lucide Icons Navigation
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI'] },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI', 'GUDANG'] },
     { id: 'karyawan', label: 'Kelola Karyawan', icon: Users, roles: ['OWNER', 'ADMIN'] },
-    { id: 'inventaris', label: 'Inventaris & Stok', icon: Package, roles: ['OWNER', 'ADMIN'] },
+    { id: 'inventaris', label: 'Inventaris & Stok', icon: Package, roles: ['OWNER', 'ADMIN', 'GUDANG'] },
     { id: 'mesin', label: 'Inventaris Mesin', icon: Cpu, roles: ['OWNER', 'ADMIN', 'PRODUKSI'] },
     { id: 'produksi', label: 'Produksi Borongan', icon: Scissors, roles: ['OWNER', 'ADMIN', 'PRODUKSI'] },
     { id: 'payroll', label: 'Payroll & Penggajian', icon: Wallet, roles: ['OWNER', 'FINANCE'] },
     { id: 'audit-log', label: 'Log Keamanan', icon: ShieldAlert, roles: ['OWNER'] },
-    { id: 'setting', label: 'Akun Saya', icon: User, roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI'] },
+    { id: 'setting', label: 'Akun Saya', icon: User, roles: ['OWNER', 'ADMIN', 'FINANCE', 'PRODUKSI', 'GUDANG'] },
   ];
 
   // Normalisasi string role ke UPPERCASE

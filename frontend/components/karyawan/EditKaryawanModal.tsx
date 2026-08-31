@@ -115,6 +115,24 @@ export const EditKaryawanModal: React.FC<EditKaryawanModalProps> = ({
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white"
                             />
                         </div>
+
+                        {/* Reset Password oleh Atasan */}
+                        <div className="md:col-span-2 p-3 bg-slate-950/80 rounded-xl border border-indigo-500/20 space-y-1.5">
+                            <label className="text-xs font-bold text-indigo-400 block flex items-center justify-between">
+                                <span>Reset Password Akun (Khusus Atasan)</span>
+                                <span className="text-[10px] text-slate-500 font-normal">Tercatat di Audit Log</span>
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="Masukkan password baru jika ingin mereset (min. 6 karakter)..."
+                                value={editFormData.password || ''}
+                                onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
+                                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                            />
+                            <p className="text-[10px] text-slate-400">
+                                Kosongkan jika tidak ingin mengubah password akun karyawan ini.
+                            </p>
+                        </div>
                     </div>
 
                     <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">

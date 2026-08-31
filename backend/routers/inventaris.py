@@ -38,11 +38,11 @@ def require_roles(allowed_roles: List[str]):
     return role_checker
 
 
-# 🔒 Inisialisasi APIRouter dengan Proteksi Kunci (Hanya OWNER, DEVELOPER, ADMIN)
+# 🔒 Inisialisasi APIRouter dengan Proteksi Kunci (OWNER, DEVELOPER, ADMIN, GUDANG)
 router = APIRouter(
     prefix="/api/inventaris",
     tags=["Inventaris & Stok"],
-    dependencies=[Depends(require_roles(["OWNER", "DEVELOPER", "ADMIN"]))]
+    dependencies=[Depends(require_roles(["OWNER", "DEVELOPER", "ADMIN", "GUDANG"]))]
 )
 
 

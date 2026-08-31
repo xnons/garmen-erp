@@ -214,11 +214,17 @@ export default function ProduksiPage({ currentUser }: ProduksiPageProps) {
         }
     };
 
-    const handleVerify = async (logId: number, statusQC: StatusVerifikasiOutput) => {
+    const handleVerify = async (
+        logId: number,
+        statusQC: StatusVerifikasiOutput,
+        fotoDefect?: string,
+        alasan?: string
+    ) => {
         try {
             await produksiService.verifyOutput(logId, {
                 status_verifikasi: statusQC,
-                catatan: statusQC === 'APPROVED' ? 'Disetujui Checker/Mandor' : 'Ditolak/Revisi'
+                catatan: alasan || (statusQC === 'APPROVED' ? 'Disetujui Checker/Mandor' : 'Ditolak/Revisi'),
+                foto_bukti_defect: fotoDefect
             });
             setSuccessMessage(`Status verifikasi setoran #${logId} berhasil diperbarui.`);
             fetchOutputLogs();

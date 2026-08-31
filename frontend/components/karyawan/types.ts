@@ -21,6 +21,7 @@ export interface Karyawan {
     gaji_pokok: number;
     tarif_borongan_pcs: number;
     poin_pelanggaran: number;
+    password?: string;
 
     // 🟢 Field Tambahan Pengarsipan / Offboarding
     alasan_keluar?: string;

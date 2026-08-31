@@ -27,6 +27,27 @@ def auto_migrate_db():
             ("log_output_borongan", "jumlah_bahan_digunakan", "FLOAT DEFAULT 0.0"),
             ("log_login", "device_info", "VARCHAR(255)"),
             ("log_login", "lokasi", "VARCHAR(255)"),
+            # Kolom baru SPK Produksi
+            ("spk_produksi", "tipe_order", "VARCHAR(20) DEFAULT 'CMT'"),
+            ("spk_produksi", "penyedia_kain", "VARCHAR(50) DEFAULT 'CUSTOMER'"),
+            ("spk_produksi", "penyedia_aksesoris", "VARCHAR(50) DEFAULT 'CUSTOMER'"),
+            ("spk_produksi", "biaya_kain_per_pcs", "FLOAT DEFAULT 0.0"),
+            ("spk_produksi", "biaya_aksesoris_per_pcs", "FLOAT DEFAULT 0.0"),
+            ("spk_produksi", "biaya_maklon_luar_per_pcs", "FLOAT DEFAULT 0.0"),
+            ("spk_produksi", "konsumsi_kain_per_pcs", "FLOAT DEFAULT 0.0"),
+            ("spk_produksi", "dp_nominal", "FLOAT DEFAULT 0.0"),
+            ("spk_produksi", "link_google_drive", "VARCHAR(500)"),
+            ("spk_produksi", "status_acc_sampel", "VARCHAR(30) DEFAULT 'APPROVED'"),
+            # Kolom baru Mesin
+            ("mesin", "harga_beli", "FLOAT DEFAULT 0.0"),
+            ("mesin", "jumlah_terbayar", "FLOAT DEFAULT 0.0"),
+            ("mesin", "sisa_pembayaran", "FLOAT DEFAULT 0.0"),
+            ("mesin", "status_pembayaran", "VARCHAR(30) DEFAULT 'LUNAS'"),
+            ("mesin", "vendor_supplier", "VARCHAR(100)"),
+            ("mesin", "no_seri", "VARCHAR(100)"),
+            ("mesin", "tanggal_pembelian", "VARCHAR(20)"),
+            ("mesin", "garansi_hingga", "VARCHAR(20)"),
+            ("mesin", "riwayat_pembayaran", "TEXT DEFAULT '[]'"),
         ]
         for tbl_name, col_name, col_type in columns_to_add:
             try:
@@ -45,34 +66,35 @@ async def lifespan(app: FastAPI):
     auto_migrate_db()
     db = SessionLocal()
     try:
-        # Seeder Akun Owner Master
-        owner_exist = db.query(models.Karyawan).filter(models.Karyawan.username == "admin.nexora").first()
-        if not owner_exist:
-            user_master = models.Karyawan(
-                id_karyawan="KRY-2026-001",
-                nama="Bapak Owner Nexora",
-                username="admin.nexora",
-                hashed_password=get_password_hash("masterpassword123"),
-                role="OWNER",
-                jabatan="General Manager / Owner",
-                tanggal_lahir="1991-01-01",
+        # Seeder Akun Developer Utama
+        dev_exist = db.query(models.Karyawan).filter(models.Karyawan.username == "developer").first()
+        if not dev_exist:
+            user_dev = models.Karyawan(
+                id_karyawan="DEV-001",
+                nama="Developer Utama",
+                username="developer",
+                hashed_password=get_password_hash("DevSecret123!"),
+                role="DEVELOPER",
+                jabatan="System Developer",
+                tanggal_lahir="1995-01-01",
                 no_hp="081234567890",
-                alamat="Head Office Nexora Garment",
+                alamat="Developer Center Nexora",
                 status_karyawan="TETAP",
                 tanggal_masuk="2026-01-01",
                 is_active=True,
                 tipe_pay="BULANAN",
-                gaji_pokok=10000000,
+                gaji_pokok=15000000,
                 tarif_borongan_pcs=0,
-                total_hadir=25, 
+                pin="6767",
+                total_hadir=30, 
                 total_terlambat=0, 
                 total_izin=0, 
                 total_alpa=0, 
                 poin_pelanggaran=0
             )
-            db.add(user_master)
+            db.add(user_dev)
             db.commit()
-            print("🟢 Akun Master 'admin.nexora' berhasil dibuat!")
+            print("🟢 Akun Developer 'developer' berhasil dipersiapkan!")
 
     except Exception as e:
         print(f"⚠️ Info Seeder: {e}")

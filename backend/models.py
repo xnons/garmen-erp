@@ -110,6 +110,17 @@ class Mesin(Base):
     
     operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
     
+    # Finansial & Pembayaran Mesin
+    harga_beli = Column(Float, default=0.0)
+    jumlah_terbayar = Column(Float, default=0.0)
+    sisa_pembayaran = Column(Float, default=0.0)
+    status_pembayaran = Column(String(30), default="LUNAS") # LUNAS, DICICIL, BELUM_BAYAR
+    vendor_supplier = Column(String(100), nullable=True)
+    no_seri = Column(String(100), nullable=True)
+    tanggal_pembelian = Column(String(20), nullable=True)
+    garansi_hingga = Column(String(20), nullable=True)
+    riwayat_pembayaran = Column(JSON, nullable=True, default=[])
+
     keterangan = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -190,11 +201,20 @@ class SPKProduksi(Base):
     realisasi_potong = Column(Integer, nullable=False, default=0)  # Qty riil dari Cutting (Hard-Cap)
 
     # D. Spesifikasi Bahan & Material
+    tipe_order = Column(String(20), default="CMT")               # CMT, FOB, HYBRID
+    penyedia_kain = Column(String(50), default="CUSTOMER")       # CUSTOMER, PABRIK
+    penyedia_aksesoris = Column(String(50), default="CUSTOMER")  # CUSTOMER, PABRIK
     jenis_kain = Column(String(150), nullable=True)     # e.g. American Drill Unione #328
     warna_kain = Column(String(100), nullable=True)
     aksesoris = Column(Text, nullable=True)             # Kancing, Resleting, Label Brand
     spesifikasi_sablon_bordir = Column(Text, nullable=True)
     toleransi_defect_pct = Column(Float, default=2.0)  # Max defect toleransi (%)
+    
+    # HPP & Struktur Biaya
+    biaya_kain_per_pcs = Column(Float, default=0.0)
+    biaya_aksesoris_per_pcs = Column(Float, default=0.0)
+    biaya_maklon_luar_per_pcs = Column(Float, default=0.0)
+    konsumsi_kain_per_pcs = Column(Float, default=0.0)
 
     # E. Schedule & Lifecycle Status
     tanggal_mulai = Column(Date, nullable=False)
@@ -202,6 +222,9 @@ class SPKProduksi(Base):
     target_sewing = Column(Date, nullable=True)
     deadline = Column(Date, nullable=False)             # Deadline delivery final
     status = Column(String(30), default=StatusSPK.DRAFT.value, nullable=False)
+    dp_nominal = Column(Float, default=0.0)
+    link_google_drive = Column(String(500), nullable=True)
+    status_acc_sampel = Column(String(30), default="APPROVED")
 
     # F. Financial Valuation
     harga_jual_per_pcs = Column(Float, default=0.0)    # Untuk perhitungan estimasi omset/margin

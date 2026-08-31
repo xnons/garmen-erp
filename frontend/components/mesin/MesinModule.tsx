@@ -111,7 +111,14 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
                 merk_tipe: formData.merk_model,
                 lokasi_line: formData.lokasi_line,
                 status: formData.status || 'OPERASIONAL',
-                keterangan: formData.vendor_supplier || ''
+                keterangan: formData.keterangan || formData.vendor_supplier || '',
+                harga_beli: Number(formData.harga_beli) || 0,
+                jumlah_terbayar: Number(formData.jumlah_terbayar) || 0,
+                status_pembayaran: formData.status_pembayaran || 'LUNAS',
+                vendor_supplier: formData.vendor_supplier,
+                no_seri: formData.no_seri,
+                tanggal_pembelian: formData.tanggal_pembelian,
+                garansi_hingga: formData.garansi_hingga
             };
 
             if (selectedEdit) {
@@ -148,16 +155,23 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
 
     // 🟢 3. TAMBAH PEMBAYARAN CICILAN
     const handleAddPayment = async (machineId: string, record: PaymentRecord) => {
-        const target = machines.find(m => m.id === machineId);
+        const target = machines.find(m => String(m.id) === String(machineId) || m.kode_mesin === machineId);
         if (!target) return;
 
         try {
+            const currentHistory = Array.isArray(target.riwayat_pembayaran) ? target.riwayat_pembayaran : [];
+            const updatedHistory = [...currentHistory, record];
+            const newTerbayar = (Number(target.jumlah_terbayar) || 0) + Number(record.jumlah);
+            const hargaBeli = Number(target.harga_beli) || 0;
+            const newStatus = (hargaBeli > 0 && newTerbayar >= hargaBeli) ? 'LUNAS' : (newTerbayar > 0 ? 'DICICIL' : 'BELUM_BAYAR');
+
             const res = await fetch(`${API_BASE}/mesin/${target.kode_mesin}`, {
                 method: 'PUT',
                 headers: getAuthHeader(),
                 body: JSON.stringify({
-                    jumlah_terbayar: (target.jumlah_terbayar || 0) + record.jumlah,
-                    catatan_pembayaran: record.catatan
+                    jumlah_terbayar: newTerbayar,
+                    status_pembayaran: newStatus,
+                    riwayat_pembayaran: updatedHistory
                 })
             });
 
@@ -175,7 +189,7 @@ export default function MesinPage({ activeUser }: MesinPageProps) {
 
     // 🟢 4. ARSIPKAN MESIN
     const handleConfirmArchive = async (machineId: string, archiveData: any) => {
-        const target = machines.find(m => m.id === machineId);
+        const target = machines.find(m => String(m.id) === String(machineId) || m.kode_mesin === machineId);
         if (!target) return;
 
         try {
