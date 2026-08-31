@@ -111,6 +111,40 @@ def delete_partner(
     return {"message": f"Partner '{p_name}' berhasil dihapus."}
 
 
+def format_sales_order_response(so: models.SalesOrder) -> SalesOrderResponse:
+    b_name = so.buyer.name if so.buyer else getattr(so, "buyer_name", None)
+    return SalesOrderResponse(
+        id=so.id,
+        so_number=so.so_number or "",
+        buyer_id=so.buyer_id,
+        buyer_name=b_name,
+        buyer_po_number=so.buyer_po_number,
+        customer_pic_name=so.customer_pic_name,
+        customer_pic_phone=so.customer_pic_phone,
+        customer_email=so.customer_email,
+        delivery_address=so.delivery_address,
+        style_name=so.style_name or "-",
+        item_category=so.item_category or "GARMENT",
+        color=so.color or "-",
+        fabric_type=so.fabric_type,
+        target_shrinkage_pct=so.target_shrinkage_pct or 0.0,
+        special_instructions=so.special_instructions,
+        contract_type=so.contract_type or "CMT",
+        order_qty=so.order_qty or 0,
+        unit_price=so.unit_price or 0.0,
+        total_order_value=so.total_order_value or 0.0,
+        dp_amount=so.dp_amount or 0.0,
+        payment_terms=so.payment_terms or "NET_30",
+        tax_ppn_pct=so.tax_ppn_pct or 0.0,
+        discount_amount=so.discount_amount or 0.0,
+        size_breakdown_target=so.size_breakdown_target or {},
+        bom_accessories=so.bom_accessories or [],
+        status=so.status or "REGISTERED",
+        order_date=so.order_date,
+        deadline=so.deadline,
+        created_at=so.created_at
+    )
+
 # ---------------------------------------------------------------------------
 # 2. SALES ORDER (SO) MANAGEMENT
 # ---------------------------------------------------------------------------
@@ -125,13 +159,7 @@ def get_all_sales_orders(
         query = query.filter(models.SalesOrder.status == status_filter.upper())
     orders = query.order_by(models.SalesOrder.created_at.desc()).all()
     
-    result = []
-    for so in orders:
-        item_dict = SalesOrderResponse.from_orm(so)
-        if so.buyer:
-            item_dict.buyer_name = so.buyer.name
-        result.append(item_dict)
-    return result
+    return [format_sales_order_response(so) for so in orders]
 
 @router.post("/orders", response_model=SalesOrderResponse, status_code=status.HTTP_201_CREATED)
 def create_sales_order(
@@ -139,30 +167,27 @@ def create_sales_order(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(require_role(["PPIC", "ADMIN", "OWNER", "DEVELOPER"]))
 ):
-    existing = db.query(models.SalesOrder).filter(models.SalesOrder.so_number == payload.so_number).first()
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Sales Order dengan nomor '{payload.so_number}' sudah terdaftar!"
-        )
+    # Auto-generate SO Number jika tidak disediakan (SO-MG26xxxx)
+    so_num = payload.so_number
+    if not so_num:
+        count_so = db.query(models.SalesOrder).count() + 1
+        so_num = f"SO-MG26{count_so:04d}"
 
-    # Validasi Size Breakdown
-    calculated_qty = payload.order_qty
+    # Auto hitung order_qty jika matrix breakdown diberikan
+    calc_qty = payload.order_qty
     if payload.size_breakdown_target:
         matrix_sum = sum(payload.size_breakdown_target.values())
         if matrix_sum > 0:
-            calculated_qty = matrix_sum
+            calc_qty = matrix_sum
 
-    # Kalkulasi Otomatis Total Nilai Order
-    unit_price = payload.unit_price or 0.0
-    discount = payload.discount_amount or 0.0
-    tax_pct = payload.tax_ppn_pct or 0.0
-    subtotal = calculated_qty * unit_price
-    tax_val = (subtotal - discount) * (tax_pct / 100.0)
-    calculated_total_value = payload.total_order_value if (payload.total_order_value and payload.total_order_value > 0) else max(0.0, subtotal - discount + tax_val)
+    # Auto kalkulasi total_order_value (CMT/FOB Price x Qty - Discount + PPN)
+    subtotal = calc_qty * (payload.unit_price or 0.0)
+    disc = payload.discount_amount or 0.0
+    tax = (subtotal - disc) * ((payload.tax_ppn_pct or 0.0) / 100.0)
+    calc_total_val = payload.total_order_value or max(0.0, subtotal - disc + tax)
 
     new_so = models.SalesOrder(
-        so_number=payload.so_number.upper(),
+        so_number=so_num.upper(),
         buyer_id=payload.buyer_id,
         buyer_po_number=payload.buyer_po_number,
         customer_pic_name=payload.customer_pic_name,
@@ -170,19 +195,19 @@ def create_sales_order(
         customer_email=payload.customer_email,
         delivery_address=payload.delivery_address,
         style_name=payload.style_name.upper(),
-        item_category=payload.item_category or "LONG JEANS",
-        color=payload.color,
+        item_category=payload.item_category.upper() if payload.item_category else "LONG JEANS",
+        color=payload.color.upper() if payload.color else "-",
         fabric_type=payload.fabric_type,
         target_shrinkage_pct=payload.target_shrinkage_pct or 0.0,
         special_instructions=payload.special_instructions,
-        contract_type=(payload.contract_type or "CMT").upper(),
-        order_qty=calculated_qty,
-        unit_price=unit_price,
-        total_order_value=calculated_total_value,
+        contract_type=payload.contract_type.upper() if payload.contract_type else "CMT",
+        order_qty=calc_qty,
+        unit_price=payload.unit_price or 0.0,
+        total_order_value=calc_total_val,
         dp_amount=payload.dp_amount or 0.0,
         payment_terms=payload.payment_terms or "NET_30",
-        tax_ppn_pct=tax_pct,
-        discount_amount=discount,
+        tax_ppn_pct=payload.tax_ppn_pct or 0.0,
+        discount_amount=payload.discount_amount or 0.0,
         size_breakdown_target=payload.size_breakdown_target or {},
         bom_accessories=payload.bom_accessories or [],
         status="REGISTERED",
@@ -201,10 +226,7 @@ def create_sales_order(
         catatan=f"Sales Order '{new_so.so_number}' ({new_so.style_name} - {new_so.order_qty} pcs, Kontrak: {new_so.contract_type}, Nilai: Rp {new_so.total_order_value:,.0f}) dibuat oleh {current_user.nama}."
     )
 
-    resp = SalesOrderResponse.from_orm(new_so)
-    if new_so.buyer:
-        resp.buyer_name = new_so.buyer.name
-    return resp
+    return format_sales_order_response(new_so)
 
 @router.get("/orders/{so_id}", response_model=SalesOrderResponse)
 def get_sales_order_detail(
@@ -216,10 +238,7 @@ def get_sales_order_detail(
     if not so:
         raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
     
-    resp = SalesOrderResponse.from_orm(so)
-    if so.buyer:
-        resp.buyer_name = so.buyer.name
-    return resp
+    return format_sales_order_response(so)
 
 @router.put("/orders/{so_id}", response_model=SalesOrderResponse)
 def update_sales_order(
@@ -266,10 +285,7 @@ def update_sales_order(
         catatan=f"Sales Order '{so.so_number}' dikoreksi oleh {current_user.nama} (Style: {old_style}->{so.style_name}, Qty: {old_qty}->{so.order_qty} pcs, DL: {so.deadline})."
     )
     
-    resp = SalesOrderResponse.from_orm(so)
-    if so.buyer:
-        resp.buyer_name = so.buyer.name
-    return resp
+    return format_sales_order_response(so)
 
 @router.delete("/orders/{so_id}")
 def delete_sales_order(

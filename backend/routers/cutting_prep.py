@@ -15,6 +15,44 @@ from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/cutting", tags=["Cutting, Consumption & Preparation"])
 
+def format_cutting_record_response(cr: models.CuttingRecord, default_op_name: Optional[str] = None) -> CuttingRecordResponse:
+    op_name = cr.operator.nama if (hasattr(cr, "operator") and cr.operator) else default_op_name
+    return CuttingRecordResponse(
+        id=cr.id,
+        so_id=cr.so_id,
+        cutting_date=cr.cutting_date,
+        operator_id=cr.operator_id,
+        operator_name=op_name,
+        qty_cut=cr.qty_cut or 0,
+        size_breakdown_cut=cr.size_breakdown_cut or {},
+        main_fabric_used=cr.main_fabric_used or 0.0,
+        puring_used=cr.puring_used or 0.0,
+        puring_jala_used=cr.puring_jala_used or 0.0,
+        main_consumption_rate=cr.main_consumption_rate or 0.0,
+        puring_consumption_rate=cr.puring_consumption_rate or 0.0,
+        marker_length_yard=cr.marker_length_yard or 0.0,
+        marker_efficiency_pct=cr.marker_efficiency_pct or 0.0,
+        gelaran_layers=cr.gelaran_layers or 1,
+        fabric_waste_yards=cr.fabric_waste_yards or 0.0,
+        created_at=cr.created_at
+    )
+
+def format_prep_task_response(t: models.CuttingPrepTask, default_op_name: Optional[str] = None) -> CuttingPrepTaskResponse:
+    op_name = t.operator.nama if (hasattr(t, "operator") and t.operator) else default_op_name
+    return CuttingPrepTaskResponse(
+        id=t.id,
+        so_id=t.so_id,
+        task_type=t.task_type or "NUMBERING",
+        operator_id=t.operator_id,
+        operator_name=op_name,
+        task_date=t.task_date,
+        qty_done=t.qty_done or 0,
+        size_breakdown=t.size_breakdown or {},
+        piece_rate=t.piece_rate or 0.0,
+        total_wage=t.total_wage or 0.0,
+        created_at=t.created_at
+    )
+
 # ---------------------------------------------------------------------------
 # 1. CUTTING LOG & CONSUMPTION CALCULATION
 # ---------------------------------------------------------------------------
@@ -31,13 +69,7 @@ def get_cutting_records(
         query = query.filter(models.CuttingRecord.so_id == so_id)
     records = query.order_by(models.CuttingRecord.cutting_date.desc()).all()
 
-    result = []
-    for cr in records:
-        cr_dict = CuttingRecordResponse.from_orm(cr)
-        if cr.operator:
-            cr_dict.operator_name = cr.operator.nama
-        result.append(cr_dict)
-    return result
+    return [format_cutting_record_response(cr, current_user.nama) for cr in records]
 
 @router.post("/records", response_model=CuttingRecordResponse, status_code=status.HTTP_201_CREATED)
 def create_cutting_record(
@@ -88,9 +120,7 @@ def create_cutting_record(
         catatan=f"Potong {payload.qty_cut} pcs oleh '{operator_name}' untuk SO '{so.so_number}'. Konsumsi Utama: {main_rate} Yd/Pcs, Puring: {puring_rate} Yd/Pcs."
     )
 
-    resp = CuttingRecordResponse.from_orm(cutting)
-    resp.operator_name = operator_name
-    return resp
+    return format_cutting_record_response(cutting, operator_name)
 
 @router.put("/records/{record_id}", response_model=CuttingRecordResponse)
 def update_cutting_record(
@@ -100,11 +130,10 @@ def update_cutting_record(
     current_user: models.Karyawan = Depends(require_role(["CUTTING", "ADMIN", "OWNER", "DEVELOPER"]))
 ):
     cutting = db.query(models.CuttingRecord).options(
-        joinedload(models.CuttingRecord.operator),
-        joinedload(models.CuttingRecord.sales_order)
+        joinedload(models.CuttingRecord.operator)
     ).filter(models.CuttingRecord.id == record_id).first()
     if not cutting:
-        raise HTTPException(status_code=404, detail="Data potong kain tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Data potong tidak ditemukan.")
 
     old_qty = cutting.qty_cut
     update_data = payload.model_dump(exclude_unset=True)
@@ -113,26 +142,23 @@ def update_cutting_record(
             setattr(cutting, k, v)
 
     # Rekalkulasi Rasio Konsumsi
-    if cutting.qty_cut > 0:
-        cutting.main_consumption_rate = round(cutting.main_fabric_used / cutting.qty_cut, 4)
-        cutting.puring_consumption_rate = round((cutting.puring_used or 0.0) / cutting.qty_cut, 4) if cutting.puring_used else 0.0
+    if cutting.qty_cut and cutting.qty_cut > 0:
+        cutting.main_consumption_rate = round((cutting.main_fabric_used or 0.0) / cutting.qty_cut, 4)
+        if cutting.puring_used:
+            cutting.puring_consumption_rate = round(cutting.puring_used / cutting.qty_cut, 4)
 
     db.commit()
     db.refresh(cutting)
 
-    so_num = cutting.sales_order.so_number if cutting.sales_order else "N/A"
     record_audit(
         db=db,
         actor_id=current_user.id_karyawan,
         aksi="UPDATE_CUTTING",
         target_id=cutting.id,
-        catatan=f"Data meja potong #{record_id} (SO: {so_num}) dikoreksi oleh {current_user.nama} (Qty Potong: {old_qty} -> {cutting.qty_cut} pcs, Kain: {cutting.main_fabric_used} Yd)."
+        catatan=f"Koreksi log potong #{record_id} oleh {current_user.nama} (Qty: {old_qty}->{cutting.qty_cut} pcs, Konsumsi: {cutting.main_consumption_rate} Yd/Pcs)."
     )
 
-    resp = CuttingRecordResponse.from_orm(cutting)
-    if cutting.operator:
-        resp.operator_name = cutting.operator.nama
-    return resp
+    return format_cutting_record_response(cutting, current_user.nama)
 
 @router.delete("/records/{record_id}")
 def delete_cutting_record(
@@ -177,13 +203,7 @@ def get_prep_tasks(
         query = query.filter(models.CuttingPrepTask.task_type == task_type.upper())
     tasks = query.order_by(models.CuttingPrepTask.task_date.desc()).all()
 
-    result = []
-    for t in tasks:
-        t_dict = CuttingPrepTaskResponse.from_orm(t)
-        if t.operator:
-            t_dict.operator_name = t.operator.nama
-        result.append(t_dict)
-    return result
+    return [format_prep_task_response(t, current_user.nama) for t in tasks]
 
 @router.post("/prep-tasks", response_model=CuttingPrepTaskResponse, status_code=status.HTTP_201_CREATED)
 def create_prep_task(
@@ -224,9 +244,7 @@ def create_prep_task(
         catatan=f"Tugas persiapan {payload.task_type} ({payload.qty_done} pcs) oleh {operator_name} didaftarkan."
     )
 
-    resp = CuttingPrepTaskResponse.from_orm(task)
-    resp.operator_name = operator_name
-    return resp
+    return format_prep_task_response(task, operator_name)
 
 @router.put("/prep-tasks/{task_id}", response_model=CuttingPrepTaskResponse)
 def update_prep_task(
@@ -266,9 +284,7 @@ def update_prep_task(
         catatan=f"Tugas persiapan #{task_id} ({task.task_type}) dikoreksi oleh {current_user.nama} (Qty: {old_qty} -> {task.qty_done} pcs, Total Upah: Rp {task.total_wage:,.0f})."
     )
 
-    resp = CuttingPrepTaskResponse.from_orm(task)
-    resp.operator_name = op_name
-    return resp
+    return format_prep_task_response(task, op_name)
 
 @router.delete("/prep-tasks/{task_id}")
 def delete_prep_task(

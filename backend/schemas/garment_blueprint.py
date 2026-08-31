@@ -23,8 +23,13 @@ class PartnerUpdate(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
 
-class PartnerResponse(PartnerBase):
+class PartnerResponse(BaseModel):
     id: str
+    name: Optional[str] = "UMUM"
+    category: Optional[str] = "BUYER"
+    code: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:
@@ -35,21 +40,21 @@ class PartnerResponse(PartnerBase):
 # 2. PPIC & SALES ORDERS (SO-MG26xxxx)
 # ===========================================================================
 class SalesOrderBase(BaseModel):
-    so_number: str
+    so_number: Optional[str] = ""
     buyer_id: Optional[str] = None
     buyer_po_number: Optional[str] = None
     customer_pic_name: Optional[str] = None
     customer_pic_phone: Optional[str] = None
     customer_email: Optional[str] = None
     delivery_address: Optional[str] = None
-    style_name: str
+    style_name: Optional[str] = "-"
     item_category: Optional[str] = "LONG JEANS"
     color: Optional[str] = None
     fabric_type: Optional[str] = None
     target_shrinkage_pct: Optional[float] = 0.0
     special_instructions: Optional[str] = None
     contract_type: Optional[str] = "CMT" # CMT / FOB
-    order_qty: int
+    order_qty: Optional[int] = 0
     unit_price: Optional[float] = 0.0
     total_order_value: Optional[float] = 0.0
     dp_amount: Optional[float] = 0.0
@@ -92,7 +97,7 @@ class SalesOrderUpdate(BaseModel):
 
 class SalesOrderResponse(SalesOrderBase):
     id: str
-    status: str
+    status: Optional[str] = "REGISTERED"
     created_at: Optional[datetime] = None
     buyer_name: Optional[str] = None
 
@@ -116,8 +121,21 @@ class InventoryItemCreate(BaseModel):
     min_stock_alert: Optional[float] = 50.0
     rack_location: Optional[str] = "GUDANG_UTAMA"
 
-class InventoryItemResponse(InventoryItemCreate):
+class InventoryItemResponse(BaseModel):
     id: str
+    item_code: Optional[str] = ""
+    description: Optional[str] = ""
+    item_type: Optional[str] = "FABRIC_MAIN"
+    unit: Optional[str] = "YARD"
+    unit_price: Optional[float] = 0.0
+    current_stock: Optional[float] = 0.0
+    color_shade_lot: Optional[str] = None
+    width_inch: Optional[float] = 58.0
+    gramasi_gsm: Optional[float] = 0.0
+    min_stock_alert: Optional[float] = 50.0
+    rack_location: Optional[str] = "GUDANG_UTAMA"
+    created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -139,11 +157,20 @@ class MaterialReceiptUpdate(BaseModel):
     unit: Optional[str] = None
     contract_type: Optional[str] = None
 
-class MaterialReceiptResponse(MaterialReceiptCreate):
+class MaterialReceiptResponse(BaseModel):
     id: str
-    inspection_status: str
+    item_id: Optional[str] = None
+    supplier_id: Optional[str] = None
+    receipt_date: Optional[date] = None
+    roll_number: Optional[str] = None
+    qty_received: Optional[float] = 0.0
+    unit: Optional[str] = "YARD"
+    contract_type: Optional[str] = "FOB"
+    inspection_status: Optional[str] = "PENDING"
     item_description: Optional[str] = None
     supplier_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -167,19 +194,20 @@ class FabricInspectionUpdate(BaseModel):
 
 class FabricInspectionResponse(BaseModel):
     id: str
-    receipt_id: str
+    receipt_id: Optional[str] = None
     inspector_id: Optional[str] = None
     inspector_name: Optional[str] = None
-    inspection_date: date
+    inspection_date: Optional[date] = None
     lot_number: Optional[str] = None
-    length_before: float
-    length_after: float
-    width_inch: float
-    total_defect_points: int
-    summary_point: float
-    grade: str # GRADE_A, GRADE_B, GRADE_C
+    length_before: Optional[float] = 0.0
+    length_after: Optional[float] = 0.0
+    width_inch: Optional[float] = 0.0
+    total_defect_points: Optional[int] = 0
+    summary_point: Optional[float] = 0.0
+    grade: Optional[str] = "GRADE_A"
     defect_remarks: Optional[str] = None
     created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -190,10 +218,17 @@ class MaterialAllocationCreate(BaseModel):
     qty_issued: float
     surat_jalan_no: Optional[str] = None
 
-class MaterialAllocationResponse(MaterialAllocationCreate):
+class MaterialAllocationResponse(BaseModel):
     id: str
+    so_id: Optional[str] = None
+    item_id: Optional[str] = None
+    dispatch_date: Optional[date] = None
+    qty_issued: Optional[float] = 0.0
+    surat_jalan_no: Optional[str] = None
     so_number: Optional[str] = None
     item_description: Optional[str] = None
+    created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -228,13 +263,25 @@ class CuttingRecordUpdate(BaseModel):
     gelaran_layers: Optional[int] = None
     fabric_waste_yards: Optional[float] = None
 
-class CuttingRecordResponse(CuttingRecordCreate):
+class CuttingRecordResponse(BaseModel):
     id: str
+    so_id: Optional[str] = None
     operator_id: Optional[str] = None
     operator_name: Optional[str] = None
-    main_consumption_rate: float
-    puring_consumption_rate: float
+    cutting_date: Optional[date] = None
+    qty_cut: Optional[int] = 0
+    size_breakdown_cut: Optional[Dict[str, int]] = {}
+    main_fabric_used: Optional[float] = 0.0
+    puring_used: Optional[float] = 0.0
+    puring_jala_used: Optional[float] = 0.0
+    marker_length_yard: Optional[float] = 0.0
+    marker_efficiency_pct: Optional[float] = 0.0
+    gelaran_layers: Optional[int] = 1
+    fabric_waste_yards: Optional[float] = 0.0
+    main_consumption_rate: Optional[float] = 0.0
+    puring_consumption_rate: Optional[float] = 0.0
     created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -255,11 +302,19 @@ class CuttingPrepTaskUpdate(BaseModel):
     size_breakdown: Optional[Dict[str, int]] = None
     piece_rate: Optional[float] = None
 
-class CuttingPrepTaskResponse(CuttingPrepTaskCreate):
+class CuttingPrepTaskResponse(BaseModel):
     id: str
+    so_id: Optional[str] = None
     operator_id: Optional[str] = None
     operator_name: Optional[str] = None
-    total_wage: float
+    task_type: Optional[str] = "NUMBERING"
+    task_date: Optional[date] = None
+    qty_done: Optional[int] = 0
+    size_breakdown: Optional[Dict[str, int]] = {}
+    piece_rate: Optional[float] = 0.0
+    total_wage: Optional[float] = 0.0
+    created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -302,23 +357,25 @@ class WIPMovementResponse(BaseModel):
     so_id: str
     so_number: Optional[str] = None
     style_name: Optional[str] = None
-    stage_name: str
-    sequence_order: int
+    stage_name: Optional[str] = "SEWING"
+    sequence_order: Optional[int] = 1
     partner_id: Optional[str] = None
     partner_name: Optional[str] = None
     supervisor_id: Optional[str] = None
     supervisor_name: Optional[str] = None
     surat_jalan_no: Optional[str] = None
-    dispatch_date: date
-    qty_dispatched: int
+    dispatch_date: Optional[date] = None
+    qty_dispatched: Optional[int] = 0
     size_breakdown_dispatched: Optional[Dict[str, int]] = {}
     received_date: Optional[date] = None
-    qty_received: int
-    qty_reject: int
+    qty_received: Optional[int] = 0
+    qty_reject: Optional[int] = 0
     size_breakdown_received: Optional[Dict[str, int]] = {}
-    balance_discrepancy: int
-    status: str
+    balance_discrepancy: Optional[int] = 0
+    status: Optional[str] = "IN_PROCESS"
     remarks: Optional[str] = None
+    created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -347,11 +404,21 @@ class PieceRateWageUpdate(BaseModel):
     wage_per_piece: Optional[float] = None
     notes: Optional[str] = None
 
-class PieceRateWageResponse(PieceRateWageCreate):
+class PieceRateWageResponse(BaseModel):
     id: str
+    so_id: Optional[str] = None
     operator_id: Optional[str] = None
     operator_name: Optional[str] = None
-    total_wage: float
+    operation_type: Optional[str] = "STIM"
+    work_date: Optional[date] = None
+    qty_completed: Optional[int] = 0
+    qty_reject: Optional[int] = 0
+    size_breakdown: Optional[dict] = {}
+    wage_per_piece: Optional[float] = 0.0
+    total_wage: Optional[float] = 0.0
+    notes: Optional[str] = None
+    created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -383,10 +450,25 @@ class ShipmentUpdate(BaseModel):
     invoice_number: Optional[str] = None
     remarks: Optional[str] = None
 
-class ShipmentResponse(ShipmentCreate):
+class ShipmentResponse(BaseModel):
     id: str
-    total_invoice_amount: float
-    is_invoiced: bool
+    so_id: Optional[str] = None
+    shipment_date: Optional[date] = None
+    surat_jalan_no: Optional[str] = "-"
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    vehicle_plate_no: Optional[str] = None
+    carton_box_count: Optional[int] = 0
+    destination_address: Optional[str] = None
+    total_qty_shipped: Optional[int] = 0
+    size_breakdown_shipped: Optional[Dict[str, int]] = {}
+    unit_price: Optional[float] = 0.0
+    total_invoice_amount: Optional[float] = 0.0
+    invoice_number: Optional[str] = None
+    is_invoiced: Optional[bool] = False
+    remarks: Optional[str] = None
+    created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -415,3 +497,4 @@ class WIPMatrixRow(BaseModel):
 
     class Config:
         from_attributes = True
+

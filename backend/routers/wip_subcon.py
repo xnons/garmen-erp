@@ -14,6 +14,37 @@ from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/wip", tags=["WIP & Subcon Pipeline Movements"])
 
+def format_wip_movement_response(m: models.WIPMovement, current_user_name: Optional[str] = None) -> WIPMovementResponse:
+    so_num = m.sales_order.so_number if m.sales_order else None
+    style_nm = m.sales_order.style_name if m.sales_order else None
+    ptr_nm = m.partner.name if m.partner else None
+    spv_nm = m.supervisor.nama if (hasattr(m, "supervisor") and m.supervisor) else current_user_name
+
+    return WIPMovementResponse(
+        id=m.id,
+        so_id=m.so_id,
+        so_number=so_num,
+        style_name=style_nm,
+        stage_name=m.stage_name or "SEWING",
+        sequence_order=m.sequence_order or 1,
+        partner_id=m.partner_id,
+        partner_name=ptr_nm,
+        supervisor_id=m.internal_supervisor_id,
+        supervisor_name=spv_nm,
+        surat_jalan_no=m.surat_jalan_no,
+        dispatch_date=m.dispatch_date,
+        qty_dispatched=m.qty_dispatched or 0,
+        size_breakdown_dispatched=m.size_breakdown_dispatched or {},
+        received_date=m.received_date,
+        qty_received=m.qty_received or 0,
+        qty_reject=m.qty_reject or 0,
+        size_breakdown_received=m.size_breakdown_received or {},
+        balance_discrepancy=m.balance_discrepancy or 0,
+        status=m.status or "IN_PROCESS",
+        remarks=m.remarks,
+        created_at=m.created_at
+    )
+
 # ---------------------------------------------------------------------------
 # 1. DISPATCH / SURAT JALAN KIRIM KE SUBCON / JAHIT
 # ---------------------------------------------------------------------------
@@ -39,18 +70,7 @@ def get_wip_movements(
         
     movements = query.order_by(models.WIPMovement.dispatch_date.desc()).all()
 
-    result = []
-    for m in movements:
-        m_dict = WIPMovementResponse.from_orm(m)
-        if m.sales_order:
-            m_dict.so_number = m.sales_order.so_number
-            m_dict.style_name = m.sales_order.style_name
-        if m.partner:
-            m_dict.partner_name = m.partner.name
-        if m.supervisor:
-            m_dict.supervisor_name = m.supervisor.nama
-        result.append(m_dict)
-    return result
+    return [format_wip_movement_response(m, current_user.nama) for m in movements]
 
 @router.post("/dispatch", response_model=WIPMovementResponse, status_code=status.HTTP_201_CREATED)
 def create_wip_dispatch(
@@ -111,11 +131,7 @@ def create_wip_dispatch(
         catatan=f"Surat Jalan Kirim {payload.qty_dispatched} pcs ke {payload.stage_name} (SJ: {sj_num}) untuk SO '{so.so_number}'."
     )
 
-    resp = WIPMovementResponse.from_orm(movement)
-    resp.so_number = so.so_number
-    resp.style_name = so.style_name
-    resp.supervisor_name = current_user.nama
-    return resp
+    return format_wip_movement_response(movement, current_user.nama)
 
 
 # ---------------------------------------------------------------------------
@@ -139,8 +155,6 @@ def receive_wip_movement(
     qty_rec = payload.qty_received
     qty_rej = payload.qty_reject or 0
 
-    # 🟢 RUMUS REKONSILIASI SELISIH MAKLUN (Mendukung Pengiriman Bertahap / Partial Receive):
-    # balance_discrepancy = qty_dispatched - (qty_received + qty_reject)
     discrepancy = movement.qty_dispatched - (qty_rec + qty_rej)
 
     movement.received_date = payload.received_date
@@ -150,7 +164,6 @@ def receive_wip_movement(
     movement.balance_discrepancy = discrepancy
     
     if (qty_rec + qty_rej) < movement.qty_dispatched and discrepancy > 0:
-        # Jika baru setor sebagian (partial batch delivery)
         movement.status = "PARTIAL_RECEIVED"
     elif discrepancy == 0:
         movement.status = "COMPLETED"
@@ -160,7 +173,6 @@ def receive_wip_movement(
     if payload.remarks:
         movement.remarks = f"{movement.remarks or ''} | Terima: {payload.remarks}"
 
-    # Catat log rijek jika ada kerusakan barang
     if qty_rej > 0:
         reject_entry = models.RejectLog(
             wip_movement_id=movement.id,
@@ -181,17 +193,10 @@ def receive_wip_movement(
         actor_id=current_user.id_karyawan,
         aksi="WIP_RECEIVE",
         target_id=movement.id,
-        catatan=f"Terima {qty_rec} pcs (Rijek: {qty_rej}, Selisih: {discrepancy}) dari {movement.stage_name} untuk SO '{movement.sales_order.so_number}'."
+        catatan=f"Terima {qty_rec} pcs (Rijek: {qty_rej}, Selisih: {discrepancy}) dari {movement.stage_name} untuk SO '{movement.sales_order.so_number if movement.sales_order else 'N/A'}'."
     )
 
-    resp = WIPMovementResponse.from_orm(movement)
-    if movement.sales_order:
-        resp.so_number = movement.sales_order.so_number
-        resp.style_name = movement.sales_order.style_name
-    if movement.partner:
-        resp.partner_name = movement.partner.name
-    resp.supervisor_name = getattr(movement.supervisor, "nama", current_user.nama)
-    return resp
+    return format_wip_movement_response(movement, current_user.nama)
 
 @router.put("/movements/{movement_id}", response_model=WIPMovementResponse)
 def update_wip_movement(
@@ -237,14 +242,7 @@ def update_wip_movement(
         catatan=f"Surat Jalan #{movement.surat_jalan_no or movement_id} (SO: {so_num}) dikoreksi oleh {current_user.nama} (Kirim: {old_dispatch}->{movement.qty_dispatched}, Terima: {old_rec}->{movement.qty_received})."
     )
 
-    resp = WIPMovementResponse.from_orm(movement)
-    if movement.sales_order:
-        resp.so_number = movement.sales_order.so_number
-        resp.style_name = movement.sales_order.style_name
-    if movement.partner:
-        resp.partner_name = movement.partner.name
-    resp.supervisor_name = getattr(movement.supervisor, "nama", current_user.nama)
-    return resp
+    return format_wip_movement_response(movement, current_user.nama)
 
 @router.delete("/movements/{movement_id}")
 def delete_wip_movement(

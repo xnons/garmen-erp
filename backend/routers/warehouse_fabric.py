@@ -276,13 +276,7 @@ def get_fabric_inspections(
         joinedload(models.FabricInspection.inspector)
     ).order_by(models.FabricInspection.inspection_date.desc()).all()
 
-    result = []
-    for fi in inspections:
-        fi_dict = FabricInspectionResponse.from_orm(fi)
-        if fi.inspector:
-            fi_dict.inspector_name = fi.inspector.nama
-        result.append(fi_dict)
-    return result
+    return [format_inspection_response(fi, current_user.nama) for fi in inspections]
 
 @router.post("/inspections", response_model=FabricInspectionResponse, status_code=status.HTTP_201_CREATED)
 def create_fabric_inspection(
@@ -341,9 +335,7 @@ def create_fabric_inspection(
         catatan=f"Uji kain roll {receipt.roll_number or receipt.id} menghasilkan Score: {summary_pt} ({grade} - {receipt_status})."
     )
 
-    resp = FabricInspectionResponse.from_orm(inspection)
-    resp.inspector_name = current_user.nama
-    return resp
+    return format_inspection_response(inspection, current_user.nama)
 
 @router.put("/inspections/{inspection_id}", response_model=FabricInspectionResponse)
 def update_fabric_inspection(
@@ -364,25 +356,16 @@ def update_fabric_inspection(
         if v is not None:
             setattr(inspection, k, v)
 
-    # Rekalkulasi Otomatis 4-Point ASTM
-    w = inspection.width_inch or 58.0
-    l = inspection.length_after or 100.0
-    pts = inspection.total_defect_points or 0
-    if w > 0 and l > 0:
-        summary_pt = round((pts * 3600.0) / (w * l), 2)
-        inspection.summary_point = summary_pt
-        if summary_pt <= 20.0:
+    # Rekalkulasi score
+    if inspection.width_inch > 0 and inspection.length_after > 0:
+        summary_pt = (inspection.total_defect_points * 3600.0) / (inspection.width_inch * inspection.length_after)
+        inspection.summary_point = round(summary_pt, 2)
+        if inspection.summary_point <= 20.0:
             inspection.grade = "GRADE_A"
-            if inspection.receipt:
-                inspection.receipt.inspection_status = "PASSED"
-        elif summary_pt <= 30.0:
+        elif inspection.summary_point <= 30.0:
             inspection.grade = "GRADE_B"
-            if inspection.receipt:
-                inspection.receipt.inspection_status = "PASSED"
         else:
             inspection.grade = "GRADE_C"
-            if inspection.receipt:
-                inspection.receipt.inspection_status = "REJECTED"
 
     db.commit()
     db.refresh(inspection)
@@ -390,15 +373,12 @@ def update_fabric_inspection(
     record_audit(
         db=db,
         actor_id=current_user.id_karyawan,
-        aksi="UPDATE_INSPECTION",
+        aksi="UPDATE_FABRIC_INSPECTION",
         target_id=inspection.id,
-        catatan=f"Hasil uji QC roll kain #{inspection_id} dikoreksi oleh {current_user.nama} (Skor Baru: {inspection.summary_point} - {inspection.grade})."
+        catatan=f"Koreksi hasil uji kain roll #{inspection.receipt_id} oleh {current_user.nama} (Grade: {inspection.grade}, Score: {inspection.summary_point})."
     )
 
-    resp = FabricInspectionResponse.from_orm(inspection)
-    if inspection.inspector:
-        resp.inspector_name = inspection.inspector.nama
-    return resp
+    return format_inspection_response(inspection, current_user.nama)
 
 
 # ---------------------------------------------------------------------------
@@ -418,15 +398,7 @@ def get_material_allocations(
         query = query.filter(models.MaterialAllocation.so_id == so_id)
     allocations = query.order_by(models.MaterialAllocation.dispatch_date.desc()).all()
 
-    result = []
-    for a in allocations:
-        a_dict = MaterialAllocationResponse.from_orm(a)
-        if a.sales_order:
-            a_dict.so_number = a.sales_order.so_number
-        if a.item:
-            a_dict.item_description = a.item.description
-        result.append(a_dict)
-    return result
+    return [format_allocation_response(a) for a in allocations]
 
 @router.post("/allocations", response_model=MaterialAllocationResponse, status_code=status.HTTP_201_CREATED)
 def create_material_allocation(
@@ -477,10 +449,7 @@ def create_material_allocation(
         catatan=f"Pengeluaran kain {payload.qty_issued} {item.unit} ({item.description}) untuk SO '{so.so_number}' via SJ '{sj_code}'."
     )
 
-    resp = MaterialAllocationResponse.from_orm(allocation)
-    resp.so_number = so.so_number
-    resp.item_description = item.description
-    return resp
+    return format_allocation_response(allocation)
 
 @router.delete("/allocations/{allocation_id}")
 def delete_material_allocation(

@@ -15,6 +15,46 @@ from core.audit_helper import record_audit
 
 router = APIRouter(prefix="/api/shipping", tags=["Finishing Borongan, Expedisi & Billing Form WI"])
 
+def format_piece_rate_wage_response(w: models.PieceRateWage, default_op_name: Optional[str] = None) -> PieceRateWageResponse:
+    op_name = w.operator.nama if (hasattr(w, "operator") and w.operator) else default_op_name
+    return PieceRateWageResponse(
+        id=w.id,
+        so_id=w.so_id,
+        operator_id=w.operator_id,
+        operator_name=op_name,
+        operation_type=w.operation_type or "STIM",
+        work_date=w.work_date,
+        qty_completed=w.qty_completed or 0,
+        qty_reject=w.qty_reject or 0,
+        size_breakdown=w.size_breakdown or {},
+        wage_per_piece=w.wage_per_piece or 0.0,
+        total_wage=w.total_wage or 0.0,
+        notes=w.notes,
+        created_at=w.created_at
+    )
+
+def format_shipment_response(s: models.Shipment, default_driver_name: Optional[str] = None) -> ShipmentResponse:
+    drv_name = s.driver.nama if (hasattr(s, "driver") and s.driver) else (s.driver_name or default_driver_name)
+    return ShipmentResponse(
+        id=s.id,
+        so_id=s.so_id,
+        shipment_date=s.shipment_date,
+        surat_jalan_no=s.surat_jalan_no or "-",
+        driver_id=s.driver_id,
+        driver_name=drv_name,
+        vehicle_plate_no=s.vehicle_plate_no,
+        carton_box_count=s.carton_box_count or 0,
+        destination_address=s.destination_address,
+        total_qty_shipped=s.total_qty_shipped or 0,
+        size_breakdown_shipped=s.size_breakdown_shipped or {},
+        unit_price=s.unit_price or 0.0,
+        total_invoice_amount=s.total_invoice_amount or 0.0,
+        invoice_number=s.invoice_number,
+        is_invoiced=s.is_invoiced or False,
+        remarks=s.remarks,
+        created_at=s.created_at
+    )
+
 # ---------------------------------------------------------------------------
 # 1. PIECE-RATE WAGES (UPAH SATUAN FINISHING: STEAM JOHAN, KANCING, DLL)
 # ---------------------------------------------------------------------------
@@ -34,13 +74,7 @@ def get_piece_rate_wages(
         query = query.filter(models.PieceRateWage.operation_type == operation_type.upper())
     wages = query.order_by(models.PieceRateWage.work_date.desc()).all()
 
-    result = []
-    for w in wages:
-        w_dict = PieceRateWageResponse.from_orm(w)
-        if w.operator:
-            w_dict.operator_name = w.operator.nama
-        result.append(w_dict)
-    return result
+    return [format_piece_rate_wage_response(w, current_user.nama) for w in wages]
 
 @router.post("/wages", response_model=PieceRateWageResponse, status_code=status.HTTP_201_CREATED)
 def create_piece_rate_wage(
@@ -82,9 +116,7 @@ def create_piece_rate_wage(
         catatan=f"Entri upah {payload.operation_type} ({payload.qty_completed} pcs @ Rp {payload.wage_per_piece}) untuk {operator_name} (Total: Rp {total_wage:,.0f})."
     )
 
-    resp = PieceRateWageResponse.from_orm(wage)
-    resp.operator_name = operator_name
-    return resp
+    return format_piece_rate_wage_response(wage, operator_name)
 
 @router.put("/wages/{wage_id}", response_model=PieceRateWageResponse)
 def update_piece_rate_wage(
@@ -123,9 +155,7 @@ def update_piece_rate_wage(
         catatan=f"Upah borongan #{wage_id} ({wage.operation_type} - {op_name}) dikoreksi oleh {current_user.nama} (Rp {old_total:,.0f} -> Rp {wage.total_wage:,.0f})."
     )
 
-    resp = PieceRateWageResponse.from_orm(wage)
-    resp.operator_name = op_name
-    return resp
+    return format_piece_rate_wage_response(wage, op_name)
 
 @router.delete("/wages/{wage_id}")
 def delete_piece_rate_wage(
@@ -136,9 +166,9 @@ def delete_piece_rate_wage(
     wage = db.query(models.PieceRateWage).filter(models.PieceRateWage.id == wage_id).first()
     if not wage:
         raise HTTPException(status_code=404, detail="Data upah tidak ditemukan.")
-
-    t_amt = wage.total_wage
-    op_type = wage.operation_type
+    
+    w_op = wage.operation_type
+    w_tot = wage.total_wage
     db.delete(wage)
     db.commit()
 
@@ -147,7 +177,7 @@ def delete_piece_rate_wage(
         actor_id=current_user.id_karyawan,
         aksi="DELETE_FINISHING_WAGE",
         target_id=wage_id,
-        catatan=f"Entri upah {op_type} #{wage_id} (Rp {t_amt:,.0f}) dihapus oleh {current_user.nama}."
+        catatan=f"Entri upah {w_op} #{wage_id} (Rp {w_tot:,.0f}) dihapus oleh {current_user.nama}."
     )
     return {"message": "Data upah borongan berhasil dihapus."}
 
@@ -168,13 +198,7 @@ def get_shipments(
         query = query.filter(models.Shipment.so_id == so_id)
     shipments = query.order_by(models.Shipment.shipment_date.desc()).all()
 
-    result = []
-    for s in shipments:
-        s_dict = ShipmentResponse.from_orm(s)
-        if s.driver:
-            s_dict.driver_name = s.driver.nama
-        result.append(s_dict)
-    return result
+    return [format_shipment_response(s, current_user.nama) for s in shipments]
 
 @router.post("/shipments", response_model=ShipmentResponse, status_code=status.HTTP_201_CREATED)
 def create_shipment(
@@ -225,9 +249,7 @@ def create_shipment(
         catatan=f"Pengiriman SJP '{shipment.surat_jalan_no}' sejumlah {payload.total_qty_shipped} pcs untuk SO '{so.so_number}'."
     )
 
-    resp = ShipmentResponse.from_orm(shipment)
-    resp.driver_name = getattr(shipment.driver, "nama", current_user.nama)
-    return resp
+    return format_shipment_response(shipment, current_user.nama)
 
 @router.put("/shipments/{shipment_id}", response_model=ShipmentResponse)
 def update_shipment(
