@@ -75,14 +75,25 @@ def get_cutting_records(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    query = db.query(models.CuttingRecord).options(
-        joinedload(models.CuttingRecord.operator)
-    )
-    if so_id:
-        query = query.filter(models.CuttingRecord.so_id == so_id)
-    records = query.order_by(models.CuttingRecord.cutting_date.desc()).all()
+    try:
+        query = db.query(models.CuttingRecord).options(
+            joinedload(models.CuttingRecord.operator)
+        )
+        if so_id:
+            query = query.filter(models.CuttingRecord.so_id == so_id)
+        records = query.order_by(models.CuttingRecord.cutting_date.desc()).all()
 
-    return [format_cutting_record_response(cr, current_user.nama) for cr in records]
+        result = []
+        for cr in records:
+            try:
+                result.append(format_cutting_record_response(cr, current_user.nama))
+            except Exception as row_err:
+                print(f"⚠️ Error formatting cutting record row {getattr(cr, 'id', 'unknown')}: {row_err}")
+                continue
+        return result
+    except Exception as e:
+        print(f"⚠️ Error get_cutting_records: {e}")
+        return []
 
 @router.post("/records", response_model=CuttingRecordResponse, status_code=status.HTTP_201_CREATED)
 def create_cutting_record(
@@ -207,16 +218,27 @@ def get_prep_tasks(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    query = db.query(models.CuttingPrepTask).options(
-        joinedload(models.CuttingPrepTask.operator)
-    )
-    if so_id:
-        query = query.filter(models.CuttingPrepTask.so_id == so_id)
-    if task_type:
-        query = query.filter(models.CuttingPrepTask.task_type == task_type.upper())
-    tasks = query.order_by(models.CuttingPrepTask.task_date.desc()).all()
+    try:
+        query = db.query(models.CuttingPrepTask).options(
+            joinedload(models.CuttingPrepTask.operator)
+        )
+        if so_id:
+            query = query.filter(models.CuttingPrepTask.so_id == so_id)
+        if task_type:
+            query = query.filter(models.CuttingPrepTask.task_type == task_type.upper())
+        tasks = query.order_by(models.CuttingPrepTask.task_date.desc()).all()
 
-    return [format_prep_task_response(t, current_user.nama) for t in tasks]
+        result = []
+        for t in tasks:
+            try:
+                result.append(format_prep_task_response(t, current_user.nama))
+            except Exception as row_err:
+                print(f"⚠️ Error formatting prep task row {getattr(t, 'id', 'unknown')}: {row_err}")
+                continue
+        return result
+    except Exception as e:
+        print(f"⚠️ Error get_prep_tasks: {e}")
+        return []
 
 @router.post("/prep-tasks", response_model=CuttingPrepTaskResponse, status_code=status.HTTP_201_CREATED)
 def create_prep_task(

@@ -78,16 +78,27 @@ def get_piece_rate_wages(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    query = db.query(models.PieceRateWage).options(
-        joinedload(models.PieceRateWage.operator)
-    )
-    if so_id:
-        query = query.filter(models.PieceRateWage.so_id == so_id)
-    if operation_type:
-        query = query.filter(models.PieceRateWage.operation_type == operation_type.upper())
-    wages = query.order_by(models.PieceRateWage.work_date.desc()).all()
+    try:
+        query = db.query(models.PieceRateWage).options(
+            joinedload(models.PieceRateWage.operator)
+        )
+        if so_id:
+            query = query.filter(models.PieceRateWage.so_id == so_id)
+        if operation_type:
+            query = query.filter(models.PieceRateWage.operation_type == operation_type.upper())
+        wages = query.order_by(models.PieceRateWage.work_date.desc()).all()
 
-    return [format_piece_rate_wage_response(w, current_user.nama) for w in wages]
+        result = []
+        for w in wages:
+            try:
+                result.append(format_piece_rate_wage_response(w, current_user.nama))
+            except Exception as row_err:
+                print(f"⚠️ Error formatting wage row {getattr(w, 'id', 'unknown')}: {row_err}")
+                continue
+        return result
+    except Exception as e:
+        print(f"⚠️ Error get_piece_rate_wages: {e}")
+        return []
 
 @router.post("/wages", response_model=PieceRateWageResponse, status_code=status.HTTP_201_CREATED)
 def create_piece_rate_wage(
@@ -204,14 +215,25 @@ def get_shipments(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    query = db.query(models.Shipment).options(
-        joinedload(models.Shipment.driver)
-    )
-    if so_id:
-        query = query.filter(models.Shipment.so_id == so_id)
-    shipments = query.order_by(models.Shipment.shipment_date.desc()).all()
+    try:
+        query = db.query(models.Shipment).options(
+            joinedload(models.Shipment.driver)
+        )
+        if so_id:
+            query = query.filter(models.Shipment.so_id == so_id)
+        shipments = query.order_by(models.Shipment.shipment_date.desc()).all()
 
-    return [format_shipment_response(s, current_user.nama) for s in shipments]
+        result = []
+        for s in shipments:
+            try:
+                result.append(format_shipment_response(s, current_user.nama))
+            except Exception as row_err:
+                print(f"⚠️ Error formatting shipment row {getattr(s, 'id', 'unknown')}: {row_err}")
+                continue
+        return result
+    except Exception as e:
+        print(f"⚠️ Error get_shipments: {e}")
+        return []
 
 @router.post("/shipments", response_model=ShipmentResponse, status_code=status.HTTP_201_CREATED)
 def create_shipment(

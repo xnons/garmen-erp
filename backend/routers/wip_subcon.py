@@ -69,21 +69,32 @@ def get_wip_movements(
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    query = db.query(models.WIPMovement).options(
-        joinedload(models.WIPMovement.sales_order),
-        joinedload(models.WIPMovement.partner),
-        joinedload(models.WIPMovement.supervisor)
-    )
-    if so_id:
-        query = query.filter(models.WIPMovement.so_id == so_id)
-    if stage_name:
-        query = query.filter(models.WIPMovement.stage_name == stage_name.upper())
-    if status_filter:
-        query = query.filter(models.WIPMovement.status == status_filter.upper())
-        
-    movements = query.order_by(models.WIPMovement.dispatch_date.desc()).all()
+    try:
+        query = db.query(models.WIPMovement).options(
+            joinedload(models.WIPMovement.sales_order),
+            joinedload(models.WIPMovement.partner),
+            joinedload(models.WIPMovement.supervisor)
+        )
+        if so_id:
+            query = query.filter(models.WIPMovement.so_id == so_id)
+        if stage_name:
+            query = query.filter(models.WIPMovement.stage_name == stage_name.upper())
+        if status_filter:
+            query = query.filter(models.WIPMovement.status == status_filter.upper())
+            
+        movements = query.order_by(models.WIPMovement.dispatch_date.desc()).all()
 
-    return [format_wip_movement_response(m, current_user.nama) for m in movements]
+        result = []
+        for m in movements:
+            try:
+                result.append(format_wip_movement_response(m, current_user.nama))
+            except Exception as row_err:
+                print(f"⚠️ Error formatting movement row {getattr(m, 'id', 'unknown')}: {row_err}")
+                continue
+        return result
+    except Exception as e:
+        print(f"⚠️ Error get_wip_movements: {e}")
+        return []
 
 @router.post("/dispatch", response_model=WIPMovementResponse, status_code=status.HTTP_201_CREATED)
 def create_wip_dispatch(
