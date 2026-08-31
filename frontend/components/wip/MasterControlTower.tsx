@@ -38,6 +38,8 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
+  const [reseeding, setReseeding] = useState<boolean>(false);
+
   const fetchMatrix = async () => {
     setLoading(true);
     try {
@@ -47,6 +49,20 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
       console.error("Gagal mengambil data Live WIP Matrix:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReseed = async () => {
+    if (!confirm("Apakah Anda ingin menginjeksi 20 Master Sales Orders dan seluruh data pipeline produksi 6 fase?")) return;
+    setReseeding(true);
+    try {
+      const res = await api.post('/api/dashboard/reseed-production-pipeline');
+      alert(res.data?.message || "Berhasil seeding data produksi!");
+      await fetchMatrix();
+    } catch (err: any) {
+      alert("Gagal seeding: " + (err.response?.data?.error || err.message));
+    } finally {
+      setReseeding(false);
     }
   };
 
@@ -116,9 +132,17 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={handleReseed}
+              disabled={reseeding}
+              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-indigo-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              <Layers className={`w-4 h-4 ${reseeding ? 'animate-spin' : ''}`} />
+              {reseeding ? 'Menginjeksi...' : '⚡ Injeksi 20 Master SO'}
+            </button>
+            <button
               onClick={fetchMatrix}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-xl text-sm font-medium transition-all shadow-md active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-xl text-sm font-medium transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
               Refresh Data

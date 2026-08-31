@@ -301,178 +301,195 @@ def seed_production_database():
                 db.add(alloc1)
             db.commit()
 
-        # 6. Seed Cutting Records & Prep Tasks
-        print("[6/8] Seeding Meja Potong & Upah Persiapan...")
+        # 6, 7, 8: Seed Operational Pipeline (Cutting, WIP Movements, Finishing Wages, Shipments) for ALL Sales Orders
+        print("[6/8] Seeding Meja Potong, Subcon, Finishing & Shipments untuk seluruh Sales Order...")
         bu_nani_id = emp_map.get("KRY-CUT-01")
         silma_id = emp_map.get("KRY-PRS-01")
-        so_wind_black = so_map.get("SO-MG260004")
-        so_wind_blue = so_map.get("SO-MG260005")
-
-        if db.query(models.CuttingRecord).count() < 2 and so_wind_black:
-            cr1 = models.CuttingRecord(
-                so_id=so_wind_black,
-                cutting_date=date(2026, 4, 5),
-                operator_id=bu_nani_id,
-                qty_cut=1060,
-                size_breakdown_cut={"28": 212, "30": 318, "32": 318, "34": 212},
-                main_fabric_used=1378.0,
-                puring_used=212.0,
-                main_consumption_rate=1.3,
-                puring_consumption_rate=0.2,
-                gelaran_layers=50,
-                fabric_waste_yards=5.0
-            )
-            db.add(cr1)
-
-            if so_wind_blue:
-                cr2 = models.CuttingRecord(
-                    so_id=so_wind_blue,
-                    cutting_date=date(2026, 4, 7),
-                    operator_id=bu_nani_id,
-                    qty_cut=1494,
-                    size_breakdown_cut={"28": 300, "30": 450, "32": 450, "34": 294},
-                    main_fabric_used=1942.2,
-                    puring_used=298.8,
-                    main_consumption_rate=1.3,
-                    puring_consumption_rate=0.2,
-                    gelaran_layers=60,
-                    fabric_waste_yards=8.0
-                )
-                db.add(cr2)
-
-        if db.query(models.CuttingPrepTask).count() == 0 and so_wind_black and silma_id:
-            t1 = models.CuttingPrepTask(
-                so_id=so_wind_black,
-                task_type="NUMBERING",
-                operator_id=silma_id,
-                task_date=date(2026, 4, 6),
-                qty_done=1060,
-                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 212},
-                piece_rate=400.0,
-                total_wage=424000.0
-            )
-            t2 = models.CuttingPrepTask(
-                so_id=so_wind_black,
-                task_type="PRESS",
-                operator_id=silma_id,
-                task_date=date(2026, 4, 6),
-                qty_done=1060,
-                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 212},
-                piece_rate=400.0,
-                total_wage=424000.0
-            )
-            db.add_all([t1, t2])
-        db.commit()
-
-        # 7. Seed WIP Movements
-        print("[7/8] Seeding Alur Distribusi Subcon & Maklun...")
+        anis_spv_id = emp_map.get("KRY-SEW-01")
         mkl_alitihad = partner_map.get("AL-ITIHAD GARMENT") or list(partner_map.values())[0]
         wsh_anugrah = partner_map.get("ANUGRAH WASHING") or list(partner_map.values())[0]
-        anis_spv_id = emp_map.get("KRY-SEW-01")
-
-        if db.query(models.WIPMovement).count() == 0 and so_wind_black:
-            wip1 = models.WIPMovement(
-                so_id=so_wind_black,
-                stage_name="SEWING",
-                sequence_order=1,
-                partner_id=mkl_alitihad,
-                internal_supervisor_id=anis_spv_id,
-                surat_jalan_no="SJ-SEW-2604.01",
-                dispatch_date=date(2026, 4, 8),
-                qty_dispatched=1060,
-                size_breakdown_dispatched={"28": 212, "30": 318, "32": 318, "34": 212},
-                received_date=date(2026, 4, 18),
-                qty_received=1060,
-                qty_reject=0,
-                size_breakdown_received={"28": 212, "30": 318, "32": 318, "34": 212},
-                balance_discrepancy=0,
-                status="COMPLETED"
-            )
-            wip2 = models.WIPMovement(
-                so_id=so_wind_black,
-                stage_name="WASHING",
-                sequence_order=2,
-                partner_id=wsh_anugrah,
-                internal_supervisor_id=anis_spv_id,
-                surat_jalan_no="SJ-WSH-2604.01",
-                dispatch_date=date(2026, 4, 19),
-                qty_dispatched=1060,
-                size_breakdown_dispatched={"28": 212, "30": 318, "32": 318, "34": 212},
-                received_date=date(2026, 4, 25),
-                qty_received=1060,
-                qty_reject=0,
-                size_breakdown_received={"28": 212, "30": 318, "32": 318, "34": 212},
-                balance_discrepancy=0,
-                status="COMPLETED"
-            )
-            db.add_all([wip1, wip2])
-        db.commit()
-
-        # 8. Seed Finishing Wages & Shipments
-        print("[8/8] Seeding Upah Finishing Borongan & SJP Pengiriman...")
         johan_id = emp_map.get("KRY-FIN-01")
         ica_id = emp_map.get("KRY-FIN-02")
         desti_id = emp_map.get("KRY-FIN-04")
         sandi_driver_id = emp_map.get("KRY-EXP-01")
 
-        if db.query(models.PieceRateWage).count() == 0 and so_wind_black:
-            w1 = models.PieceRateWage(
-                so_id=so_wind_black,
-                operator_id=johan_id,
-                operation_type="STIM",
-                work_date=date(2026, 4, 26),
-                qty_completed=1060,
-                qty_reject=0,
-                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 212},
-                wage_per_piece=500.0,
-                total_wage=530000.0,
-                notes="Steam uap rapi oleh Johan"
-            )
-            w2 = models.PieceRateWage(
-                so_id=so_wind_black,
-                operator_id=ica_id,
-                operation_type="KANCING",
-                work_date=date(2026, 4, 27),
-                qty_completed=1060,
-                qty_reject=0,
-                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 212},
-                wage_per_piece=400.0,
-                total_wage=424000.0,
-                notes="Pasang kancing & rivet saku"
-            )
-            w3 = models.PieceRateWage(
-                so_id=so_wind_black,
-                operator_id=desti_id,
-                operation_type="PACKING",
-                work_date=date(2026, 4, 28),
-                qty_completed=1055,
-                qty_reject=5,
-                size_breakdown={"28": 212, "30": 318, "32": 318, "34": 207},
-                wage_per_piece=400.0,
-                total_wage=422000.0,
-                notes="Lipat polybag & hangtag (5 pcs rijek kancing rusak)"
-            )
-            db.add_all([w1, w2, w3])
+        for so_item in SALES_ORDERS_DATA:
+            so_num = so_item["so_number"]
+            so_id = so_map.get(so_num)
+            if not so_id:
+                continue
 
-        if db.query(models.Shipment).count() == 0 and so_wind_black:
-            s1 = models.Shipment(
-                so_id=so_wind_black,
-                shipment_date=date(2026, 4, 30),
-                surat_jalan_no="SJP-2604.0001",
-                driver_id=sandi_driver_id,
-                driver_name="Sandi",
-                vehicle_plate_no="D 8821 CJM",
-                carton_box_count=35,
-                destination_address="Gudang Distribusi VOXFLY Jakarta Barat",
-                total_qty_shipped=1055,
-                size_breakdown_shipped={"28": 212, "30": 318, "32": 318, "34": 207},
-                unit_price=35000.0,
-                total_invoice_amount=36925000.0,
-                invoice_number="INV-2604-001",
-                is_invoiced=True,
-                remarks="Pengiriman tuntas 1.055 pcs dengan SJP Resmi Sandi."
-            )
-            db.add(s1)
+            order_qty = so_item["order_qty"]
+            st = so_item["status"]
+            if order_qty <= 0:
+                continue
+
+            # Size distribution
+            sz_breakdown = {
+                "28": int(order_qty * 0.2),
+                "30": int(order_qty * 0.3),
+                "32": int(order_qty * 0.3),
+                "34": order_qty - (int(order_qty * 0.2) + int(order_qty * 0.3) * 2)
+            }
+
+            # 1. CUTTING RECORD
+            if st in ["CUTTING", "SEWING", "WASHING", "FINISHING", "SHIPPED"]:
+                existing_cut = db.query(models.CuttingRecord).filter(models.CuttingRecord.so_id == so_id).first()
+                if not existing_cut:
+                    cr = models.CuttingRecord(
+                        so_id=so_id,
+                        cutting_date=so_item["order_date"],
+                        operator_id=bu_nani_id,
+                        qty_cut=order_qty,
+                        size_breakdown_cut=sz_breakdown,
+                        main_fabric_used=round(order_qty * 1.3, 1),
+                        puring_used=round(order_qty * 0.2, 1),
+                        main_consumption_rate=1.3,
+                        puring_consumption_rate=0.2,
+                        gelaran_layers=max(10, min(100, order_qty // 10)),
+                        fabric_waste_yards=round(order_qty * 0.005, 1)
+                    )
+                    db.add(cr)
+
+                # Prep Task (Numbering & Press)
+                existing_prep = db.query(models.CuttingPrepTask).filter(models.CuttingPrepTask.so_id == so_id).first()
+                if not existing_prep and silma_id:
+                    db.add_all([
+                        models.CuttingPrepTask(
+                            so_id=so_id,
+                            task_type="NUMBERING",
+                            operator_id=silma_id,
+                            task_date=so_item["order_date"],
+                            qty_done=order_qty,
+                            size_breakdown=sz_breakdown,
+                            piece_rate=400.0,
+                            total_wage=order_qty * 400.0
+                        ),
+                        models.CuttingPrepTask(
+                            so_id=so_id,
+                            task_type="PRESS",
+                            operator_id=silma_id,
+                            task_date=so_item["order_date"],
+                            qty_done=order_qty,
+                            size_breakdown=sz_breakdown,
+                            piece_rate=400.0,
+                            total_wage=order_qty * 400.0
+                        )
+                    ])
+
+            # 2. WIP MOVEMENTS (SEWING & WASHING)
+            if st in ["SEWING", "WASHING", "FINISHING", "SHIPPED"]:
+                existing_sew = db.query(models.WIPMovement).filter(models.WIPMovement.so_id == so_id, models.WIPMovement.stage_name == "SEWING").first()
+                if not existing_sew:
+                    rec_qty = order_qty if st in ["WASHING", "FINISHING", "SHIPPED"] else int(order_qty * 0.6)
+                    sew_wip = models.WIPMovement(
+                        so_id=so_id,
+                        stage_name="SEWING",
+                        sequence_order=1,
+                        partner_id=mkl_alitihad,
+                        internal_supervisor_id=anis_spv_id,
+                        surat_jalan_no=f"SJ-SEW-{so_num[-4:]}",
+                        dispatch_date=so_item["order_date"],
+                        qty_dispatched=order_qty,
+                        size_breakdown_dispatched=sz_breakdown,
+                        received_date=so_item["order_date"],
+                        qty_received=rec_qty,
+                        qty_reject=0,
+                        size_breakdown_received=sz_breakdown,
+                        balance_discrepancy=0 if rec_qty == order_qty else (order_qty - rec_qty),
+                        status="COMPLETED" if rec_qty == order_qty else "IN_PROCESS"
+                    )
+                    db.add(sew_wip)
+
+            if st in ["WASHING", "FINISHING", "SHIPPED"]:
+                existing_wsh = db.query(models.WIPMovement).filter(models.WIPMovement.so_id == so_id, models.WIPMovement.stage_name == "WASHING").first()
+                if not existing_wsh:
+                    rec_qty = order_qty if st in ["FINISHING", "SHIPPED"] else int(order_qty * 0.8)
+                    wsh_wip = models.WIPMovement(
+                        so_id=so_id,
+                        stage_name="WASHING",
+                        sequence_order=2,
+                        partner_id=wsh_anugrah,
+                        internal_supervisor_id=anis_spv_id,
+                        surat_jalan_no=f"SJ-WSH-{so_num[-4:]}",
+                        dispatch_date=so_item["order_date"],
+                        qty_dispatched=order_qty,
+                        size_breakdown_dispatched=sz_breakdown,
+                        received_date=so_item["order_date"],
+                        qty_received=rec_qty,
+                        qty_reject=0,
+                        size_breakdown_received=sz_breakdown,
+                        balance_discrepancy=0,
+                        status="COMPLETED" if rec_qty == order_qty else "IN_PROCESS"
+                    )
+                    db.add(wsh_wip)
+
+            # 3. FINISHING WAGES
+            if st in ["FINISHING", "SHIPPED"]:
+                existing_wage = db.query(models.PieceRateWage).filter(models.PieceRateWage.so_id == so_id).first()
+                if not existing_wage:
+                    db.add_all([
+                        models.PieceRateWage(
+                            so_id=so_id,
+                            operator_id=johan_id,
+                            operation_type="STIM",
+                            work_date=so_item["order_date"],
+                            qty_completed=order_qty,
+                            qty_reject=0,
+                            size_breakdown=sz_breakdown,
+                            wage_per_piece=500.0,
+                            total_wage=order_qty * 500.0,
+                            notes=f"Steam uap rapi #{so_num}"
+                        ),
+                        models.PieceRateWage(
+                            so_id=so_id,
+                            operator_id=ica_id,
+                            operation_type="KANCING",
+                            work_date=so_item["order_date"],
+                            qty_completed=order_qty,
+                            qty_reject=0,
+                            size_breakdown=sz_breakdown,
+                            wage_per_piece=400.0,
+                            total_wage=order_qty * 400.0,
+                            notes=f"Pasang kancing #{so_num}"
+                        ),
+                        models.PieceRateWage(
+                            so_id=so_id,
+                            operator_id=desti_id,
+                            operation_type="PACKING",
+                            work_date=so_item["order_date"],
+                            qty_completed=order_qty,
+                            qty_reject=0,
+                            size_breakdown=sz_breakdown,
+                            wage_per_piece=400.0,
+                            total_wage=order_qty * 400.0,
+                            notes=f"Packing polybag & hangtag #{so_num}"
+                        )
+                    ])
+
+            # 4. SHIPMENTS
+            if st == "SHIPPED":
+                existing_shp = db.query(models.Shipment).filter(models.Shipment.so_id == so_id).first()
+                if not existing_shp:
+                    shp = models.Shipment(
+                        so_id=so_id,
+                        shipment_date=so_item["order_date"],
+                        surat_jalan_no=f"SJP-2604.{so_num[-4:]}",
+                        driver_id=sandi_driver_id,
+                        driver_name="Sandi (Ekspedisi)",
+                        vehicle_plate_no="D 8821 CJM",
+                        carton_box_count=max(5, order_qty // 30),
+                        destination_address=f"Gudang Distribusi {so_item['buyer_name']}",
+                        total_qty_shipped=order_qty,
+                        size_breakdown_shipped=sz_breakdown,
+                        unit_price=so_item["unit_price"],
+                        total_invoice_amount=so_item["total_order_value"],
+                        invoice_number=f"INV-2604-{so_num[-4:]}",
+                        is_invoiced=True,
+                        remarks=f"Pengiriman tuntas {order_qty} pcs dengan SJP Resmi Sandi."
+                    )
+                    db.add(shp)
+
         db.commit()
 
         print("\n✅ SEEDING LENGKAP SEMUA 6 FASE PRODUKSI PT. CHIKAL JAYA MAKMUR SUKSES!")

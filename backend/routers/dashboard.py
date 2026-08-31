@@ -685,3 +685,25 @@ def get_advanced_pnl_analytics(
             "error": f"Gagal menghasilkan analitik P&L: {str(e)}",
             "traceback": traceback.format_exc()
         }
+
+
+@router.post("/reseed-production-pipeline")
+def trigger_reseed_pipeline(
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(get_current_user)
+):
+    """
+    On-demand endpoint untuk menginjeksi dataset produksi lengkap 6 fase PT. Chikal Jaya Makmur.
+    """
+    try:
+        from scripts.seed_production_sql import seed_production_database
+        seed_production_database()
+        return {
+            "success": True,
+            "message": "Seeding seluruh 6 fase produksi PT. Chikal Jaya Makmur berhasil diinjeksikan ke database!"
+        }
+    except Exception as err:
+        return {
+            "success": False,
+            "error": f"Gagal seeding: {str(err)}"
+        }
