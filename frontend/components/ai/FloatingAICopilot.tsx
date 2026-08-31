@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Sparkles, X, Send, Bot, User, ShieldAlert, TrendingUp, Cpu, Factory,
   FileText, Camera, Upload, CheckCircle2, AlertTriangle, RefreshCw, Copy, Check,
@@ -201,31 +201,33 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Persona Badges Meta
-  const personas = [
+  const userRole = (activeUser?.role || 'KARYAWAN').toUpperCase();
+
+  // 🔒 Persona Badges Meta
+  const allPersonas = [
     {
-      id: 'EXECUTIVE',
+      id: 'EXECUTIVE' as const,
       label: 'Executive Advisor',
       icon: TrendingUp,
       desc: 'Kapasitas pabrik & strategi deadline',
       color: 'from-amber-500/20 to-orange-500/10 text-amber-300 border-amber-500/30'
     },
     {
-      id: 'FINANCE',
+      id: 'FINANCE' as const,
       label: 'Finance & Costing',
       icon: Factory,
       desc: 'Margin CMT, upah borongan & Form WI',
       color: 'from-emerald-500/20 to-teal-500/10 text-emerald-300 border-emerald-500/30'
     },
     {
-      id: 'PRODUCTION',
+      id: 'PRODUCTION' as const,
       label: 'PPIC & Subcon',
       icon: Cpu,
       desc: 'Yield meja potong & bottleneck maklun',
       color: 'from-indigo-500/20 to-blue-500/10 text-indigo-300 border-indigo-500/30'
     },
     {
-      id: 'SECURITY',
+      id: 'SECURITY' as const,
       label: 'Cyber Sentinel',
       icon: ShieldAlert,
       desc: 'Deteksi vendor curang & audit integritas',
@@ -233,12 +235,62 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
     }
   ];
 
-  const quickPrompts = [
-    '📊 Berikan ringkasan eksekutif status pabrik hari ini.',
-    '⚠️ Apakah ada subkon yang selisih barangnya kritis?',
-    '✂️ Bagaimana rata-rata yield konsumsi kain meja potong Bu Nani?',
-    '💰 Berapa estimasi tagihan SJP CMT yang belum di-invoice?'
-  ];
+  // 🔒 Filter personas strictly by user role
+  const roleAllowedMap: Record<string, Array<'EXECUTIVE' | 'FINANCE' | 'PRODUCTION' | 'SECURITY'>> = {
+    DEVELOPER: ['EXECUTIVE', 'FINANCE', 'PRODUCTION', 'SECURITY'],
+    OWNER: ['EXECUTIVE', 'FINANCE', 'PRODUCTION', 'SECURITY'],
+    FINANCE: ['FINANCE', 'EXECUTIVE'],
+    ADMIN: ['PRODUCTION', 'EXECUTIVE'],
+    PRODUKSI: ['PRODUCTION'],
+    PPIC: ['PRODUCTION'],
+    GUDANG: ['PRODUCTION'],
+    KARYAWAN: ['PRODUCTION']
+  };
+
+  const allowedIds = roleAllowedMap[userRole] || ['PRODUCTION'];
+  const personas = allPersonas.filter((p) => allowedIds.includes(p.id));
+
+  // Auto-switch selected persona if current selection is not allowed
+  useEffect(() => {
+    if (!allowedIds.includes(selectedPersona)) {
+      setSelectedPersona(allowedIds[0]);
+    }
+  }, [userRole, allowedIds, selectedPersona]);
+
+  // 🔒 Role-Specific Quick Prompts
+  const quickPrompts = useMemo(() => {
+    if (userRole === 'FINANCE') {
+      return [
+        '💰 Berapa estimasi tagihan SJP CMT yang belum di-invoice?',
+        '📊 Rekap total pengeluaran upah borongan finishing.',
+        '🧾 Berapa tarif rata-rata jasa CMT per pcs saat ini?',
+        '📈 Analisis efisiensi biaya bahan baku vs target SPK.'
+      ];
+    }
+    if (userRole === 'ADMIN') {
+      return [
+        '📊 Berikan ringkasan eksekutif status pabrik hari ini.',
+        '📋 Tampilkan daftar Sales Order yang mendekati deadline.',
+        '📦 Berapa total pcs barang jadi yang sudah diterbitkan SJP?',
+        '✂️ Bagaimana progres pemotongan lembaran pola minggu ini?'
+      ];
+    }
+    if (userRole === 'PRODUKSI' || userRole === 'PPIC' || userRole === 'GUDANG') {
+      return [
+        '✂️ Bagaimana rata-rata yield konsumsi kain meja potong Bu Nani?',
+        '⚠️ Apakah ada subkon (Mas Kirno/Ko Dede/Anis) yang bottleneck?',
+        '🧵 Berapa sisa antrean lembaran pola yang belum masuk jahit?',
+        '📦 Cek ketersediaan stok kain dan aksesoris kritis di gudang.'
+      ];
+    }
+    // OWNER / DEVELOPER
+    return [
+      '📊 Berikan ringkasan eksekutif status pabrik hari ini.',
+      '💰 Berapa estimasi tagihan SJP CMT yang belum di-invoice?',
+      '⚠️ Apakah ada subkon yang selisih barangnya kritis?',
+      '✂️ Bagaimana rata-rata yield konsumsi kain meja potong Bu Nani?'
+    ];
+  }, [userRole]);
 
   return (
     <>

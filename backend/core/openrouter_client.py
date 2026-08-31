@@ -40,66 +40,88 @@ Fokus Anda adalah:
 }
 
 
-def build_factory_grounded_context(db: Session) -> str:
+# 🔒 MATRIKS RBAC ENTERPRISE AI: IZIN PERSONA PER ROLE KARYAWAN
+ROLE_ALLOWED_PERSONAS: Dict[str, List[str]] = {
+    "DEVELOPER": ["EXECUTIVE", "FINANCE", "PRODUCTION", "SECURITY"],
+    "OWNER": ["EXECUTIVE", "FINANCE", "PRODUCTION", "SECURITY"],
+    "FINANCE": ["FINANCE", "EXECUTIVE"],
+    "ADMIN": ["PRODUCTION", "EXECUTIVE"],
+    "PRODUKSI": ["PRODUCTION"],
+    "PPIC": ["PRODUCTION"],
+    "GUDANG": ["PRODUCTION"],
+    "KARYAWAN": ["PRODUCTION"]
+}
+
+
+def build_factory_grounded_context(db: Session, user_role: str = "OWNER") -> str:
     """
-    Mengambil data riil live dari database untuk diinjeksi ke dalam Large Context Window Gemini/Claude.
-    Ini menjamin AI tidak berhalusinasi dan selalu menjawab berbasis transaksi riil pabrik.
+    Mengambil data riil live dari database dengan FILTER KEAMANAN RBAC (Role-Based Context Isolation).
+    Menjamin role ADMIN/PRODUKSI tidak bisa melihat data finansial rahasia, gaji, atau audit forensik.
     """
+    u_role = (user_role or "KARYAWAN").upper()
+    can_view_finance = u_role in ["DEVELOPER", "OWNER", "FINANCE"]
+    can_view_security = u_role in ["DEVELOPER", "OWNER"]
+
     try:
         # 1. Sales Orders
-        sos = db.query(models.SalesOrder).order_by(models.SalesOrder.created_at.desc()).limit(15).all()
+        sos = db.query(models.SalesOrder).order_by(models.SalesOrder.created_at.desc()).limit(15).all() if db else []
         so_summary = []
         for so in sos:
-            so_summary.append({
-                "so_number": so.so_number,
-                "style": so.style_name,
-                "category": so.item_category,
-                "target_qty": so.order_qty,
-                "status": so.status,
-                "deadline": str(so.deadline) if so.deadline else "N/A"
-            })
+            so_item: Dict[str, Any] = {
+                "so_number": getattr(so, 'so_number', 'N/A'),
+                "style": getattr(so, 'style_name', 'Style'),
+                "category": getattr(so, 'item_category', 'General'),
+                "target_qty": getattr(so, 'order_qty', 0),
+                "status": getattr(so, 'status', 'REGISTERED'),
+                "deadline": str(so.deadline) if getattr(so, 'deadline', None) else "N/A"
+            }
+            if can_view_finance:
+                so_item["unit_price_cmt"] = getattr(so, 'unit_price', 0.0)
+            so_summary.append(so_item)
 
         # 2. Stok Kain & Bahan Kritis
-        items = db.query(models.InventoryItem).order_by(models.InventoryItem.current_stock.asc()).limit(10).all()
+        items = db.query(models.InventoryItem).order_by(models.InventoryItem.current_stock.asc()).limit(10).all() if db else []
         item_summary = []
         for it in items:
             item_summary.append({
-                "code": it.item_code,
-                "desc": it.description,
-                "stock": f"{it.current_stock} {it.unit}",
-                "min_alert": it.min_stock_alert,
-                "is_low": it.current_stock <= (it.min_stock_alert or 50.0)
+                "code": getattr(it, 'item_code', 'N/A'),
+                "desc": getattr(it, 'description', 'N/A'),
+                "stock": f"{getattr(it, 'current_stock', 0)} {getattr(it, 'unit', 'YARD')}",
+                "min_alert": getattr(it, 'min_stock_alert', 50.0),
+                "is_low": (getattr(it, 'current_stock', 0) or 0) <= (getattr(it, 'min_stock_alert', 50.0) or 50.0)
             })
 
         # 3. Selisih Subkon WIP & Discrepancies
         discrepant_wip = db.query(models.WIPMovement).filter(
             models.WIPMovement.balance_discrepancy > 0
-        ).limit(10).all()
+        ).limit(10).all() if db else []
         wip_summary = []
         for w in discrepant_wip:
             wip_summary.append({
-                "so_id": w.so_id,
-                "stage": w.stage_name,
-                "dispatched": w.qty_dispatched,
-                "received": w.qty_received,
-                "reject": w.qty_reject,
-                "discrepancy_lost": w.balance_discrepancy,
-                "status": w.status
+                "so_id": getattr(w, 'so_id', 'N/A'),
+                "stage": getattr(w, 'stage_name', 'N/A'),
+                "dispatched": getattr(w, 'qty_dispatched', 0),
+                "received": getattr(w, 'qty_received', 0),
+                "reject": getattr(w, 'qty_reject', 0),
+                "discrepancy_lost": getattr(w, 'balance_discrepancy', 0),
+                "status": getattr(w, 'status', 'N/A')
             })
 
         # 4. Pengiriman SJP Terakhir
-        shipments = db.query(models.Shipment).order_by(models.Shipment.shipment_date.desc()).limit(5).all()
+        shipments = db.query(models.Shipment).order_by(models.Shipment.shipment_date.desc()).limit(5).all() if db else []
         ship_summary = []
         for s in shipments:
-            ship_summary.append({
-                "sjp_no": s.surat_jalan_no,
-                "qty": s.total_qty_shipped,
-                "date": str(s.shipment_date),
-                "invoice_total": s.total_invoice_amount
-            })
+            s_item: Dict[str, Any] = {
+                "sjp_no": getattr(s, 'surat_jalan_no', 'N/A'),
+                "qty": getattr(s, 'total_qty_shipped', 0),
+                "date": str(getattr(s, 'shipment_date', 'N/A'))
+            }
+            if can_view_finance:
+                s_item["invoice_total"] = getattr(s, 'total_invoice_amount', 0.0)
+            ship_summary.append(s_item)
 
         context_str = f"""
-=== DATA LIVE DATABASE PT. CHIKAL JAYA MAKMUR (MASTER GARMENT) ===
+=== DATA LIVE DATABASE PT. CHIKAL JAYA MAKMUR (USER ROLE: {u_role}) ===
 1. Sales Orders Aktif ({len(so_summary)} Batch Terakhir):
 {json.dumps(so_summary, indent=2)}
 
@@ -179,14 +201,41 @@ def call_openrouter_api(messages: List[Dict[str, Any]], model: Optional[str] = N
     return f"⚠️ {last_error}"
 
 
-def generate_grounded_local_response(prompt: str, persona: str, db: Session) -> str:
+def generate_grounded_local_response(prompt: str, persona: str, db: Session, user_role: str = "OWNER") -> str:
     """
-    Local Grounded Enterprise AI Engine:
-    Menganalisis live database secara langsung dan menghasilkan respon cerdas berbasis data nyata
-    tanpa bergantung 100% pada API pihak ketiga jika sedang 401 / limit / offline.
+    Local Grounded Enterprise AI Engine with RBAC Role Enforcement:
+    Menganalisis live database secara langsung dan membatasi data sensitif (Finansial/Gaji/Audit)
+    berdasarkan role pengguna yang login.
     """
     p_upper = (persona or "EXECUTIVE").upper()
     prompt_lower = (prompt or "").lower()
+    u_role = (user_role or "KARYAWAN").upper()
+
+    can_view_finance = u_role in ["DEVELOPER", "OWNER", "FINANCE"]
+    can_view_security = u_role in ["DEVELOPER", "OWNER"]
+
+    # 🔒 RBAC GUARD 1: Blokir Akses Finansial jika bukan Finance/Owner/Dev
+    if p_upper == "FINANCE" and not can_view_finance:
+        return f"""🔒 **Akses Ditolak (Security RBAC Guard)**
+
+Maaf, akun Anda dengan peran **{u_role}** tidak memiliki izin untuk berkonsultasi dengan Persona **Finance & Costing** atau melihat rincian keuangan perusahaan.
+
+* Akses Finansial hanya diizinkan untuk: `FINANCE`, `OWNER`, `DEVELOPER`.
+* Anda dapat menggunakan Persona **PPIC & Production** atau **Executive (Operasional)**."""
+
+    # 🔒 RBAC GUARD 2: Blokir Akses Forensik jika bukan Owner/Dev
+    if p_upper == "SECURITY" and not can_view_security:
+        return f"""🔒 **Akses Ditolak (Security RBAC Guard)**
+
+Maaf, akun Anda dengan peran **{u_role}** tidak memiliki izin untuk mengakses Persona **Cyber Sentinel & Forensik Keamanan**.
+
+* Akses Forensik Keamanan hanya diizinkan untuk: `OWNER`, `DEVELOPER`."""
+
+    # 🔒 RBAC GUARD 3: Anti-Data Exfiltration (Gaji Perorangan & Master PIN)
+    if ("gaji" in prompt_lower or "salary" in prompt_lower or "pin" in prompt_lower or "password" in prompt_lower) and not can_view_finance:
+        return f"""🔒 **Kebijakan Privasi & Keamanan Data (Security Guard)**
+
+Maaf, data gaji karyawan perorangan dan kredensial sistem dilindungi oleh protokol keamanan internal. Peran **{u_role}** tidak diizinkan mengekstrak informasi gaji atau PIN melalui AI Co-Pilot."""
 
     try:
         sos = db.query(models.SalesOrder).order_by(models.SalesOrder.created_at.desc()).all() if db else []
@@ -225,11 +274,11 @@ def generate_grounded_local_response(prompt: str, persona: str, db: Session) -> 
     total_cut_pcs = sum(getattr(c, 'qty_cut', 0) or 0 for c in cuttings)
     total_lost_pcs = sum(getattr(d, 'balance_discrepancy', 0) or 0 for d in discrepancies)
     total_shipped_pcs = sum(getattr(s, 'total_qty_shipped', 0) or 0 for s in shipments)
-    total_invoice_rp = sum(getattr(s, 'total_invoice_amount', 0.0) or 0.0 for s in shipments)
-    total_piece_wages = sum(getattr(w, 'total_wage', 0.0) or 0.0 for w in wages)
+    total_invoice_rp = sum(getattr(s, 'total_invoice_amount', 0.0) or 0.0 for s in shipments) if can_view_finance else 0.0
+    total_piece_wages = sum(getattr(w, 'total_wage', 0.0) or 0.0 for w in wages) if can_view_finance else 0.0
 
-    if p_upper == "FINANCE" or "biaya" in prompt_lower or "keuangan" in prompt_lower or "upah" in prompt_lower or "gaji" in prompt_lower:
-        return f"""### 💰 **Laporan Finansial & Analisis Biaya Produksi (Grounded Analysis)**
+    if p_upper == "FINANCE" or (can_view_finance and ("biaya" in prompt_lower or "keuangan" in prompt_lower or "upah" in prompt_lower or "gaji" in prompt_lower)):
+        return f"""### 💰 **Laporan Finansial & Analisis Biaya Produksi (Khusus Finance & Owner)**
 
 Berdasarkan audit live database keuangan PT. Chikal Jaya Makmur:
 
@@ -248,7 +297,7 @@ Berdasarkan audit live database keuangan PT. Chikal Jaya Makmur:
 
     elif p_upper == "PRODUCTION" or "ppic" in prompt_lower or "alur" in prompt_lower or "cutting" in prompt_lower or "sewing" in prompt_lower or "potong" in prompt_lower:
         so_highlights = "\n".join([f"   * **{getattr(s, 'so_number', 'SO-N/A')}** ({getattr(s, 'style_name', 'Style')}): Target {getattr(s, 'order_qty', 0)} pcs | Status: `{getattr(s, 'status', 'REGISTERED')}`" for s in sos[:5]]) if sos else "   * Belum ada Sales Order aktif."
-        return f"""### 🏭 **Status Produksi & Kapasitas Lantai Pabrik (PPIC Live)**
+        return f"""### 🏭 **Status Produksi & Kapasitas Lantai Pabrik (PPIC & Operasional)**
 
 Hasil pemantauan stasiun kerja aktif PT. Chikal Jaya Makmur:
 
@@ -288,15 +337,16 @@ Hasil audit live integritas data produksi:
         low_stock_lines = f"⚠️ Ada {len(low_stocks)} item bahan kritis di bawah batas minimum!" if low_stocks else "✅ Stok kain & aksesoris dalam batas aman."
         disc_text = f"⚠️ Terdeteksi {total_lost_pcs} pcs selisih di vendor subkon." if total_lost_pcs > 0 else "✅ Selisih vendor subkon 0 pcs (Aman)."
 
+        fin_line = f"\n   * 📦 **Pengiriman Selesai**: **{total_shipped_pcs:,} Pcs** (Nilai Tagihan: **Rp {total_invoice_rp:,.0f}**)." if can_view_finance else f"\n   * 📦 **Pengiriman Selesai**: **{total_shipped_pcs:,} Pcs**."
+        wage_line = f"\n   * 🧵 **Upah Borongan Terbayar**: **Rp {total_piece_wages:,.0f}**." if can_view_finance else ""
+
         return f"""### 📊 **Ringkasan Eksekutif Operasional Pabrik (Executive Briefing)**
 
-Selamat datang! Berikut adalah ringkasan live operasional **PT. Chikal Jaya Makmur**:
+Selamat datang! Berikut adalah ringkasan live operasional **PT. Chikal Jaya Makmur** (Hak Akses: `{u_role}`):
 
 1. **Metrik Kunci Operasional**:
    * 📋 **Sales Orders Aktif**: **{total_so} Batch** (Total Target: **{total_target_pcs:,} Pcs**).
-   * ✂️ **Progress Pemotongan**: **{total_cut_pcs:,} Pcs** lembaran pola selesai.
-   * 📦 **Pengiriman Selesai**: **{total_shipped_pcs:,} Pcs** (Nilai Tagihan: **Rp {total_invoice_rp:,.0f}**).
-   * 🧵 **Upah Borongan Terbayar**: **Rp {total_piece_wages:,.0f}**.
+   * ✂️ **Progress Pemotongan**: **{total_cut_pcs:,} Pcs** lembaran pola selesai.{fin_line}{wage_line}
 
 2. **Indikator Risiko & Peringatan Dini**:
    * **Pengawasan Subkon**: {disc_text}
@@ -307,14 +357,21 @@ Selamat datang! Berikut adalah ringkasan live operasional **PT. Chikal Jaya Makm
    * Pantau setoran operator jahit internal agar target output harian 1.000 pcs tercapai."""
 
 
-def chat_with_persona(prompt: str, persona: str, db: Session, history: Optional[List[Dict[str, str]]] = None) -> str:
+def chat_with_persona(prompt: str, persona: str, db: Session, user_role: str = "OWNER", history: Optional[List[Dict[str, str]]] = None) -> str:
     """
-    Chat cerdas multi-persona dengan injeksi Grounded Context Database pabrik.
+    Chat cerdas multi-persona dengan injeksi Grounded Context Database pabrik dan RBAC Guard.
     Dilengkapi Zero-Failure Auto Fallback ke Local Grounded AI Engine.
     """
     try:
-        sys_prompt = PERSONA_PROMPTS.get((persona or "EXECUTIVE").upper(), PERSONA_PROMPTS["EXECUTIVE"])
-        grounded_context = build_factory_grounded_context(db)
+        p_clean = (persona or "EXECUTIVE").upper()
+        u_role = (user_role or "KARYAWAN").upper()
+
+        allowed_personas = ROLE_ALLOWED_PERSONAS.get(u_role, ["PRODUCTION"])
+        if p_clean not in allowed_personas:
+            return f"🔒 **Akses Ditolak (Security RBAC Guard)**\n\nPeran Anda (**{u_role}**) tidak memiliki izin untuk mengakses Persona **{p_clean}**.\n\n* Persona yang diizinkan untuk peran Anda: **{', '.join(allowed_personas)}**."
+
+        sys_prompt = PERSONA_PROMPTS.get(p_clean, PERSONA_PROMPTS["EXECUTIVE"])
+        grounded_context = build_factory_grounded_context(db, user_role=u_role)
 
         combined_system = f"{sys_prompt}\n\n{grounded_context}"
 
@@ -333,11 +390,11 @@ def chat_with_persona(prompt: str, persona: str, db: Session, history: Optional[
                 return cloud_reply
 
         # 2. ZERO-FAILURE FALLBACK: Jika OpenRouter offline, 401, atau habis kuota, jalankan Grounded Engine Lokal
-        return generate_grounded_local_response(prompt=prompt, persona=persona, db=db)
+        return generate_grounded_local_response(prompt=prompt, persona=persona, db=db, user_role=u_role)
     except Exception as e:
         print(f"[AI Co-Pilot Exception Handled]: {e}")
         try:
-            return generate_grounded_local_response(prompt=prompt, persona=persona, db=db)
+            return generate_grounded_local_response(prompt=prompt, persona=persona, db=db, user_role=user_role)
         except Exception as inner_e:
             return f"### 📊 Ringkasan Operasional Pabrik\n\nSistem AI Co-Pilot terhubung dengan database live. Status operasional pabrik berjalan normal. (Info: {inner_e})"
 
