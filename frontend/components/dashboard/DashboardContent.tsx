@@ -21,6 +21,7 @@ import CuttingPrepModule from '@/components/cutting/CuttingPrepModule';
 import WIPSubconModule from '@/components/wip/WIPSubconModule';
 import FinishingWagesModule from '@/components/finishing/FinishingWagesModule';
 import ShippingBillingModule from '@/components/shipping/ShippingBillingModule';
+import ExecutiveAnalyticsModule from '@/components/analytics/ExecutiveAnalyticsModule';
 
 interface DashboardContentProps {
   activeMenu: string;
@@ -41,6 +42,7 @@ export default function DashboardContent({
 
   const getMenuTitle = (menu: string) => {
     switch (menu) {
+      case 'executive-analytics': return 'Analitik Margin & Profit / Loss (P&L)';
       case 'wip-control-tower': return 'Master Control Tower — Live WIP Matrix';
       case 'ppic-so': return 'Fase 1: PPIC & Sales Order (SO)';
       case 'warehouse-fabric': return 'Fase 2: Gudang Bahan Baku & QC 4-Point';
@@ -62,6 +64,18 @@ export default function DashboardContent({
 
   // Helper untuk memilih modul yang ditampilkan berdasarkan RBAC
   const renderActiveModule = () => {
+    // 0. Executive Margin & P&L Analytics (Dev & Owner Only)
+    if (activeMenu === 'executive-analytics') {
+      if (['DEVELOPER', 'OWNER'].includes(userRole)) {
+        return <ExecutiveAnalyticsModule />;
+      }
+      return (
+        <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-2">
+          <p className="text-rose-400 font-bold text-sm">Akses Terbatas</p>
+          <p className="text-slate-400 text-xs">Modul Analitik Margin & Profit/Loss hanya dapat diakses oleh Developer dan Owner.</p>
+        </div>
+      );
+    }
     // 0. Master Control Tower (Live WIP Matrix Telemetry)
     if (activeMenu === 'wip-control-tower') {
       return (
