@@ -7,7 +7,7 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- -----------------------------------------------------
--- PHASE 0: AUTO-SCHEMA SYNC (CREATE / ALTER TABLES)
+-- PHASE 0: 100% COMPREHENSIVE AUTO-SCHEMA SYNC (ALL TABLES & COLUMNS)
 -- -----------------------------------------------------
 
 -- 1. Partners Table
@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS partners (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE partners ADD COLUMN IF NOT EXISTS code VARCHAR(50);
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS name VARCHAR(100);
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS category VARCHAR(50);
 ALTER TABLE partners ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE partners ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
 
@@ -40,6 +42,17 @@ CREATE TABLE IF NOT EXISTS karyawan (
     tarif_borongan_pcs FLOAT DEFAULT 0.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS nama VARCHAR(100);
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS username VARCHAR(50);
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS hashed_password VARCHAR(255);
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS role VARCHAR(50);
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS jabatan VARCHAR(100);
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS pin VARCHAR(10);
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS status_karyawan VARCHAR(50) DEFAULT 'TETAP';
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS tipe_pay VARCHAR(50) DEFAULT 'BULANAN';
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS gaji_pokok FLOAT DEFAULT 0.0;
+ALTER TABLE karyawan ADD COLUMN IF NOT EXISTS tarif_borongan_pcs FLOAT DEFAULT 0.0;
 
 -- 3. Inventory Items Table
 CREATE TABLE IF NOT EXISTS inventory_items (
@@ -57,6 +70,12 @@ CREATE TABLE IF NOT EXISTS inventory_items (
     rack_location VARCHAR(50) DEFAULT 'GUDANG_UTAMA',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS item_code VARCHAR(50);
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS item_type VARCHAR(30);
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS unit VARCHAR(20) DEFAULT 'YARD';
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS unit_price FLOAT DEFAULT 0.0;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS current_stock FLOAT DEFAULT 0.0;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS color_shade_lot VARCHAR(50);
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS width_inch FLOAT DEFAULT 58.0;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS gramasi_gsm FLOAT DEFAULT 0.0;
@@ -94,15 +113,20 @@ CREATE TABLE IF NOT EXISTS sales_orders (
     deadline DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS buyer_id VARCHAR(50);
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS buyer_po_number VARCHAR(100);
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS customer_pic_name VARCHAR(100);
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS customer_pic_phone VARCHAR(50);
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS customer_email VARCHAR(100);
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS delivery_address TEXT;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS style_name VARCHAR(150);
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS item_category VARCHAR(100) DEFAULT 'LONG JEANS';
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS color VARCHAR(50);
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS fabric_type VARCHAR(150);
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS target_shrinkage_pct FLOAT DEFAULT 0.0;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS special_instructions TEXT;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS contract_type VARCHAR(20) DEFAULT 'CMT';
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS order_qty INTEGER DEFAULT 0;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS unit_price FLOAT DEFAULT 0.0;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS total_order_value FLOAT DEFAULT 0.0;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS dp_amount FLOAT DEFAULT 0.0;
@@ -111,6 +135,8 @@ ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS tax_ppn_pct FLOAT DEFAULT 0.0;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS discount_amount FLOAT DEFAULT 0.0;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS size_breakdown_target JSON DEFAULT '{}'::json;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS bom_accessories JSON DEFAULT '[]'::json;
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'REGISTERED';
+ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS order_date DATE DEFAULT CURRENT_DATE;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS deadline DATE;
 
 -- 5. Material Receipts & Allocations
@@ -125,6 +151,12 @@ CREATE TABLE IF NOT EXISTS material_receipts (
     contract_type VARCHAR(20) DEFAULT 'FOB',
     inspection_status VARCHAR(30) DEFAULT 'PENDING'
 );
+ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS item_id VARCHAR(50);
+ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS supplier_id VARCHAR(50);
+ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS receipt_date DATE;
+ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS roll_number VARCHAR(50);
+ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS qty_received FLOAT;
+ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS unit VARCHAR(20) DEFAULT 'YARD';
 ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS contract_type VARCHAR(20) DEFAULT 'FOB';
 ALTER TABLE material_receipts ADD COLUMN IF NOT EXISTS inspection_status VARCHAR(30) DEFAULT 'PENDING';
 
@@ -136,6 +168,11 @@ CREATE TABLE IF NOT EXISTS material_allocations (
     qty_issued FLOAT NOT NULL,
     surat_jalan_no VARCHAR(100)
 );
+ALTER TABLE material_allocations ADD COLUMN IF NOT EXISTS so_id VARCHAR(50);
+ALTER TABLE material_allocations ADD COLUMN IF NOT EXISTS item_id VARCHAR(50);
+ALTER TABLE material_allocations ADD COLUMN IF NOT EXISTS dispatch_date DATE;
+ALTER TABLE material_allocations ADD COLUMN IF NOT EXISTS qty_issued FLOAT;
+ALTER TABLE material_allocations ADD COLUMN IF NOT EXISTS surat_jalan_no VARCHAR(100);
 
 -- 6. Cutting Records & Tasks
 CREATE TABLE IF NOT EXISTS cutting_records (
@@ -156,6 +193,16 @@ CREATE TABLE IF NOT EXISTS cutting_records (
     fabric_waste_yards FLOAT DEFAULT 0.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS so_id VARCHAR(50);
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS cutting_date DATE;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS operator_id VARCHAR(50);
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS qty_cut INTEGER;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS size_breakdown_cut JSON DEFAULT '{}'::json;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS main_fabric_used FLOAT;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS puring_used FLOAT DEFAULT 0.0;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS puring_jala_used FLOAT DEFAULT 0.0;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS main_consumption_rate FLOAT DEFAULT 0.0;
+ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS puring_consumption_rate FLOAT DEFAULT 0.0;
 ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS marker_length_yard FLOAT DEFAULT 0.0;
 ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS marker_efficiency_pct FLOAT DEFAULT 0.0;
 ALTER TABLE cutting_records ADD COLUMN IF NOT EXISTS gelaran_layers INTEGER DEFAULT 1;
@@ -181,6 +228,22 @@ CREATE TABLE IF NOT EXISTS wip_movements (
     status VARCHAR(30) DEFAULT 'IN_PROCESS',
     remarks TEXT
 );
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS so_id VARCHAR(50);
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS stage_name VARCHAR(50);
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS sequence_order INTEGER DEFAULT 1;
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS partner_id VARCHAR(50);
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS internal_supervisor_id VARCHAR(50);
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS surat_jalan_no VARCHAR(100);
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS dispatch_date DATE;
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS qty_dispatched INTEGER;
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS size_breakdown_dispatched JSON DEFAULT '{}'::json;
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS received_date DATE;
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS qty_received INTEGER DEFAULT 0;
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS qty_reject INTEGER DEFAULT 0;
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS size_breakdown_received JSON DEFAULT '{}'::json;
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS balance_discrepancy INTEGER DEFAULT 0;
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS status VARCHAR(30) DEFAULT 'IN_PROCESS';
+ALTER TABLE wip_movements ADD COLUMN IF NOT EXISTS remarks TEXT;
 
 -- 8. Piece Rate Wages & Shipments
 CREATE TABLE IF NOT EXISTS piece_rate_wages (
@@ -196,6 +259,16 @@ CREATE TABLE IF NOT EXISTS piece_rate_wages (
     total_wage FLOAT DEFAULT 0.0,
     notes TEXT
 );
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS so_id VARCHAR(50);
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS operator_id VARCHAR(50);
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS operation_type VARCHAR(50);
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS work_date DATE;
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS qty_completed INTEGER;
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS qty_reject INTEGER DEFAULT 0;
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS size_breakdown JSON DEFAULT '{}'::json;
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS wage_per_piece FLOAT;
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS total_wage FLOAT DEFAULT 0.0;
+ALTER TABLE piece_rate_wages ADD COLUMN IF NOT EXISTS notes TEXT;
 
 CREATE TABLE IF NOT EXISTS shipments (
     id VARCHAR(50) PRIMARY KEY,
@@ -215,10 +288,21 @@ CREATE TABLE IF NOT EXISTS shipments (
     is_invoiced BOOLEAN DEFAULT FALSE,
     remarks TEXT
 );
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS so_id VARCHAR(50);
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS shipment_date DATE;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS surat_jalan_no VARCHAR(100);
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS driver_id VARCHAR(50);
 ALTER TABLE shipments ADD COLUMN IF NOT EXISTS driver_name VARCHAR(100);
 ALTER TABLE shipments ADD COLUMN IF NOT EXISTS vehicle_plate_no VARCHAR(50);
 ALTER TABLE shipments ADD COLUMN IF NOT EXISTS carton_box_count INTEGER DEFAULT 0;
 ALTER TABLE shipments ADD COLUMN IF NOT EXISTS destination_address TEXT;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS total_qty_shipped INTEGER;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS size_breakdown_shipped JSON DEFAULT '{}'::json;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS unit_price FLOAT DEFAULT 0.0;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS total_invoice_amount FLOAT DEFAULT 0.0;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(100);
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS is_invoiced BOOLEAN DEFAULT FALSE;
+ALTER TABLE shipments ADD COLUMN IF NOT EXISTS remarks TEXT;
 
 
 -- -----------------------------------------------------
