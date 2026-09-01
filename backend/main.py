@@ -12,7 +12,7 @@ from core.security import get_password_hash
 from routers import auth, karyawan, mesin, inventaris, dashboard, audit, payroll
 from routers import produksi_master, produksi_output
 from routers import ppic_so, warehouse_fabric, cutting_prep, wip_subcon, finishing_shipping
-from routers import ai_copilot, email_reports
+from routers import ai_copilot, email_reports, reports
 
 def init_db():
     try:
@@ -403,6 +403,9 @@ app.include_router(finishing_shipping.router)
 # 🟢 Router AI Co-Pilot & Automated Reporting
 app.include_router(ai_copilot.router)
 app.include_router(email_reports.router)
+
+# 🟢 Router Laporan Agregat (produksi / keuangan / vendor scorecard)
+app.include_router(reports.router)
 
 @app.get("/")
 def root_check():

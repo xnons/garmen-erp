@@ -136,6 +136,50 @@ def get_overview_stats(
     }
 
 
+@router.get("/kpi-ribbon")
+def get_kpi_ribbon(
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(get_current_user),
+):
+    """Ribbon KPI ringkas untuk header dashboard — satu request, angka live."""
+    today = date.today()
+    soon = today + timedelta(days=7)
+
+    def _safe(q, default=0):
+        try:
+            return q() or default
+        except Exception:
+            return default
+
+    so_active = _safe(lambda: db.query(func.count(models.SalesOrder.id)).filter(
+        models.SalesOrder.status.notin_(["SHIPPED", "CLOSED"])).scalar())
+
+    deadlines_soon = _safe(lambda: db.query(func.count(models.SalesOrder.id)).filter(
+        models.SalesOrder.status.notin_(["SHIPPED", "CLOSED"]),
+        models.SalesOrder.deadline.isnot(None),
+        models.SalesOrder.deadline <= soon).scalar())
+
+    wip_in_process = _safe(lambda: db.query(func.coalesce(func.sum(
+        models.WIPMovement.qty_dispatched - models.WIPMovement.qty_received), 0)).filter(
+        models.WIPMovement.status.notin_(["COMPLETED"])).scalar())
+
+    vendor_discrepancy = _safe(lambda: db.query(func.count(models.WIPMovement.id)).filter(
+        models.WIPMovement.balance_discrepancy > 0).scalar())
+
+    low_stock_fabric = _safe(lambda: db.query(func.count(models.InventoryItem.id)).filter(
+        models.InventoryItem.current_stock <= models.InventoryItem.min_stock_alert).scalar())
+    low_stock_trims = _safe(lambda: db.query(func.count(models.BahanBaku.id)).filter(
+        models.BahanBaku.stok_saat_ini <= models.BahanBaku.stok_minimum).scalar())
+
+    return {
+        "soActive": int(so_active),
+        "deadlinesWithin7Days": int(deadlines_soon),
+        "wipInProcessPcs": int(max(0, wip_in_process)),
+        "vendorDiscrepancyFlags": int(vendor_discrepancy),
+        "lowStockItems": int(low_stock_fabric) + int(low_stock_trims),
+    }
+
+
 @router.get("/owner-analytics")
 def get_owner_executive_analytics(
     db: Session = Depends(get_db),
