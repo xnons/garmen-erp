@@ -574,6 +574,11 @@ class CuttingPrepTask(Base):
     total_wage = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Lifecycle pembayaran payroll (diisi oleh POST /api/payroll/mark-paid)
+    is_paid = Column(Boolean, default=False)
+    payroll_batch_id = Column(String(50), nullable=True)
+    paid_at = Column(DateTime, nullable=True)
+
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
     operator = relationship("Karyawan", foreign_keys=[operator_id])
 
@@ -634,6 +639,11 @@ class PieceRateWage(Base):
     total_wage = Column(Float, default=0.0)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Lifecycle pembayaran payroll (diisi oleh POST /api/payroll/mark-paid)
+    is_paid = Column(Boolean, default=False)
+    payroll_batch_id = Column(String(50), nullable=True)
+    paid_at = Column(DateTime, nullable=True)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
     operator = relationship("Karyawan", foreign_keys=[operator_id])
