@@ -109,7 +109,7 @@ class Mesin(Base):
     lokasi_line = Column(String(50), nullable=False) # Line 1, Line 2, Cutting Room, Finishing
     status = Column(String(30), default="OPERASIONAL") # OPERASIONAL, MAINTENANCE, RUSAK
     
-    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan", ondelete="SET NULL"), nullable=True)
     
     # Finansial & Pembayaran Mesin
     harga_beli = Column(Float, default=0.0)
@@ -505,7 +505,7 @@ class FabricInspection(Base):
 
     id = Column(String(50), primary_key=True, default=generate_uuid)
     receipt_id = Column(String(50), ForeignKey("material_receipts.id"), nullable=False)
-    inspector_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    inspector_id = Column(String(50), ForeignKey("karyawan.id_karyawan", ondelete="SET NULL"), nullable=True)
     inspection_date = Column(Date, nullable=False)
     lot_number = Column(String(50), nullable=True)
     length_before = Column(Float, nullable=False)
@@ -541,7 +541,7 @@ class CuttingRecord(Base):
     id = Column(String(50), primary_key=True, default=generate_uuid)
     so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
     cutting_date = Column(Date, nullable=False)
-    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan", ondelete="SET NULL"), nullable=True)
     qty_cut = Column(Integer, nullable=False)
     size_breakdown_cut = Column(JSON, default={})
     main_fabric_used = Column(Float, nullable=False)
@@ -566,7 +566,7 @@ class CuttingPrepTask(Base):
     id = Column(String(50), primary_key=True, default=generate_uuid)
     so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
     task_type = Column(String(50), nullable=False)                         # 'NUMBERING', 'PRESS_INTERLINING'
-    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan", ondelete="SET NULL"), nullable=True)
     task_date = Column(Date, nullable=False)
     qty_done = Column(Integer, nullable=False)
     size_breakdown = Column(JSON, default={})
@@ -586,7 +586,7 @@ class WIPMovement(Base):
     stage_name = Column(String(50), nullable=False)                        # 'PRINT_MENTAH', 'EMBROIDERY_MENTAH', 'SEWING_INTERNAL', 'SEWING_MAKLUN', 'WASHING', 'EMBROIDERY_JADI', 'FINISHING'
     sequence_order = Column(Integer, nullable=False, default=1)            # 1: Print, 2: Bordir M, 3: Sewing, 4: Washing, 5: Bordir J, 6: Finishing
     partner_id = Column(String(50), ForeignKey("partners.id"), nullable=True) # Subcon / Maklun Vendor (NULL jika internal)
-    internal_supervisor_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    internal_supervisor_id = Column(String(50), ForeignKey("karyawan.id_karyawan", ondelete="SET NULL"), nullable=True)
     surat_jalan_no = Column(String(100), nullable=True)
     dispatch_date = Column(Date, nullable=False)
     qty_dispatched = Column(Integer, nullable=False)
@@ -624,7 +624,7 @@ class PieceRateWage(Base):
 
     id = Column(String(50), primary_key=True, default=generate_uuid)
     so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
-    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    operator_id = Column(String(50), ForeignKey("karyawan.id_karyawan", ondelete="SET NULL"), nullable=True)
     operation_type = Column(String(50), nullable=False)                    # 'STIM', 'LUBANG_KANCING', 'PASANG_KANCING', 'LIPAT', 'PACKING'
     work_date = Column(Date, nullable=False)
     qty_completed = Column(Integer, nullable=False)
@@ -645,7 +645,7 @@ class Shipment(Base):
     so_id = Column(String(50), ForeignKey("sales_orders.id"), nullable=False)
     shipment_date = Column(Date, nullable=False)
     surat_jalan_no = Column(String(100), unique=True, nullable=False)      # 'SJP-2608.0001'
-    driver_id = Column(String(50), ForeignKey("karyawan.id_karyawan"), nullable=True)
+    driver_id = Column(String(50), ForeignKey("karyawan.id_karyawan", ondelete="SET NULL"), nullable=True)
     total_qty_shipped = Column(Integer, nullable=False)
     size_breakdown_shipped = Column(JSON, default={})
     unit_price = Column(Float, default=0.0)

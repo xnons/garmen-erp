@@ -395,8 +395,28 @@ async def hapus_karyawan(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Akses Ditolak! Hanya DEVELOPER yang berhak menghapus akun Owner atau Developer."
         )
-        
+
+    # 🔒 Jangan hard-delete kalau masih dipakai di riwayat produksi/upah — akan
+    # meninggalkan baris yatim (dan riwayat gaji jadi tak bisa ditelusuri).
+    # Arahkan ke penonaktifan (is_active = False) via menu edit.
+    _refs = {
+        "upah borongan": db.query(models.PieceRateWage).filter(models.PieceRateWage.operator_id == id_karyawan).count(),
+        "log potong": db.query(models.CuttingRecord).filter(models.CuttingRecord.operator_id == id_karyawan).count(),
+        "tugas persiapan": db.query(models.CuttingPrepTask).filter(models.CuttingPrepTask.operator_id == id_karyawan).count(),
+        "pengiriman (sopir)": db.query(models.Shipment).filter(models.Shipment.driver_id == id_karyawan).count(),
+    }
+    used = {k: v for k, v in _refs.items() if v}
+    if used:
+        rincian = ", ".join(f"{v} {k}" for k, v in used.items())
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Karyawan '{target_karyawan.nama}' masih terpakai di riwayat: {rincian}. "
+                f"Nonaktifkan akun (is_active = False) lewat menu edit, jangan dihapus permanen."
+            ),
+        )
+
     db.delete(target_karyawan)
     db.commit()
-    
+
     return {"message": f"Karyawan {target_karyawan.nama} ({id_karyawan}) berhasil dihapus."}
