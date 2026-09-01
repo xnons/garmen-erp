@@ -8,6 +8,9 @@ import {
 } from 'lucide-react';
 import api from '@/services/api';
 
+// Panggilan AI bisa lama (OpenRouter mencoba beberapa model, timeout 45s masing-masing).
+const AI_TIMEOUT_MS = 90000;
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -110,7 +113,7 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
         prompt: textToSend,
         persona: selectedPersona,
         history: messages.map((m) => ({ role: m.role, content: m.content }))
-      });
+      }, { timeout: AI_TIMEOUT_MS });
 
       const aiReply = res.data?.reply || 'Tidak ada respon dari model AI.';
       setMessages((prev) => [...prev, { role: 'assistant', content: aiReply }]);
@@ -146,7 +149,7 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
       const res = await api.post('/api/ai/auto-fill', {
         raw_text: rawText,
         form_type: formType
-      });
+      }, { timeout: AI_TIMEOUT_MS });
 
       if (res.data?.parsed_data) {
         setParsedResult(res.data.parsed_data);
@@ -181,7 +184,7 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
       const res = await api.post('/api/ai/vision-qc', {
         image_base64: selectedImage,
         defect_notes: defectNotes
-      });
+      }, { timeout: AI_TIMEOUT_MS });
 
       if (res.data?.analysis) {
         setVisionAnalysis(res.data.analysis);

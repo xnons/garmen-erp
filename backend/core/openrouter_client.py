@@ -288,6 +288,23 @@ Maaf, data gaji karyawan perorangan dan kredensial sistem dilindungi oleh protok
     total_piece_wages = sum(getattr(w, 'total_wage', 0.0) or 0.0 for w in wages) if can_view_finance else 0.0
 
     if p_upper == "FINANCE" or (can_view_finance and ("biaya" in prompt_lower or "keuangan" in prompt_lower or "upah" in prompt_lower or "gaji" in prompt_lower)):
+        # Hitung rata-rata tarif riil per jenis operasi dari data upah satuan yang tercatat.
+        # Tidak ada angka hardcoded — jika belum ada data, dinyatakan eksplisit.
+        rate_by_op: Dict[str, list] = {}
+        for w in wages:
+            op = getattr(w, 'operation_type', None) or 'LAINNYA'
+            rate = getattr(w, 'wage_per_piece', 0.0) or 0.0
+            if rate > 0:
+                rate_by_op.setdefault(op, []).append(rate)
+        if rate_by_op:
+            rate_lines = "\n".join(
+                f"   * **{op}**: rata-rata Rp {sum(v) / len(v):,.0f}/pcs "
+                f"(rentang Rp {min(v):,.0f}–Rp {max(v):,.0f}, {len(v)} entri)."
+                for op, v in sorted(rate_by_op.items())
+            )
+        else:
+            rate_lines = "   * Belum ada data upah satuan (`piece_rate_wages`) yang tercatat untuk dianalisis."
+
         return f"""### 💰 **Laporan Finansial & Analisis Biaya Produksi (Khusus Finance & Owner)**
 
 Berdasarkan audit live database keuangan PT. Chikal Jaya Makmur:
@@ -296,10 +313,8 @@ Berdasarkan audit live database keuangan PT. Chikal Jaya Makmur:
    * **Total Akumulasi Invoice SJP**: **Rp {total_invoice_rp:,.0f}** ({len(shipments)} batch pengiriman selesai).
    * **Total Pengeluaran Upah Borongan**: **Rp {total_piece_wages:,.0f}** ({len(wages)} entri setoran borongan jahit, steam, kancing, dan potong).
 
-2. **Evaluasi Efisiensi Biaya per Pcs**:
-   * **Tarif Jahit Sewing**: Rata-rata Rp 2.500 - Rp 3.500/pcs.
-   * **Tarif Finishing (Steam + Kancing + Lipat + Packing)**: Rata-rata Rp 1.250 - Rp 1.500/pcs.
-   * **Tarif Meja Potong & Press**: Rp 500 - Rp 800/pcs.
+2. **Tarif Riil per Jenis Operasi** (dihitung dari data upah satuan yang tercatat):
+{rate_lines}
 
 3. **Rekomendasi Finansial**:
    * Segera terbitkan rekonsiliasi Form WI untuk mempercepat pencairan invoice dari Buyer.
