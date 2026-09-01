@@ -13,6 +13,7 @@ from schemas.garment_blueprint import (
 from core.security import get_current_user, require_role
 from core.audit_helper import record_audit
 from core.person_ref import resolve_worker, person_name as _person_name
+from core.payroll_period import assert_period_open
 
 router = APIRouter(prefix="/api/cutting", tags=["Cutting, Consumption & Preparation"])
 
@@ -263,6 +264,8 @@ def create_prep_task(
     if not so:
         raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
 
+    assert_period_open(db, payload.task_date, field="Tanggal tugas")
+
     # Tugas persiapan = upah borongan -> operator WAJIB, aktif, & bukan akun sistem.
     operator_obj = resolve_worker(db, payload.operator_id, field="Nama pekerja")
     assert operator_obj is not None
@@ -309,8 +312,18 @@ def update_prep_task(
     if not task:
         raise HTTPException(status_code=404, detail="Tugas persiapan cutting tidak ditemukan.")
 
+    if task.is_paid:
+        raise HTTPException(
+            status_code=409,
+            detail="Tugas ini sudah dicairkan lewat payroll; tidak bisa dikoreksi.",
+        )
+
     old_qty = task.qty_done
     update_data = payload.model_dump(exclude_unset=True)
+
+    assert_period_open(db, task.task_date, field="Tanggal tugas")
+    if update_data.get("task_date"):
+        assert_period_open(db, update_data["task_date"], field="Tanggal tugas baru")
 
     if update_data.get("operator_id"):
         resolve_worker(db, update_data["operator_id"], field="Pekerja", required=True)
@@ -348,7 +361,12 @@ def delete_prep_task(
     task = db.query(models.CuttingPrepTask).filter(models.CuttingPrepTask.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Tugas persiapan tidak ditemukan.")
-    
+    if task.is_paid:
+        raise HTTPException(
+            status_code=409,
+            detail="Tugas ini sudah dicairkan lewat payroll; tidak bisa dihapus.",
+        )
+
     t_type = task.task_type
     db.delete(task)
     db.commit()

@@ -13,6 +13,7 @@ from schemas.garment_blueprint import (
 from core.security import get_current_user, require_role
 from core.audit_helper import record_audit
 from core.person_ref import resolve_worker
+from core.payroll_period import assert_period_open
 
 # Role yang boleh mencatat upah borongan finishing (mirror visibilitas menu Fase 5
 # + role edit di PUT). GUDANG / PPIC / QC / EXPEDITION_DRIVER sengaja tidak masuk.
@@ -128,6 +129,8 @@ def create_piece_rate_wage(
     if not so:
         raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
 
+    assert_period_open(db, payload.work_date, field="Tanggal kerja")
+
     # Operator WAJIB, harus karyawan AKTIF, dan BUKAN akun sistem/manajerial.
     # Tanpa ini akun dev/owner bisa tercatat sebagai buruh borongan & upahnya
     # mengalir ke Payroll (bug "Muhammad tegar jadi pekerja").
@@ -177,8 +180,19 @@ def update_piece_rate_wage(
     if not wage:
         raise HTTPException(status_code=404, detail="Data upah borongan tidak ditemukan.")
 
+    if wage.is_paid:
+        raise HTTPException(
+            status_code=409,
+            detail="Baris upah ini sudah dicairkan lewat payroll; tidak bisa dikoreksi.",
+        )
+
     old_total = wage.total_wage
     update_data = payload.model_dump(exclude_unset=True)
+
+    # Blokir pemindahan tanggal ke periode payroll yang sudah dicairkan (atau keluar dari periode terbuka).
+    assert_period_open(db, wage.work_date, field="Tanggal kerja")
+    if update_data.get("work_date"):
+        assert_period_open(db, update_data["work_date"], field="Tanggal kerja baru")
 
     # Kalau operator_id diganti, harus karyawan aktif & bukan akun sistem.
     if "operator_id" in update_data:
@@ -217,7 +231,12 @@ def delete_piece_rate_wage(
     wage = db.query(models.PieceRateWage).filter(models.PieceRateWage.id == wage_id).first()
     if not wage:
         raise HTTPException(status_code=404, detail="Data upah tidak ditemukan.")
-    
+    if wage.is_paid:
+        raise HTTPException(
+            status_code=409,
+            detail="Baris upah ini sudah dicairkan lewat payroll; tidak bisa dihapus.",
+        )
+
     w_op = wage.operation_type
     w_tot = wage.total_wage
     db.delete(wage)
