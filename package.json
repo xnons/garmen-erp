@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "recharts": "^3.9.2",
-    "xlsx": "^0.18.5"
-  }
-}
