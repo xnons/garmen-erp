@@ -26,7 +26,7 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'CHAT' | 'AUTOFILL' | 'VISION'>('CHAT');
   const [selectedPersona, setSelectedPersona] = useState<'EXECUTIVE' | 'FINANCE' | 'PRODUCTION' | 'SECURITY'>('EXECUTIVE');
-  
+
   // Chat States
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -161,7 +161,7 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
       <div className="relative w-full max-w-4xl h-[90vh] max-h-[850px] bg-slate-900 border border-indigo-500/30 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-        
+
         {/* MODAL HEADER */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-indigo-950/60 via-slate-900 to-slate-900">
           <div className="flex items-center gap-3">
@@ -171,7 +171,7 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-black text-white tracking-tight">
-                  Master Garment AI Co-Pilot
+                  Master Garment AI
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
                   Gemini Large-Context
@@ -188,31 +188,28 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
             <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
               <button
                 onClick={() => setActiveTab('CHAT')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  activeTab === 'CHAT'
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'CHAT'
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 💬 Chat Konsultasi
               </button>
               <button
                 onClick={() => setActiveTab('AUTOFILL')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  activeTab === 'AUTOFILL'
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'AUTOFILL'
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 ⚡ Auto-Fill Form
               </button>
               <button
                 onClick={() => setActiveTab('VISION')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  activeTab === 'VISION'
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'VISION'
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 📸 Vision QC Scan
               </button>
@@ -232,18 +229,17 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
         {/* ================================================================= */}
         {activeTab === 'CHAT' && (
           <div className="flex-1 flex flex-col overflow-hidden">
-            
+
             {/* PERSONA SELECTOR BAR */}
             <div className="px-6 py-2.5 bg-slate-950/60 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto">
               <span className="text-xs font-bold text-slate-400 shrink-0">Persona AI:</span>
-              
+
               <button
                 onClick={() => setSelectedPersona('EXECUTIVE')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                  selectedPersona === 'EXECUTIVE'
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${selectedPersona === 'EXECUTIVE'
                     ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
                     : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
+                  }`}
               >
                 <Cpu className="w-3.5 h-3.5" />
                 🏢 Executive Advisor
@@ -251,11 +247,10 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
 
               <button
                 onClick={() => setSelectedPersona('FINANCE')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                  selectedPersona === 'FINANCE'
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${selectedPersona === 'FINANCE'
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                     : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
+                  }`}
               >
                 <TrendingUp className="w-3.5 h-3.5" />
                 💰 Finance & Costing
@@ -263,11 +258,10 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
 
               <button
                 onClick={() => setSelectedPersona('PRODUCTION')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                  selectedPersona === 'PRODUCTION'
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${selectedPersona === 'PRODUCTION'
                     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                     : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
+                  }`}
               >
                 <Factory className="w-3.5 h-3.5" />
                 🏭 PPIC & Production
@@ -275,11 +269,10 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
 
               <button
                 onClick={() => setSelectedPersona('SECURITY')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                  selectedPersona === 'SECURITY'
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${selectedPersona === 'SECURITY'
                     ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                     : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
+                  }`}
               >
                 <ShieldAlert className="w-3.5 h-3.5" />
                 🛡️ Audit & Security Sentinel
@@ -300,11 +293,10 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
                   )}
 
                   <div
-                    className={`max-w-2xl px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                      m.role === 'user'
+                    className={`max-w-2xl px-4 py-3 rounded-2xl text-sm leading-relaxed ${m.role === 'user'
                         ? 'bg-indigo-600 text-white rounded-tr-none'
                         : 'bg-slate-800/90 text-slate-200 rounded-tl-none border border-slate-700/80 shadow-lg'
-                    }`}
+                      }`}
                   >
                     <div className="whitespace-pre-wrap font-sans">{m.content}</div>
                   </div>
@@ -529,7 +521,7 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
               {/* VISION ANALYSIS RESULT */}
               <div className="p-5 bg-slate-950 border border-slate-800 rounded-2xl flex flex-col">
                 <h4 className="text-xs font-bold text-slate-300 mb-3">Hasil Penilaian AI Vision:</h4>
-                
+
                 {visionAnalysis ? (
                   <div className="space-y-3 flex-1 overflow-auto text-xs text-slate-300">
                     {visionAnalysis.astm_points && (

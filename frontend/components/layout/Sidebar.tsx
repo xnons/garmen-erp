@@ -143,7 +143,7 @@ export default function Sidebar({
                 {/* Teks Logo (Tampil di Mobile selalu, atau di PC jika tidak collapsed) */}
                 <div className={`transition-all duration-300 ${isCollapsed ? 'md:hidden' : 'block'}`}>
                   <h1 className="text-white font-extrabold text-base tracking-wider leading-none flex items-center gap-1.5">
-                    MASTER_GARMENT
+                    Nexora
                     <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20 shadow-sm">
                       ERP
                     </span>
@@ -210,13 +210,11 @@ export default function Sidebar({
                             key={item.id}
                             onClick={() => handleSelectMenu(item.id)}
                             title={isCollapsed ? item.label : undefined}
-                            className={`relative w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-3 cursor-pointer group ${
-                              isCollapsed ? 'md:justify-center md:px-0' : ''
-                            } ${
-                              isActive
+                            className={`relative w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-3 cursor-pointer group ${isCollapsed ? 'md:justify-center md:px-0' : ''
+                              } ${isActive
                                 ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/25 scale-[1.01]'
                                 : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
-                            }`}
+                              }`}
                           >
                             {/* Glowing Active Line Accent */}
                             {isActive && (
@@ -224,9 +222,8 @@ export default function Sidebar({
                             )}
 
                             <IconComponent
-                              className={`w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                                isActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-400'
-                              }`}
+                              className={`w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-400'
+                                }`}
                             />
 
                             <span className={`truncate tracking-wide ${isCollapsed ? 'md:hidden' : 'block'}`}>
@@ -257,9 +254,8 @@ export default function Sidebar({
           <div className="p-3 border-t border-slate-800/80 bg-slate-900/40 text-xs space-y-2.5">
             <div
               title={isCollapsed ? `${activeUser?.nama || "User"} (${userRole})` : undefined}
-              className={`flex items-center gap-3 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80 relative overflow-hidden group ${
-                isCollapsed ? 'md:justify-center md:p-2' : ''
-              }`}
+              className={`flex items-center gap-3 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80 relative overflow-hidden group ${isCollapsed ? 'md:justify-center md:p-2' : ''
+                }`}
             >
               <div className="relative shrink-0">
                 <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center text-xs uppercase shadow-inner">

@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Truck, Plus, Search, RefreshCw, Printer, FileText, 
   CheckCircle2, DollarSign, ArrowUpRight, CheckCheck, Eye,
-  Pencil, Trash2, X
+  Pencil, Trash2, X, LayoutGrid, List, Layers, ShieldCheck
 } from 'lucide-react';
 import api from '@/services/api';
 import PrintSuratJalanModal from '../common/PrintSuratJalanModal';
@@ -15,7 +15,10 @@ export default function ShippingBillingModule() {
   const [shipments, setShipments] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  
+  // Customization & Filtering
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [viewMode, setViewMode] = useState<'TABLE' | 'GRID'>('TABLE');
 
   // Modals
   const [isNewSJPOpen, setIsNewSJPOpen] = useState(false);
@@ -181,23 +184,38 @@ export default function ShippingBillingModule() {
     });
   };
 
-  const filteredShipments = shipments.filter(s =>
-    (s.surat_jalan_no && s.surat_jalan_no.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (s.invoice_number && s.invoice_number.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (s.driver_name && s.driver_name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredShipments = useMemo(() => {
+    return shipments.filter(s => {
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        (s.surat_jalan_no && s.surat_jalan_no.toLowerCase().includes(q)) ||
+        (s.invoice_number && s.invoice_number.toLowerCase().includes(q)) ||
+        (s.driver_name && s.driver_name.toLowerCase().includes(q)) ||
+        (s.destination_address && s.destination_address.toLowerCase().includes(q))
+      );
+    });
+  }, [shipments, searchQuery]);
+
+  const shippingMetrics = useMemo(() => {
+    const totalSJP = shipments.length;
+    const totalQty = shipments.reduce((acc, s) => acc + (Number(s.total_qty_shipped) || 0), 0);
+    const totalVal = shipments.reduce((acc, s) => acc + (Number(s.total_billing_amount) || ((Number(s.total_qty_shipped) || 0) * (Number(s.unit_price) || 0))), 0);
+    const totalCartons = shipments.reduce((acc, s) => acc + (Number(s.carton_box_count) || 0), 0);
+    return { totalSJP, totalQty, totalVal, totalCartons };
+  }, [shipments]);
 
   return (
     <div className="space-y-6">
       
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-6 rounded-3xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-6 rounded-3xl backdrop-blur-xl">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <Truck className="w-3.5 h-3.5" />
             Fase 6: Ekspedisi Pengiriman & Form WI
           </div>
-          <h1 className="text-2xl font-black text-white">Shipping & Billing Form WI</h1>
+          <h1 className="text-2xl font-black text-white tracking-wide">Shipping & Billing Form WI</h1>
           <p className="text-slate-400 text-sm mt-0.5">
             Penerbitan Surat Jalan Pengiriman (SJP Sandi) ke Buyer dan Rekapitulasi Tagihan CMT Form WI.
           </p>
@@ -214,8 +232,43 @@ export default function ShippingBillingModule() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-3">
+      {/* KPI Ribbon */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+          <span className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5 text-blue-400" />
+            Total SJP Terbit
+          </span>
+          <p className="text-xl font-black text-white mt-1">{shippingMetrics.totalSJP} <span className="text-xs text-slate-500 font-normal">Surat Jalan</span></p>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+          <span className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-emerald-400" />
+            Total Qty Terkirim
+          </span>
+          <p className="text-xl font-black text-emerald-400 mt-1">{shippingMetrics.totalQty.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-normal">Pcs</span></p>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+          <span className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+            <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+            Total Nilai Tagihan
+          </span>
+          <p className="text-xl font-black text-amber-300 mt-1">Rp {shippingMetrics.totalVal.toLocaleString('id-ID')}</p>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+          <span className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+            <Truck className="w-3.5 h-3.5 text-indigo-400" />
+            Total Dus / Karton
+          </span>
+          <p className="text-xl font-black text-indigo-400 mt-1">{shippingMetrics.totalCartons} <span className="text-xs text-slate-500 font-normal">Koli</span></p>
+        </div>
+      </div>
+
+      {/* Tabs & Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('SHIPMENTS')}
@@ -250,8 +303,31 @@ export default function ShippingBillingModule() {
               className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
             />
           </div>
+
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setViewMode('TABLE')}
+              className={`p-1.5 rounded-lg transition-all ${
+                viewMode === 'TABLE' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Tampilan Tabel"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('GRID')}
+              className={`p-1.5 rounded-lg transition-all ${
+                viewMode === 'GRID' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Tampilan Grid Card"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+
           <button
             onClick={fetchData}
+            title="Segarkan Data"
             className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
@@ -259,91 +335,157 @@ export default function ShippingBillingModule() {
         </div>
       </div>
 
-      {/* TAB 1: SHIPMENTS LIST */}
+      {/* TAB 1: SHIPMENTS LIST (TABLE VS GRID) */}
       {activeTab === 'SHIPMENTS' && (
-        <div className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-800 uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-4">Surat Jalan (SJP) & Tgl</th>
-                <th className="py-3 px-3">Driver / Ekspedisi</th>
-                <th className="py-3 px-3 text-right">Kuantitas Kirim</th>
-                <th className="py-3 px-3 text-right">Harga Satuan</th>
-                <th className="py-3 px-3 text-right">Nilai Tagihan</th>
-                <th className="py-3 px-3">No. Invoice</th>
-                <th className="py-3 px-4 text-center">Aksi / Cetak</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 font-medium">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-400 mb-2" />
-                    Memuat daftar pengiriman...
-                  </td>
+        viewMode === 'TABLE' ? (
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-800 uppercase tracking-wider text-[10px]">
+                  <th className="py-3 px-4">Surat Jalan (SJP) & Tgl</th>
+                  <th className="py-3 px-3">Driver / Ekspedisi</th>
+                  <th className="py-3 px-3 text-right">Kuantitas Kirim</th>
+                  <th className="py-3 px-3 text-right">Harga Satuan</th>
+                  <th className="py-3 px-3 text-right">Nilai Tagihan</th>
+                  <th className="py-3 px-3">No. Invoice</th>
+                  <th className="py-3 px-4 text-center">Aksi / Cetak</th>
                 </tr>
-              ) : filteredShipments.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    Belum ada data Surat Jalan Pengiriman (SJP).
-                  </td>
-                </tr>
-              ) : (
-                filteredShipments.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="font-mono font-bold text-white">{s.surat_jalan_no}</div>
-                      <div className="text-[11px] text-slate-500">{s.shipment_date}</div>
-                    </td>
-                    <td className="py-3 px-3 text-slate-300 font-semibold">{s.driver_name || "Sandi"}</td>
-                    <td className="py-3 px-3 text-right font-black text-emerald-400">
-                      {s.total_qty_shipped.toLocaleString('id-ID')} Pcs
-                    </td>
-                    <td className="py-3 px-3 text-right text-slate-400">
-                      Rp {(s.unit_price || 0).toLocaleString('id-ID')}
-                    </td>
-                    <td className="py-3 px-3 text-right font-black text-white">
-                      Rp {(s.total_invoice_amount || 0).toLocaleString('id-ID')}
-                    </td>
-                    <td className="py-3 px-3">
-                      {s.invoice_number ? (
-                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                          {s.invoice_number}
-                        </span>
-                      ) : (
-                        <span className="text-slate-600">-</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => handlePrintSJP(s)}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                        >
-                          <Printer className="w-3.5 h-3.5 text-blue-400" /> Cetak
-                        </button>
-                        <button
-                          onClick={() => handleOpenEditSJP(s)}
-                          title="Edit SJP"
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteShipment(s)}
-                          title="Hapus SJP"
-                          className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-medium">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <RefreshCw className="w-6 h-6 animate-spin mx-auto text-emerald-400 mb-2" />
+                      Memuat daftar Surat Jalan Pengiriman...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : filteredShipments.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      Belum ada data pengiriman SJP yang cocok.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredShipments.map((s) => {
+                    const billVal = s.total_billing_amount || ((s.total_qty_shipped || 0) * (s.unit_price || 0));
+                    return (
+                      <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-mono font-bold text-white">{s.surat_jalan_no}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{s.shipment_date}</div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="font-semibold text-slate-200">{s.driver_name || "Sandi (Ekspedisi)"}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{s.vehicle_plate_no || "-"}</div>
+                        </td>
+                        <td className="py-3 px-3 text-right font-bold text-emerald-400 font-mono">
+                          {(s.total_qty_shipped || 0).toLocaleString('id-ID')} Pcs
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono text-slate-300">
+                          Rp {(s.unit_price || 0).toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3 px-3 text-right font-black text-amber-300 font-mono">
+                          Rp {billVal.toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3 px-3">
+                          {s.invoice_number ? (
+                            <span className="px-2 py-0.5 rounded font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px]">
+                              {s.invoice_number}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-[11px]">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handlePrintSJP(s)}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors cursor-pointer"
+                              title="Cetak SJP Fisik"
+                            >
+                              <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditSJP(s)}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-colors cursor-pointer"
+                              title="Edit SJP"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteShipment(s)}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-colors cursor-pointer"
+                              title="Hapus SJP"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredShipments.map((s) => {
+              const billVal = s.total_billing_amount || ((s.total_qty_shipped || 0) * (s.unit_price || 0));
+              return (
+                <div key={s.id} className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-3 flex flex-col justify-between hover:border-slate-700 transition-all">
+                  <div>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          SJP EKSPEDISI
+                        </span>
+                        <h4 className="text-base font-black text-white mt-1">{s.surat_jalan_no}</h4>
+                        <p className="text-xs text-slate-400 font-mono">Tgl: {s.shipment_date}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="block text-lg font-black text-emerald-400">
+                          {(s.total_qty_shipped || 0).toLocaleString('id-ID')} Pcs
+                        </span>
+                        <span className="text-[10px] text-slate-500">{s.carton_box_count || 0} Dus</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs my-2 space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Driver & Plat:</span>
+                        <span className="font-semibold text-slate-200">{s.driver_name || "Sandi"} ({s.vehicle_plate_no || "-"})</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Tujuan:</span>
+                        <span className="font-semibold text-slate-300 truncate max-w-[150px]" title={s.destination_address}>{s.destination_address || "Gudang Buyer"}</span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t border-slate-800">
+                        <span className="text-slate-500">Nilai Tagihan:</span>
+                        <span className="font-bold text-amber-300 font-mono">Rp {billVal.toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-800/60">
+                    <span className="text-[10px] font-mono text-blue-400 font-semibold">{s.invoice_number ? `INV: ${s.invoice_number}` : 'Belum Ada Invoice'}</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handlePrintSJP(s)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg cursor-pointer" title="Cetak SJP">
+                        <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                      </button>
+                      <button onClick={() => handleOpenEditSJP(s)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg cursor-pointer" title="Edit SJP">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => handleDeleteShipment(s)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg cursor-pointer" title="Hapus SJP">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
 
       {/* TAB 2: FORM WI SETTLEMENT LIST */}

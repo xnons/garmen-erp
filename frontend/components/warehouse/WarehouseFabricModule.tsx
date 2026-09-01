@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Package, ShieldCheck, Scissors, Plus, Search, RefreshCw, 
   Printer, AlertOctagon, CheckCircle2, FileText, ArrowDownLeft, ArrowUpRight,
-  Pencil, Trash2
+  Pencil, Trash2, LayoutGrid, List, Filter, AlertTriangle, Layers, DollarSign
 } from 'lucide-react';
 import api from '@/services/api';
 import FabricInspectionModal from './FabricInspectionModal';
@@ -18,7 +18,12 @@ export default function WarehouseFabricModule() {
   const [inspections, setInspections] = useState<any[]>([]);
   const [allocations, setAllocations] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  
+  // Layout & Filtering State
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('GRID');
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [showLowStockOnly, setShowLowStockOnly] = useState<boolean>(false);
 
   // Modals
   const [isInspectionOpen, setIsInspectionOpen] = useState(false);
@@ -85,6 +90,32 @@ export default function WarehouseFabricModule() {
       setLoading(false);
     }
   };
+
+  // Filtered Stock Items
+  const filteredItems = useMemo(() => {
+    return items.filter((i) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchSearch = !q || 
+        (i.item_code && i.item_code.toLowerCase().includes(q)) ||
+        (i.description && i.description.toLowerCase().includes(q)) ||
+        (i.rack_location && i.rack_location.toLowerCase().includes(q)) ||
+        (i.color_shade_lot && i.color_shade_lot.toLowerCase().includes(q));
+
+      const matchCategory = categoryFilter === "ALL" || i.item_type === categoryFilter;
+      const matchLowStock = !showLowStockOnly || (Number(i.current_stock) <= Number(i.min_stock_alert || 50));
+
+      return matchSearch && matchCategory && matchLowStock;
+    });
+  }, [items, searchQuery, categoryFilter, showLowStockOnly]);
+
+  // Summary Metrics
+  const metrics = useMemo(() => {
+    const totalSKU = items.length;
+    const totalYardage = items.reduce((acc, i) => acc + (Number(i.current_stock) || 0), 0);
+    const totalValuation = items.reduce((acc, i) => acc + ((Number(i.current_stock) || 0) * (Number(i.unit_price) || 0)), 0);
+    const lowStockCount = items.filter(i => (Number(i.current_stock) || 0) <= (Number(i.min_stock_alert) || 50)).length;
+    return { totalSKU, totalYardage, totalValuation, lowStockCount };
+  }, [items]);
 
   // Item Handlers
   const handleOpenCreateItem = () => {
@@ -155,7 +186,7 @@ export default function WarehouseFabricModule() {
       item_id: items.length > 0 ? items[0].id : "",
       supplier_id: "",
       receipt_date: new Date().toISOString().split('T')[0],
-      roll_number: `ROLL-${Math.floor(Math.random() * 90 + 10)}`,
+      roll_number: `ROLL-${Date.now().toString().slice(-4)}`,
       qty_received: 100,
       unit: "YARD",
       contract_type: "FOB"
@@ -168,7 +199,7 @@ export default function WarehouseFabricModule() {
     setReceiptForm({
       item_id: rec.item_id || "",
       supplier_id: rec.supplier_id || "",
-      receipt_date: rec.receipt_date || new Date().toISOString().split('T')[0],
+      receipt_date: rec.receipt_date ? rec.receipt_date.split('T')[0] : new Date().toISOString().split('T')[0],
       roll_number: rec.roll_number || "",
       qty_received: rec.qty_received || 0,
       unit: rec.unit || "YARD",
@@ -188,17 +219,17 @@ export default function WarehouseFabricModule() {
       setIsAddReceiptOpen(false);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menyimpan penerimaan barang.");
+      alert(err.response?.data?.detail || "Gagal mencatat log roll masuk.");
     }
   };
 
   const handleDeleteReceipt = async (rec: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus roll masuk '${rec.roll_number}' (${rec.qty_received} ${rec.unit})? Stok akan otomatis disesuaikan.`)) return;
+    if (!confirm(`Hapus pencatatan roll masuk #${rec.roll_number}?`)) return;
     try {
       await api.delete(`/api/warehouse/receipts/${rec.id}`);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus penerimaan roll.");
+      alert(err.response?.data?.detail || "Gagal menghapus roll masuk.");
     }
   };
 
@@ -212,22 +243,15 @@ export default function WarehouseFabricModule() {
     }
   };
 
-  const handlePrintAllocation = (alloc: any) => {
+  const handlePrintSuratJalan = (alloc: any) => {
     setPrintDoc({
-      title: "SURAT JALAN PENYERAHAN KAIN MENTAH",
-      suratJalanNo: alloc.surat_jalan_no || "CJM-2608.100",
-      dateStr: alloc.dispatch_date,
-      senderName: "Fitrah / Gudang Dewi",
-      senderRole: "Gudang Bahan Baku (Raw Material)",
-      recipientName: "Bu Nani (Meja Potong)",
-      recipientCategory: "Cutting Department",
-      driverName: "Logistik Internal",
-      soNumber: alloc.so_number || "-",
-      styleName: alloc.item_description || "Bahan Baku Kain",
-      itemCategory: "Kain Mentah / Puring",
-      totalQty: alloc.qty_issued,
-      unit: "YARD",
-      remarks: "Bahan siap gelar dan potong pola sesuai SOP Sheet25."
+      so_number: alloc.so_number || 'SO-UNASSIGNED',
+      buyer_name: 'PT. CHIKAL JAYA MAKMUR (INTERNAL POTONG)',
+      surat_jalan_no: alloc.surat_jalan_no || `SJ-MAT-${alloc.id.slice(0, 6)}`,
+      dispatch_date: alloc.dispatch_date,
+      destination_address: 'Meja Potong Bu Nani - Workshop Utama',
+      driver_name: 'Dewi (Gudang Bahan)',
+      notes: `Pengeluaran Kain: ${alloc.item_description || 'Kain Utama'} | Qty: ${alloc.qty_issued} ${alloc.unit || 'YARD'}`
     });
   };
 
@@ -235,13 +259,13 @@ export default function WarehouseFabricModule() {
     <div className="space-y-6">
       
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-6 rounded-3xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-6 rounded-3xl backdrop-blur-xl">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <Package className="w-3.5 h-3.5" />
             Fase 2: Gudang Bahan Baku & QC 4-Point
           </div>
-          <h1 className="text-2xl font-black text-white">Warehouse & Fabric Inspection</h1>
+          <h1 className="text-2xl font-black text-white tracking-wide">Warehouse & Fabric Inspection</h1>
           <p className="text-slate-400 text-sm mt-0.5">
             Manajemen log roll kain masuk, Uji Mutu 4-Point ASTM (Safety Gate), dan Alokasi Meja Potong.
           </p>
@@ -249,13 +273,8 @@ export default function WarehouseFabricModule() {
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={() => {
-              if (items.length === 0) {
-                api.get('/api/warehouse/items').then(res => setItems(res.data || []));
-              }
-              handleOpenCreateReceipt();
-            }}
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+            onClick={handleOpenCreateReceipt}
+            className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition-all cursor-pointer"
           >
             <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
             + Log Roll Masuk
@@ -266,7 +285,7 @@ export default function WarehouseFabricModule() {
               api.get('/api/warehouse/receipts').then(res => setReceipts(res.data || []));
               setIsInspectionOpen(true);
             }}
-            className="flex items-center gap-2 px-3.5 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-200 rounded-xl text-xs font-semibold border border-indigo-700/50 transition-all cursor-pointer"
           >
             <ShieldCheck className="w-4 h-4 text-indigo-400" />
             + Input Uji QC 4-Point
@@ -333,6 +352,7 @@ export default function WarehouseFabricModule() {
         <button
           onClick={fetchData}
           className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors cursor-pointer"
+          title="Segarkan Data"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
         </button>
@@ -340,66 +360,291 @@ export default function WarehouseFabricModule() {
 
       {/* TAB 1: SALDO STOK BAHAN */}
       {activeTab === 'STOCK' && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold text-white">Daftar Bahan Baku & Stok Gudang Dewi</h3>
-            <button
-              onClick={handleOpenCreateItem}
-              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" /> + Tambah Master Item
-            </button>
+        <div className="space-y-5">
+          {/* 📊 SUMMARY METRICS RIBBON */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+              <span className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5 text-indigo-400" />
+                Total SKU Bahan
+              </span>
+              <p className="text-xl font-black text-white mt-1">{metrics.totalSKU} <span className="text-xs text-slate-500 font-normal">Item</span></p>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+              <span className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                Total Stok Fisik
+              </span>
+              <p className="text-xl font-black text-emerald-400 mt-1">{metrics.totalYardage.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-normal">Yard</span></p>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+              <span className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                Estimasi Nilai Aset
+              </span>
+              <p className="text-xl font-black text-amber-300 mt-1">Rp {metrics.totalValuation.toLocaleString('id-ID')}</p>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+              <span className="text-[11px] text-slate-400 uppercase font-bold flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                Perlu Re-Order
+              </span>
+              <p className={`text-xl font-black mt-1 ${metrics.lowStockCount > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                {metrics.lowStockCount} <span className="text-xs text-slate-500 font-normal">Item Kritis</span>
+              </p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((i) => (
-              <div key={i.id} className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl space-y-3 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                        {i.item_type}
-                      </span>
-                      <h4 className="text-base font-black text-white mt-1">{i.description}</h4>
-                      <p className="text-xs font-mono text-slate-500">{i.item_code}</p>
-                    </div>
-                    <span className="text-right">
-                      <span className="block text-lg font-black text-emerald-400">
-                        {(i.current_stock || 0).toLocaleString('id-ID')}
-                      </span>
-                      <span className="text-[10px] uppercase font-bold text-slate-500">{i.unit}</span>
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400 pt-2 mt-2 border-t border-slate-800 flex justify-between">
-                    <span>Estimasi Harga/Satuan:</span>
-                    <span className="font-semibold text-slate-200">Rp {(i.unit_price || 0).toLocaleString('id-ID')}</span>
-                  </div>
-                  {i.rack_location && (
-                    <div className="text-[11px] text-slate-500 pt-1">
-                      Lokasi Rak: <span className="font-mono text-slate-300 font-semibold">{i.rack_location}</span>
-                    </div>
-                  )}
-                </div>
+          {/* 🎛️ CUSTOMIZATION TOOLBAR: SEARCH, CATEGORY PILLS & VIEW MODE SWITCHER */}
+          <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Cari nama kain, kode item, lot, lokasi rak..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+              />
+            </div>
 
-                <div className="pt-2 flex items-center justify-end gap-1.5 border-t border-slate-800/60">
-                  <button
-                    onClick={() => handleOpenEditItem(i)}
-                    title="Edit Item Bahan"
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-all cursor-pointer"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteItem(i)}
-                    title="Hapus Item Bahan"
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-all cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+            {/* Category Pills & Low Stock Toggle */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                <button
+                  onClick={() => setCategoryFilter("ALL")}
+                  className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+                    categoryFilter === "ALL" ? "bg-slate-800 text-emerald-400" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Semua
+                </button>
+                <button
+                  onClick={() => setCategoryFilter("FABRIC_MAIN")}
+                  className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+                    categoryFilter === "FABRIC_MAIN" ? "bg-slate-800 text-emerald-400" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Kain Utama
+                </button>
+                <button
+                  onClick={() => setCategoryFilter("PURING")}
+                  className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+                    categoryFilter === "PURING" ? "bg-slate-800 text-emerald-400" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Puring
+                </button>
               </div>
-            ))}
+
+              <button
+                onClick={() => setShowLowStockOnly(!showLowStockOnly)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                  showLowStockOnly
+                    ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
+                    : "bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200"
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                <span>Stok Rendah</span>
+              </button>
+
+              {/* 🔄 VIEW MODE SWITCHER (GRID VS TABLE) */}
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 ml-auto">
+                <button
+                  onClick={() => setViewMode('GRID')}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    viewMode === 'GRID' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Tampilan Grid Card"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('TABLE')}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    viewMode === 'TABLE' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Tampilan Tabel Spreadsheet"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button
+                onClick={handleOpenCreateItem}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> + Master Item
+              </button>
+            </div>
           </div>
+
+          {/* 📦 CONTENT VIEW: GRID CARDS OR SPREADSHEET TABLE */}
+          {viewMode === 'GRID' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredItems.map((i) => {
+                const isLow = Number(i.current_stock || 0) <= Number(i.min_stock_alert || 50);
+                return (
+                  <div 
+                    key={i.id} 
+                    className={`bg-slate-900/80 border p-5 rounded-2xl space-y-3 flex flex-col justify-between transition-all hover:border-slate-700 hover:shadow-xl ${
+                      isLow ? 'border-rose-500/30' : 'border-slate-800'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                              {i.item_type}
+                            </span>
+                            {isLow && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                                <AlertTriangle className="w-2.5 h-2.5" /> REORDER
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="text-base font-black text-white mt-1.5">{i.description}</h4>
+                          <p className="text-xs font-mono text-slate-500">{i.item_code}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={`block text-xl font-black ${isLow ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {(i.current_stock || 0).toLocaleString('id-ID')}
+                          </span>
+                          <span className="text-[10px] uppercase font-bold text-slate-500">{i.unit}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-slate-400 pt-2.5 mt-2.5 border-t border-slate-800 flex justify-between">
+                        <span>Estimasi Harga/Satuan:</span>
+                        <span className="font-semibold text-slate-200">Rp {(i.unit_price || 0).toLocaleString('id-ID')}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400 pt-2">
+                        <div>
+                          <span className="text-slate-500">Rak:</span> <span className="font-mono text-slate-300 font-semibold">{i.rack_location || "GUDANG_UTAMA"}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-slate-500">Min Alert:</span> <span className="font-mono text-amber-400 font-semibold">{i.min_stock_alert || 50} {i.unit}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 flex items-center justify-between border-t border-slate-800/80">
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        Valuasi: <span className="text-slate-300 font-bold">Rp {((i.current_stock || 0) * (i.unit_price || 0)).toLocaleString('id-ID')}</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEditItem(i)}
+                          title="Edit Item Bahan"
+                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-indigo-600/30 text-indigo-400 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteItem(i)}
+                          title="Hapus Item Bahan"
+                          className="p-1.5 bg-slate-800 hover:bg-rose-600/30 text-rose-400 rounded-lg transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-950 text-slate-400 font-bold border-b border-slate-800 uppercase tracking-wider text-[10px]">
+                    <th className="py-3 px-4">Kode Item</th>
+                    <th className="py-3 px-3">Deskripsi Kain</th>
+                    <th className="py-3 px-3">Jenis</th>
+                    <th className="py-3 px-3">Lokasi Rak</th>
+                    <th className="py-3 px-3 text-right">Stok Fisik</th>
+                    <th className="py-3 px-3 text-right">Min Alert</th>
+                    <th className="py-3 px-3 text-right">Harga / Unit</th>
+                    <th className="py-3 px-3 text-right">Total Valuasi</th>
+                    <th className="py-3 px-4 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-medium">
+                  {filteredItems.map((i) => {
+                    const isLow = Number(i.current_stock || 0) <= Number(i.min_stock_alert || 50);
+                    return (
+                      <tr key={i.id} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3 px-4 font-mono text-slate-400 font-bold">{i.item_code}</td>
+                        <td className="py-3 px-3 font-bold text-white">
+                          <div className="flex items-center gap-1.5">
+                            <span>{i.description}</span>
+                            {isLow && (
+                              <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                REORDER
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-slate-300">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                            {i.item_type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-400 font-mono">{i.rack_location || "GUDANG_UTAMA"}</td>
+                        <td className="py-3 px-3 text-right font-black">
+                          <span className={isLow ? 'text-rose-400' : 'text-emerald-400'}>
+                            {(i.current_stock || 0).toLocaleString('id-ID')} {i.unit}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono text-slate-400">
+                          {i.min_stock_alert || 50} {i.unit}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono text-slate-300">
+                          Rp {(i.unit_price || 0).toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono font-bold text-amber-300">
+                          Rp {((i.current_stock || 0) * (i.unit_price || 0)).toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenEditItem(i)}
+                              title="Edit Item Bahan"
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg transition-all cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(i)}
+                              title="Hapus Item Bahan"
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg transition-all cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {filteredItems.length === 0 && (
+            <div className="py-12 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-slate-500">
+              <Package className="w-10 h-10 mx-auto mb-2 text-slate-600 opacity-50" />
+              <p className="text-sm font-semibold">Tidak ada data item bahan yang cocok dengan filter pencarian.</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -535,7 +780,7 @@ export default function WarehouseFabricModule() {
                   <td className="py-3 px-4 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <button
-                        onClick={() => handlePrintAllocation(a)}
+                        onClick={() => handlePrintSuratJalan(a)}
                         className="inline-flex items-center gap-1 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                       >
                         <Printer className="w-3.5 h-3.5 text-blue-400" /> Cetak SJ
