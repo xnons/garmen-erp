@@ -12,7 +12,7 @@ from core.security import get_password_hash
 from routers import auth, karyawan, mesin, inventaris, dashboard, audit, payroll
 from routers import produksi_master, produksi_output
 from routers import ppic_so, warehouse_fabric, cutting_prep, wip_subcon, finishing_shipping
-from routers import ai_copilot, email_reports
+from routers import ai_copilot, email_reports, reports, notifications
 
 def init_db():
     try:
@@ -22,80 +22,13 @@ def init_db():
         print(f"[Database Error]: Gagal menghubungkan database saat inisialisasi: {e}")
 
 def auto_migrate_db():
-    try:
-        with engine.connect() as conn:
-            is_sqlite = engine.url.drivername.startswith("sqlite")
-        columns_to_add = [
-            ("log_output_borongan", "kode_mesin", "VARCHAR(50)"),
-            ("log_output_borongan", "bahan_id", "VARCHAR(50)"),
-            ("log_output_borongan", "jumlah_bahan_digunakan", "FLOAT DEFAULT 0.0"),
-            ("log_login", "device_info", "VARCHAR(255)"),
-            ("log_login", "lokasi", "VARCHAR(255)"),
-            # Kolom baru SPK Produksi
-            ("spk_produksi", "tipe_order", "VARCHAR(20) DEFAULT 'CMT'"),
-            ("spk_produksi", "penyedia_kain", "VARCHAR(50) DEFAULT 'CUSTOMER'"),
-            ("spk_produksi", "penyedia_aksesoris", "VARCHAR(50) DEFAULT 'CUSTOMER'"),
-            ("spk_produksi", "biaya_kain_per_pcs", "FLOAT DEFAULT 0.0"),
-            ("spk_produksi", "biaya_aksesoris_per_pcs", "FLOAT DEFAULT 0.0"),
-            ("spk_produksi", "biaya_maklon_luar_per_pcs", "FLOAT DEFAULT 0.0"),
-            ("spk_produksi", "konsumsi_kain_per_pcs", "FLOAT DEFAULT 0.0"),
-            ("spk_produksi", "dp_nominal", "FLOAT DEFAULT 0.0"),
-            ("spk_produksi", "link_google_drive", "VARCHAR(500)"),
-            ("spk_produksi", "status_acc_sampel", "VARCHAR(30) DEFAULT 'APPROVED'"),
-            # Kolom baru Mesin
-            ("mesin", "harga_beli", "FLOAT DEFAULT 0.0"),
-            ("mesin", "jumlah_terbayar", "FLOAT DEFAULT 0.0"),
-            ("mesin", "sisa_pembayaran", "FLOAT DEFAULT 0.0"),
-            ("mesin", "status_pembayaran", "VARCHAR(30) DEFAULT 'LUNAS'"),
-            ("mesin", "vendor_supplier", "VARCHAR(100)"),
-            ("mesin", "no_seri", "VARCHAR(100)"),
-            ("mesin", "tanggal_pembelian", "VARCHAR(20)"),
-            ("mesin", "garansi_hingga", "VARCHAR(20)"),
-            ("mesin", "riwayat_pembayaran", "TEXT DEFAULT '[]'"),
-            ("karyawan", "can_login", "BOOLEAN DEFAULT TRUE"),
-            # Kolom baru Gudang Kain & Trims
-            ("inventory_items", "color_shade_lot", "VARCHAR(50)"),
-            ("inventory_items", "width_inch", "FLOAT DEFAULT 58.0"),
-            ("inventory_items", "gramasi_gsm", "FLOAT DEFAULT 0.0"),
-            ("inventory_items", "min_stock_alert", "FLOAT DEFAULT 50.0"),
-            ("inventory_items", "rack_location", "VARCHAR(50) DEFAULT 'GUDANG_UTAMA'"),
-            # Kolom baru Meja Potong
-            ("cutting_records", "marker_length_yard", "FLOAT DEFAULT 0.0"),
-            ("cutting_records", "marker_efficiency_pct", "FLOAT DEFAULT 0.0"),
-            ("cutting_records", "gelaran_layers", "INTEGER DEFAULT 1"),
-            ("cutting_records", "fabric_waste_yards", "FLOAT DEFAULT 0.0"),
-            # Kolom baru Ekspedisi & Pengiriman
-            ("shipments", "driver_name", "VARCHAR(100)"),
-            ("shipments", "vehicle_plate_no", "VARCHAR(50)"),
-            ("shipments", "carton_box_count", "INTEGER DEFAULT 0"),
-            ("shipments", "destination_address", "TEXT"),
-            # Kolom baru Sales Order (PPIC)
-            ("sales_orders", "buyer_po_number", "VARCHAR(100)"),
-            ("sales_orders", "customer_pic_name", "VARCHAR(100)"),
-            ("sales_orders", "customer_pic_phone", "VARCHAR(50)"),
-            ("sales_orders", "customer_email", "VARCHAR(100)"),
-            ("sales_orders", "delivery_address", "TEXT"),
-            ("sales_orders", "fabric_type", "VARCHAR(150)"),
-            ("sales_orders", "target_shrinkage_pct", "FLOAT DEFAULT 0.0"),
-            ("sales_orders", "special_instructions", "TEXT"),
-            ("sales_orders", "contract_type", "VARCHAR(20) DEFAULT 'CMT'"),
-            ("sales_orders", "total_order_value", "FLOAT DEFAULT 0.0"),
-            ("sales_orders", "dp_amount", "FLOAT DEFAULT 0.0"),
-            ("sales_orders", "payment_terms", "VARCHAR(50) DEFAULT 'NET_30'"),
-            ("sales_orders", "tax_ppn_pct", "FLOAT DEFAULT 0.0"),
-            ("sales_orders", "discount_amount", "FLOAT DEFAULT 0.0"),
-        ]
-        for tbl_name, col_name, col_type in columns_to_add:
-            try:
-                if is_sqlite:
-                    conn.execute(text(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} {col_type};"))
-                else:
-                    conn.execute(text(f"ALTER TABLE {tbl_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
-                conn.commit()
-            except Exception:
-                pass
-    except Exception as e:
-        print(f"[Database Migration Warning]: Gagal melakukan auto-migration: {e}")
+    """
+    Auto-migrasi ringan: tambahkan kolom model yang belum ada di DB.
+    Implementasi kini berbasis introspeksi (core/schema_sync.py) — tidak lagi
+    perlu daftar kolom manual yang mudah ketinggalan.
+    """
+    from core.schema_sync import sync_schema
+    sync_schema(engine)
 
 
 from datetime import date, datetime
@@ -346,7 +279,7 @@ async def lifespan(app: FastAPI):
                 tipe_pay="BULANAN",
                 gaji_pokok=15000000,
                 tarif_borongan_pcs=0,
-                pin="6767",
+                pin=get_password_hash("6767"),
                 total_hadir=30, 
                 total_terlambat=0, 
                 total_izin=0, 
@@ -373,6 +306,18 @@ async def lifespan(app: FastAPI):
             db.close()
         except Exception:
             pass
+
+    # Pindai kondisi risiko & buat notifikasi awal (deadline, stok, selisih vendor).
+    try:
+        from core.alert_engine import run_scan
+        scan_db = SessionLocal()
+        try:
+            res = run_scan(scan_db)
+            print(f"🔔 Alert scan: {res['total_created']} notifikasi baru.")
+        finally:
+            scan_db.close()
+    except Exception as alert_err:
+        print(f"⚠️ Alert scan gagal: {alert_err}")
     
     yield
     print("🔴 Engine Nexora ERP dimatikan.")
@@ -387,11 +332,29 @@ app = FastAPI(
 )
 
 import os
+import uuid as _uuid
 
-# --- CORS MIDDLEWARE (FLEXIBLE PRODUCTION SUPPORT) ---
+_DEV_MODE = os.getenv("DEV_MODE", "false").strip().lower() == "true"
+
+# --- CORS MIDDLEWARE ---
+# Allowlist eksplisit dari env ALLOWED_ORIGINS (dipisah koma). Origin bawaan
+# menutup kebutuhan dev + deployment Render. Regex "izinkan semua" dihindari
+# karena dikombinasikan allow_credentials=True akan membuka celah CSRF.
+_DEFAULT_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://garmen-erp-1.onrender.com",
+]
+_env_origins = [o.strip().rstrip("/") for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+ALLOWED_ORIGINS = _env_origins or _DEFAULT_ORIGINS
+
+# Lokal saja: izinkan port dev apa pun di localhost tanpa perlu daftar manual.
+_dev_origin_regex = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$" if (_DEV_MODE and not _env_origins) else None
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https?://.*",
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=_dev_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -403,17 +366,24 @@ from fastapi import Request
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
-    print(f"🔥 [CRITICAL SERVER ERROR on {request.method} {request.url.path}]: {exc}")
+    error_id = _uuid.uuid4().hex[:12]
+    print(f"🔥 [SERVER ERROR {error_id} on {request.method} {request.url.path}]: {exc}")
     traceback.print_exc()
-    response = JSONResponse(
-        status_code=500,
-        content={"detail": str(exc), "path": request.url.path}
-    )
-    origin = request.headers.get("origin") or "*"
-    response.headers["Access-Control-Allow-Origin"] = origin
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
+    # Jangan bocorkan detail exception ke klien di produksi — cukup error_id
+    # yang bisa dicocokkan dengan log server. Di DEV_MODE detail ditampilkan.
+    content = {
+        "detail": "Terjadi kesalahan internal pada server. Hubungi administrator dengan menyertakan kode error di bawah.",
+        "error_id": error_id,
+    }
+    if _DEV_MODE:
+        content["debug"] = str(exc)
+        content["path"] = request.url.path
+    response = JSONResponse(status_code=500, content=content)
+    # Pertahankan header CORS agar frontend tetap bisa membaca body error.
+    origin = request.headers.get("origin")
+    if origin and origin.rstrip("/") in ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
 
@@ -445,6 +415,12 @@ app.include_router(finishing_shipping.router)
 # 🟢 Router AI Co-Pilot & Automated Reporting
 app.include_router(ai_copilot.router)
 app.include_router(email_reports.router)
+
+# 🟢 Router Laporan Agregat (produksi / keuangan / vendor scorecard)
+app.include_router(reports.router)
+
+# 🟢 Router Notifikasi & Alert
+app.include_router(notifications.router)
 
 @app.get("/")
 def root_check():

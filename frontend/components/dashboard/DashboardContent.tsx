@@ -22,6 +22,8 @@ import WIPSubconModule from '@/components/wip/WIPSubconModule';
 import FinishingWagesModule from '@/components/finishing/FinishingWagesModule';
 import ShippingBillingModule from '@/components/shipping/ShippingBillingModule';
 import ExecutiveAnalyticsModule from '@/components/analytics/ExecutiveAnalyticsModule';
+import ReportsModule from '@/components/reports/ReportsModule';
+import NotificationBell from '@/components/common/NotificationBell';
 
 interface DashboardContentProps {
   activeMenu: string;
@@ -43,6 +45,7 @@ export default function DashboardContent({
   const getMenuTitle = (menu: string) => {
     switch (menu) {
       case 'executive-analytics': return 'Analitik Margin & Profit / Loss (P&L)';
+      case 'reports': return 'Laporan & Analitik';
       case 'wip-control-tower': return 'Master Control Tower — Live WIP Matrix';
       case 'ppic-so': return 'Fase 1: PPIC & Sales Order (SO)';
       case 'warehouse-fabric': return 'Fase 2: Gudang Bahan Baku & QC 4-Point';
@@ -85,6 +88,19 @@ export default function DashboardContent({
           }}
         />
       );
+    }
+
+    // Laporan & Analitik (RBAC di dalam modul; laporan keuangan gated)
+    if (activeMenu === 'reports') {
+      if (!['DEVELOPER', 'OWNER', 'ADMIN', 'FINANCE', 'PPIC'].includes(userRole)) {
+        return (
+          <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-2">
+            <p className="text-rose-400 font-bold text-sm">Akses Terbatas</p>
+            <p className="text-slate-400 text-xs">Modul Laporan hanya untuk Owner, Admin, Finance, dan PPIC.</p>
+          </div>
+        );
+      }
+      return <ReportsModule activeUser={activeUser} />;
     }
 
     // 1. PPIC & Sales Order
@@ -247,6 +263,9 @@ export default function DashboardContent({
       <main className="flex-1 h-full overflow-y-auto min-h-0 bg-slate-950 text-slate-100 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent p-3 sm:p-4 md:p-6">
         {renderActiveModule()}
       </main>
+
+      {/* 🔔 Lonceng Notifikasi (melayang, di kiri dock AI) */}
+      <NotificationBell activeUser={activeUser} onNavigate={setActiveMenu} />
     </div>
   );
 }

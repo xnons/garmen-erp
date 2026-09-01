@@ -1,8 +1,12 @@
-# Frontend (Next.js)
+# Dependencies (all locations)
+node_modules/
 frontend/node_modules/
+
+# Frontend (Next.js)
 frontend/.next/
 frontend/out/
 frontend/.env*.local
+*.tsbuildinfo
 
 # Backend (FastAPI / Python)
 **/__pycache__/
@@ -12,6 +16,9 @@ frontend/.env*.local
 backend/venv/
 backend/.venv/
 backend/env/
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Database & Keamanan Lokal
 *.db

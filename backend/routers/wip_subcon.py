@@ -199,10 +199,14 @@ def receive_wip_movement(
     movement.size_breakdown_received = payload.size_breakdown_received or {}
     movement.balance_discrepancy = discrepancy
     
-    if (qty_rec + qty_rej) < movement.qty_dispatched and discrepancy > 0:
-        movement.status = "PARTIAL_RECEIVED"
-    elif discrepancy == 0:
+    # Kirim = Terima + Rijek + Selisih.
+    #   Selisih 0            -> COMPLETED (klop)
+    #   Selisih > 0, partial -> PARTIAL_RECEIVED (sisa barang menyusul, ditandai eksplisit)
+    #   Selisih != 0 lainnya -> DISCREPANCY_FLAG (barang hilang / terima > kirim -> perlu klarifikasi)
+    if discrepancy == 0:
         movement.status = "COMPLETED"
+    elif discrepancy > 0 and getattr(payload, "is_partial", False):
+        movement.status = "PARTIAL_RECEIVED"
     else:
         movement.status = "DISCREPANCY_FLAG"
 

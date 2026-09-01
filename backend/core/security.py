@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import Depends, HTTPException, status
@@ -11,7 +12,23 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 
-SECRET_KEY = os.getenv("SECRET_KEY", "NEXORA_ENTERPRISE_SECRET_KEY_PROD_REPLACE_ME")
+# --- KONFIGURASI JWT ---
+# Terima SECRET_KEY atau alias JWT_SECRET_KEY. Di produksi (DEV_MODE != true)
+# secret WAJIB diisi — jika kosong server sengaja gagal start (fail fast) agar
+# token tidak bisa dipalsukan memakai secret default yang diketahui publik.
+_DEV_MODE = os.getenv("DEV_MODE", "false").strip().lower() == "true"
+SECRET_KEY = (os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET_KEY") or "").strip()
+
+if not SECRET_KEY:
+    if _DEV_MODE:
+        SECRET_KEY = "DEV_ONLY_INSECURE_SECRET_" + secrets.token_hex(8)
+        print("[security] WARNING: SECRET_KEY kosong - memakai secret dev sementara (DEV_MODE=true).")
+    else:
+        raise RuntimeError(
+            "CRITICAL: SECRET_KEY (atau JWT_SECRET_KEY) belum diisi di environment. "
+            "Set nilai acak panjang di produksi, atau set DEV_MODE=true untuk lokal."
+        )
+
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
 
@@ -78,22 +95,12 @@ def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Sesi masuk telah berakhir, silakan login ulang."
         )
-    # --- RBAC ROLE GUARD DEPENDENCY ---
+# --- RBAC ROLE GUARD DEPENDENCY ---
+# Implementasi kanonik ada di core.deps.require_roles. `require_role` dipertahankan
+# sebagai alias tipis demi kompatibilitas import lama (8 router memakainya).
+# Import lokal di dalam fungsi untuk menghindari circular import
+# (core.deps mengimpor get_current_user dari modul ini).
 def require_role(allowed_roles: list[str]):
-    """
-    Dependency builder untuk membatasi akses endpoint berdasarkan Role Karyawan.
-    Contoh Penggunaan di Router:
-    current_user: models.Karyawan = Depends(require_role(["OWNER", "DEVELOPER"]))
-    """
-    def role_checker(current_user: models.Karyawan = Depends(get_current_user)):
-        # Ambil role dari objek user (pastikan atribut kolom di models.Karyawan sesuai, misal: role)
-        user_role = str(getattr(current_user, "role", "")).upper()
-        
-        if user_role not in [r.upper() for r in allowed_roles]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Akses ditolak! Peran '{user_role}' tidak memiliki izin untuk melakukan aksi ini."
-            )
-        return current_user
-        
-    return role_checker
+    """Alias ke core.deps.require_roles. Gunakan require_roles untuk kode baru."""
+    from core.deps import require_roles
+    return require_roles(allowed_roles)

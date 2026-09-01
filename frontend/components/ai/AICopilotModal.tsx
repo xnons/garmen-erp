@@ -5,7 +5,10 @@ import {
   Sparkles, X, Send, Bot, User, ShieldAlert, TrendingUp, Cpu, Factory,
   FileText, Camera, Upload, CheckCircle2, AlertTriangle, RefreshCw, Copy, Check
 } from 'lucide-react';
-import axios from 'axios';
+import api from '@/services/api';
+
+// Panggilan AI bisa lama (OpenRouter mencoba beberapa model, timeout 45s masing-masing).
+const AI_TIMEOUT_MS = 90000;
 
 interface Message {
   role: 'user' | 'assistant';
@@ -51,8 +54,7 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
   const [visionAnalysis, setVisionAnalysis] = useState<any>(null);
   const [isVisionLoading, setIsVisionLoading] = useState(false);
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  // Auth header & baseURL ditangani oleh interceptor pada instance `api`.
 
   useEffect(() => {
     if (chatBottomRef.current) {
@@ -73,14 +75,14 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
     setIsChatLoading(true);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         '/api/ai/chat',
         {
           prompt: textToSend,
           persona: selectedPersona,
           history: messages.map((m) => ({ role: m.role, content: m.content }))
         },
-        { headers: authHeaders }
+        { timeout: AI_TIMEOUT_MS }
       );
 
       const aiReply = res.data?.reply || 'Tidak ada respon dari model AI.';
@@ -103,10 +105,10 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
     setParsedResult(null);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         '/api/ai/auto-fill',
         { raw_text: rawText, form_type: formType },
-        { headers: authHeaders }
+        { timeout: AI_TIMEOUT_MS }
       );
       setParsedResult(res.data?.parsed_data);
     } catch (err: any) {
@@ -134,13 +136,13 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
     setVisionAnalysis(null);
 
     try {
-      const res = await axios.post(
+      const res = await api.post(
         '/api/ai/vision-qc',
         {
           image_base64: selectedImage,
           defect_notes: defectNotes
         },
-        { headers: authHeaders }
+        { timeout: AI_TIMEOUT_MS }
       );
       setVisionAnalysis(res.data);
     } catch (err: any) {

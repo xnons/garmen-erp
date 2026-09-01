@@ -2,6 +2,11 @@ from typing import List
 from fastapi import Depends, HTTPException, status
 import models
 from core.security import get_current_user
+from core.roles import get_role
+
+# Re-export agar `from core.deps import get_role` juga tersedia.
+__all__ = ["get_enum_val", "require_roles", "get_role"]
+
 
 def get_enum_val(obj):
     """Mendapatkan nilai string dari Enum atau String secara aman."""
@@ -9,13 +14,16 @@ def get_enum_val(obj):
         return None
     return obj.value if hasattr(obj, 'value') else str(obj)
 
+
 def require_roles(allowed_roles: List[str]):
-    """Dependency RBAC untuk membatasi endpoint berdasarkan role user."""
+    """
+    Satu-satunya implementasi RBAC dependency untuk seluruh backend.
+    core.security.require_role kini hanya alias tipis ke fungsi ini.
+    """
+    allowed_uppercase = [r.upper() for r in allowed_roles]
+
     def role_checker(current_user: models.Karyawan = Depends(get_current_user)):
-        user_role = getattr(current_user, "role", "").upper()
-        allowed_uppercase = [r.upper() for r in allowed_roles]
-        
-        if user_role not in allowed_uppercase:
+        if get_role(current_user) not in allowed_uppercase:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Akses ditolak! Fitur ini membutuhkan role: {', '.join(allowed_uppercase)}"

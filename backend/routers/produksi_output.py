@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from typing import List, Optional
 from datetime import date, datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from database import get_db
@@ -231,10 +231,17 @@ def get_output_logs(
     spk_id: Optional[str] = Query(None, description="Filter per SPK"),
     kode_mesin: Optional[str] = Query(None, description="Filter per mesin"),
     status_verifikasi: Optional[StatusVerifikasiOutput] = Query(None, description="Filter status QC"),
+    limit: int = Query(2000, ge=1, le=5000, description="Batas maksimum baris"),
+    offset: int = Query(0, ge=0, description="Lewati N baris pertama"),
     db: Session = Depends(get_db),
     current_user: models.Karyawan = Depends(get_current_user)
 ):
-    query = db.query(models.LogOutputBorongan).filter(models.LogOutputBorongan.is_deleted == False)
+    query = db.query(models.LogOutputBorongan).options(
+        joinedload(models.LogOutputBorongan.karyawan),
+        joinedload(models.LogOutputBorongan.spk),
+        joinedload(models.LogOutputBorongan.mesin),
+        joinedload(models.LogOutputBorongan.bahan),
+    ).filter(models.LogOutputBorongan.is_deleted == False)
 
     # 🟢 Filter Rentang Tanggal (Start & End Date) atau Tanggal Tunggal
     if start_date and end_date:
@@ -256,7 +263,15 @@ def get_output_logs(
         query = query.filter(models.LogOutputBorongan.status_verifikasi == get_enum_val(status_verifikasi))
 
     # 🟢 Urutkan dari yang terbaru (tanggal terbaru & waktu dibuat terbaru)
-    logs = query.order_by(models.LogOutputBorongan.tanggal.desc(), models.LogOutputBorongan.created_at.desc()).all()
+    logs = (
+        query.order_by(
+            models.LogOutputBorongan.tanggal.desc(),
+            models.LogOutputBorongan.created_at.desc(),
+        )
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
     for log in logs:
         _populate_log_details(log)
@@ -401,6 +416,8 @@ def bulk_verify_output_logs(
 
     verified_count = 0
     skipped_self_verify = 0
+    status_baru = get_enum_val(payload.status_verifikasi)
+    verifier = getattr(current_user, "nama", None) or current_user.id_karyawan
 
     for log in logs:
         is_same_worker = (current_user.id_karyawan == log.karyawan_id)
@@ -410,8 +427,19 @@ def bulk_verify_output_logs(
             skipped_self_verify += 1
             continue
 
-        log.status_verifikasi = get_enum_val(payload.status_verifikasi)
-        log.verifier_id = getattr(current_user, "nama", None) or current_user.id_karyawan
+        status_lama = log.status_verifikasi
+        # Konsisten dengan verify_output_log: revisi dari APPROVED/REJECTED wajib tercatat di audit trail.
+        if status_lama in ["APPROVED", "REJECTED"] and status_baru != status_lama:
+            db.add(models.LogAuditVerifikasiQC(
+                log_output_id=log.id,
+                status_lama=status_lama,
+                status_baru=status_baru,
+                alasan_revisi=payload.catatan or "Revisi status verifikasi QC (bulk) oleh supervisor",
+                dieksekusi_oleh=verifier,
+            ))
+
+        log.status_verifikasi = status_baru
+        log.verifier_id = verifier
         if payload.catatan:
             log.catatan = f"{log.catatan or ''} | Bulk QC: {payload.catatan}"
 
@@ -498,11 +526,42 @@ def mark_payroll_as_paid(
     paid_time = datetime.utcnow()
     total_nominal_cair = 0.0
 
+    # Rekap per karyawan untuk pencatatan LogPayrollProduksi
+    per_worker: dict = {}
     for log in logs_to_pay:
         log.is_paid = True
         log.payroll_id = payload.payroll_id
         log.paid_at = paid_time
-        total_nominal_cair += log.subtotal_rp
+        total_nominal_cair += (log.subtotal_rp or 0.0)
+
+        agg = per_worker.setdefault(log.karyawan_id, {"count": 0, "pcs": 0, "rp": 0.0})
+        agg["count"] += 1
+        agg["pcs"] += (log.qty_pass or 0)
+        agg["rp"] += (log.subtotal_rp or 0.0)
+
+    # Konsisten dengan /api/payroll/mark-paid: simpan riwayat pencairan per pekerja.
+    for k_id, agg in per_worker.items():
+        db.merge(models.LogPayrollProduksi(
+            id=f"{payload.payroll_id}-{k_id}",
+            karyawan_id=k_id,
+            total_setoran_approved=agg["count"],
+            total_pcs_pass=agg["pcs"],
+            total_nominal_rp=agg["rp"],
+            metode_bayar="TRANSFER",
+            keterangan=f"Pencairan gaji borongan batch {payload.payroll_id}",
+            disetujui_oleh=getattr(current_user, "nama", None) or current_user.id_karyawan,
+        ))
+
+    # Audit trail pencairan (actor_id konsisten dgn /api/payroll: pakai id_karyawan)
+    db.add(models.LogAudit(
+        actor_id=current_user.id_karyawan,
+        aksi="PAYROLL_PAID",
+        target_id=payload.payroll_id,
+        catatan=(
+            f"Pencairan {len(logs_to_pay)} setoran borongan untuk {len(per_worker)} pekerja "
+            f"(total Rp {total_nominal_cair:,.0f}) oleh {getattr(current_user, 'nama', current_user.id_karyawan)}."
+        ),
+    ))
 
     db.commit()
 
@@ -510,5 +569,6 @@ def mark_payroll_as_paid(
         "message": f"Berhasil mencairkan {len(logs_to_pay)} transaksi gaji borongan.",
         "payroll_id": payload.payroll_id,
         "total_transaksi_paid": len(logs_to_pay),
+        "total_pekerja": len(per_worker),
         "total_nominal_cair_rp": total_nominal_cair
-    }   
+    }
