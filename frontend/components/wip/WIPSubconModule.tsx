@@ -14,6 +14,7 @@ import SubconDispatcherModal from './SubconDispatcherModal';
 import WIPReceiveModal from './WIPReceiveModal';
 import PrintSuratJalanModal from '../common/PrintSuratJalanModal';
 import Pagination from '@/components/common/Pagination';
+import { clampPage } from '@/utils/pagination';
 import StatusBadge from '@/components/common/StatusBadge';
 
 export default function WIPSubconModule() {
@@ -125,9 +126,10 @@ export default function WIPSubconModule() {
   }, [movements, searchQuery, statusFilter]);
 
   useEffect(() => { setPage(1); }, [searchQuery, statusFilter, pageSize]);
+  const safePage = clampPage(page, filteredMovements.length, pageSize);
   const pagedMovements = useMemo(
-    () => filteredMovements.slice((page - 1) * pageSize, page * pageSize),
-    [filteredMovements, page, pageSize],
+    () => filteredMovements.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredMovements, safePage, pageSize],
   );
 
   const wipMetrics = useMemo(() => {
@@ -491,7 +493,7 @@ export default function WIPSubconModule() {
       )}
 
       <Pagination
-        page={page}
+        page={safePage}
         pageSize={pageSize}
         total={filteredMovements.length}
         onPageChange={setPage}

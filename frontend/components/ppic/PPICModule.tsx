@@ -12,6 +12,7 @@ import api from '@/services/api';
 import { useConfirm } from '@/components/common/ConfirmDialog';
 import { errMsg, formatRp } from '@/utils/format';
 import Pagination from '@/components/common/Pagination';
+import { clampPage } from '@/utils/pagination';
 import StatusBadge from '@/components/common/StatusBadge';
 import SalesOrderModal from './SalesOrderModal';
 import PartnerModal from './PartnerModal';
@@ -139,10 +140,11 @@ export default function PPICModule() {
 
   useEffect(() => { setSoPage(1); }, [searchQuery, statusFilter, contractFilter, soPageSize, activeTab]);
 
+  const safeSoPage = clampPage(soPage, filteredOrders.length, soPageSize);
   const pagedOrders = useMemo(() => {
-    const start = (soPage - 1) * soPageSize;
+    const start = (safeSoPage - 1) * soPageSize;
     return filteredOrders.slice(start, start + soPageSize);
-  }, [filteredOrders, soPage, soPageSize]);
+  }, [filteredOrders, safeSoPage, soPageSize]);
 
   const orderMetrics = useMemo(() => {
     const totalOrders = orders.length;
@@ -549,7 +551,7 @@ export default function PPICModule() {
           )}
 
           <Pagination
-            page={soPage}
+            page={safeSoPage}
             pageSize={soPageSize}
             total={filteredOrders.length}
             onPageChange={setSoPage}

@@ -13,6 +13,7 @@ import { errMsg } from '@/utils/format';
 import CuttingModal from './CuttingModal';
 import PrepWagesModal from './PrepWagesModal';
 import Pagination from '@/components/common/Pagination';
+import { clampPage } from '@/utils/pagination';
 
 export default function CuttingPrepModule() {
   const confirm = useConfirm();
@@ -134,9 +135,10 @@ export default function CuttingPrepModule() {
   }, [cuttingRecords, searchQuery]);
 
   useEffect(() => { setPage(1); }, [searchQuery, pageSize]);
+  const safePage = clampPage(page, filteredCutting.length, pageSize);
   const pagedCutting = useMemo(
-    () => filteredCutting.slice((page - 1) * pageSize, page * pageSize),
-    [filteredCutting, page, pageSize],
+    () => filteredCutting.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredCutting, safePage, pageSize],
   );
 
   return (
@@ -405,7 +407,7 @@ export default function CuttingPrepModule() {
           )}
 
           <Pagination
-            page={page}
+            page={safePage}
             pageSize={pageSize}
             total={filteredCutting.length}
             onPageChange={setPage}
