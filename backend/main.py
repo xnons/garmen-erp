@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -290,14 +291,20 @@ async def lifespan(app: FastAPI):
             db.commit()
             print("🟢 Akun Developer 'developer' berhasil dipersiapkan!")
 
-        # Seed pipeline data secara otomatis
-        from scripts.seed_production_sql import seed_production_database
-        try:
-            seed_production_database()
-        except Exception as seed_err:
-            print(f"⚠️ Seeder Production: {seed_err}")
-            
-        seed_pipeline_data(db)
+        # Seed data dummy (SO, partner, upah, dll) HANYA di DEV_MODE.
+        # Di produksi seeder ini bisa menanam baris upah operator_id NULL &
+        # data palsu setiap boot — endpoint reseed manual pun sudah di-gate
+        # DEV_MODE, jadi lifespan harus konsisten.
+        if os.getenv("DEV_MODE", "false").strip().lower() == "true":
+            from scripts.seed_production_sql import seed_production_database
+            try:
+                seed_production_database()
+            except Exception as seed_err:
+                print(f"⚠️ Seeder Production: {seed_err}")
+
+            seed_pipeline_data(db)
+        else:
+            print("ℹ️ DEV_MODE=false — seeder data dummy dilewati.")
 
     except Exception as e:
         print(f"⚠️ Info Seeder: {e}")
@@ -331,7 +338,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-import os
 import uuid as _uuid
 
 _DEV_MODE = os.getenv("DEV_MODE", "false").strip().lower() == "true"

@@ -17,8 +17,11 @@ from sqlalchemy import text
 from database import engine
 import models
 from core.security import require_role
-from scripts.import_excel_blueprint import parse_bahan, parse_monitoring, write_sql
 
+# CATATAN: `scripts.import_excel_blueprint` meng-`import openpyxl` di top-level.
+# JANGAN import di sini — akan ikut ter-load saat boot proses web, dan kalau
+# environment deploy belum `pip install` openpyxl → uvicorn gagal start (API 502
+# total) padahal fitur impor jarang dipakai. Import di dalam handler (lazy).
 router = APIRouter(prefix="/api/import", tags=["Data Import"])
 
 _ALLOW = require_role(["OWNER", "ADMIN", "DEVELOPER"])
@@ -67,6 +70,8 @@ def preview(
     monitoring: UploadFile | None = File(None),
     _user: models.Karyawan = Depends(_ALLOW),
 ):
+    from scripts.import_excel_blueprint import parse_bahan, parse_monitoring  # lazy: lihat catatan di atas
+
     if not bahan and not monitoring:
         raise HTTPException(400, "Unggah minimal satu file Excel.")
 
@@ -119,6 +124,8 @@ def commit(
     monitoring: UploadFile = File(...),
     _user: models.Karyawan = Depends(_ALLOW),
 ):
+    from scripts.import_excel_blueprint import parse_bahan, parse_monitoring, write_sql  # lazy
+
     pb = _save_tmp(bahan)
     pm = _save_tmp(monitoring)
     sql_path = Path(tempfile.gettempdir()) / f"imp_{uuid.uuid4().hex}.sql"
