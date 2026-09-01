@@ -23,6 +23,7 @@ import FinishingWagesModule from '@/components/finishing/FinishingWagesModule';
 import ShippingBillingModule from '@/components/shipping/ShippingBillingModule';
 import ExecutiveAnalyticsModule from '@/components/analytics/ExecutiveAnalyticsModule';
 import ReportsModule from '@/components/reports/ReportsModule';
+import NotificationBell from '@/components/common/NotificationBell';
 
 interface DashboardContentProps {
   activeMenu: string;
@@ -262,6 +263,9 @@ export default function DashboardContent({
       <main className="flex-1 h-full overflow-y-auto min-h-0 bg-slate-950 text-slate-100 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent p-3 sm:p-4 md:p-6">
         {renderActiveModule()}
       </main>
+
+      {/* 🔔 Lonceng Notifikasi (melayang, di kiri dock AI) */}
+      <NotificationBell activeUser={activeUser} onNavigate={setActiveMenu} />
     </div>
   );
 }

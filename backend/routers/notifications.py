@@ -48,7 +48,9 @@ def list_notifications(
                 "title": n.title, "body": n.body,
                 "ref_type": n.ref_type, "ref_id": n.ref_id, "menu_hint": n.menu_hint,
                 "is_read": n.is_read,
-                "created_at": n.created_at.isoformat() if n.created_at else None,
+                # created_at disimpan sebagai UTC naif — beri sufiks 'Z' agar klien
+                # (browser di WIB) tidak salah tafsir sebagai waktu lokal.
+                "created_at": (n.created_at.isoformat() + "Z") if n.created_at else None,
             }
             for n in items
         ],
