@@ -19,7 +19,8 @@ import {
   Truck,
   Sparkles,
   FileText,
-  TrendingUp
+  TrendingUp,
+  BarChart3
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -60,6 +61,7 @@ export default function Sidebar({
       items: [
         { id: 'dashboard', label: 'Ringkasan Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINANCE', 'PRODUKSI', 'GUDANG', 'PPIC', 'QC_INSPECTOR', 'LINE_SUPERVISOR', 'CUTTING_OPERATOR', 'FINISHING_OPERATOR'] },
         { id: 'executive-analytics', label: 'Analitik Margin & P&L', icon: TrendingUp, roles: ['OWNER', 'DEVELOPER'], badge: 'PROFIT' },
+        { id: 'reports', label: 'Laporan & Analitik', icon: BarChart3, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'FINANCE', 'PPIC'] },
         { id: 'wip-control-tower', label: 'Master Control Tower', icon: Layers, roles: ['OWNER', 'ADMIN', 'DEVELOPER', 'PPIC', 'LINE_SUPERVISOR', 'PRODUKSI'], badge: 'LIVE' },
       ]
     },

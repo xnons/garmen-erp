@@ -22,17 +22,20 @@ _STAGE_LABELS = {
     "CUTTING": "Meja Potong",
     "PRINT_MENTAH": "Print Mentah",
     "EMBROIDERY_MENTAH": "Bordir Mentah",
+    "SEWING": "Jahit",
     "SEWING_INTERNAL": "Jahit Internal",
     "SEWING_MAKLUN": "Jahit Maklun",
     "WASHING": "Washing",
     "EMBROIDERY_JADI": "Bordir Jadi",
     "FINISHING": "Finishing",
+    "PACKING": "Packing",
 }
 
 
 def _range(start: Optional[date], end: Optional[date]) -> tuple[date, date]:
+    # Default 1 tahun: siklus order garmen berlangsung berbulan-bulan.
     end = end or date.today()
-    start = start or (end - timedelta(days=90))
+    start = start or (end - timedelta(days=365))
     return start, end
 
 
