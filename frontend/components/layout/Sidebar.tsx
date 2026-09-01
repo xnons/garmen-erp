@@ -88,6 +88,7 @@ export default function Sidebar({
     {
       categoryTitle: 'SISTEM & KEAMANAN',
       items: [
+        { id: 'data-import', label: 'Impor Data Excel', icon: FileSpreadsheet, roles: ['OWNER', 'ADMIN', 'DEVELOPER'] },
         { id: 'audit-log', label: 'Log Audit Keamanan', icon: ShieldAlert, roles: ['OWNER', 'DEVELOPER'] },
         { id: 'setting', label: 'Profil & Akun Saya', icon: User, roles: ['*'] },
       ]

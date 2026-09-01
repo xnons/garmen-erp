@@ -175,6 +175,21 @@ class LogMutasiBahan(Base):
     bahan = relationship("BahanBaku", back_populates="mutasi_logs")
 
 
+class KatalogSO(Base):
+    """
+    Katalog referensi Sales Order (SO) hasil impor dari sheet "Code So".
+    Master ringan: pemetaan NO SO -> BRAND + STYLE artikel.
+    Dipakai sebagai lookup saat input Barang Keluar / SPK.
+    """
+    __tablename__ = "katalog_so"
+
+    no_so = Column(String(50), primary_key=True, index=True)  # e.g. SO-MG260001
+    brand = Column(String(150), nullable=False)
+    style = Column(String(255), nullable=False)
+    sumber = Column(String(50), default="IMPORT_EXCEL")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 # ===========================================================================
 # 5. PRODUKSI BORONGAN MODELS (UPGRADED COMPREHENSIVE)
 # ===========================================================================

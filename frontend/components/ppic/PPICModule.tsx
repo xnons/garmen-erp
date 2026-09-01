@@ -7,12 +7,19 @@ import {
   Pencil, Trash2, Building2, User, Mail, DollarSign, Clock, Scissors,
   FileText, Eye, X, MessageSquare, ExternalLink, ShieldAlert, LayoutGrid, List
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { useConfirm } from '@/components/common/ConfirmDialog';
+import { errMsg } from '@/utils/format';
+import Pagination from '@/components/common/Pagination';
 import SalesOrderModal from './SalesOrderModal';
 import PartnerModal from './PartnerModal';
 
 export default function PPICModule() {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'ORDERS' | 'PARTNERS'>('ORDERS');
+  const [soPage, setSoPage] = useState(1);
+  const [soPageSize, setSoPageSize] = useState(24);
   const [orders, setOrders] = useState<any[]>([]);
   const [partners, setPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -68,13 +75,20 @@ export default function PPICModule() {
   };
 
   const handleDeleteSO = async (so: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus Sales Order '${so.so_number}'? Aksi ini akan dicatat di Log Audit Keamanan.`)) return;
+    const ok = await confirm({
+      title: "Hapus Sales Order?",
+      message: `SO '${so.so_number}' akan dihapus. Aksi ini dicatat di Log Audit Keamanan.`,
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/ppic/orders/${so.id}`);
+      toast.success(`Sales Order ${so.so_number} dihapus.`);
       fetchData();
       if (detailSO?.id === so.id) setDetailSO(null);
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus Sales Order.");
+      toast.error(errMsg(err, "Gagal menghapus Sales Order."));
     }
   };
 
@@ -89,12 +103,19 @@ export default function PPICModule() {
   };
 
   const handleDeletePartner = async (partner: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus Rekanan '${partner.name}'?`)) return;
+    const ok = await confirm({
+      title: "Hapus rekanan?",
+      message: `Rekanan '${partner.name}' akan dihapus.`,
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/ppic/partners/${partner.id}`);
+      toast.success("Rekanan dihapus.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus rekanan.");
+      toast.error(errMsg(err, "Gagal menghapus rekanan."));
     }
   };
 
@@ -114,6 +135,13 @@ export default function PPICModule() {
       return matchQuery && matchStatus && matchContract;
     });
   }, [orders, searchQuery, statusFilter, contractFilter]);
+
+  useEffect(() => { setSoPage(1); }, [searchQuery, statusFilter, contractFilter, soPageSize, activeTab]);
+
+  const pagedOrders = useMemo(() => {
+    const start = (soPage - 1) * soPageSize;
+    return filteredOrders.slice(start, start + soPageSize);
+  }, [filteredOrders, soPage, soPageSize]);
 
   const orderMetrics = useMemo(() => {
     const totalOrders = orders.length;
@@ -338,7 +366,7 @@ export default function PPICModule() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-medium">
-                  {filteredOrders.map((so) => {
+                  {pagedOrders.map((so) => {
                     const contractType = so.contract_type || 'CMT';
                     const totalVal = so.total_order_value || ((so.order_qty || 0) * (so.unit_price || 0));
                     return (
@@ -395,7 +423,7 @@ export default function PPICModule() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredOrders.map((so) => {
+              {pagedOrders.map((so) => {
                 const breakdown = so.size_breakdown_target || {};
                 const contractType = so.contract_type || 'CMT';
                 const totalVal = so.total_order_value || ((so.order_qty || 0) * (so.unit_price || 0));
@@ -519,6 +547,15 @@ export default function PPICModule() {
               })}
             </div>
           )}
+
+          <Pagination
+            page={soPage}
+            pageSize={soPageSize}
+            total={filteredOrders.length}
+            onPageChange={setSoPage}
+            onPageSizeChange={setSoPageSize}
+            pageSizeOptions={[12, 24, 48, 96]}
+          />
         </div>
       )}
 

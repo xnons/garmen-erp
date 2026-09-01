@@ -6,7 +6,10 @@ import {
   Phone, Mail, MapPin, DollarSign, Calendar, FileText, Layers, Scissors, 
   Tag, Info, Calculator, CreditCard, Clock, ShieldCheck
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { usePrompt } from '@/components/common/ConfirmDialog';
+import { errMsg } from '@/utils/format';
 
 interface SalesOrderModalProps {
   isOpen: boolean;
@@ -16,6 +19,7 @@ interface SalesOrderModalProps {
 }
 
 export default function SalesOrderModal({ isOpen, onClose, onSuccess, initialData }: SalesOrderModalProps) {
+  const promptDialog = usePrompt();
   const isEditing = !!initialData;
   const [activeTab, setActiveTab] = useState<'MAIN' | 'FINANCE' | 'SIZES' | 'BOM' | 'SPECS'>('MAIN');
 
@@ -181,7 +185,7 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess, initialDat
 
   const handleCreateNewBuyer = async () => {
     if (!newBuyerName.trim()) {
-      alert("Nama Brand / Buyer tidak boleh kosong.");
+      toast.warning("Nama Brand / Buyer tidak boleh kosong.");
       return;
     }
     setCreatingBuyer(true);
@@ -208,7 +212,7 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess, initialDat
       setNewBuyerPhone("");
       setNewBuyerAddress("");
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menambahkan brand baru.");
+      toast.error(errMsg(err, "Gagal menambahkan brand baru."));
     } finally {
       setCreatingBuyer(false);
     }
@@ -230,10 +234,14 @@ export default function SalesOrderModal({ isOpen, onClose, onSuccess, initialDat
     }));
   };
 
-  const handleAddSizeKey = () => {
-    const newKey = prompt("Masukkan nama ukuran baru (contoh: 36, XXL, atau ALL SIZE):");
-    if (newKey && newKey.trim()) {
-      setSizeMatrix(prev => ({ ...prev, [newKey.trim().toUpperCase()]: 0 }));
+  const handleAddSizeKey = async () => {
+    const newKey = await promptDialog({
+      title: "Tambah ukuran",
+      label: "Nama ukuran",
+      placeholder: "mis. 36, XXL, ALL SIZE",
+    });
+    if (newKey) {
+      setSizeMatrix(prev => ({ ...prev, [newKey.toUpperCase()]: 0 }));
     }
   };
 

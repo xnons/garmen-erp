@@ -23,6 +23,7 @@ import FinishingWagesModule from '@/components/finishing/FinishingWagesModule';
 import ShippingBillingModule from '@/components/shipping/ShippingBillingModule';
 import ExecutiveAnalyticsModule from '@/components/analytics/ExecutiveAnalyticsModule';
 import ReportsModule from '@/components/reports/ReportsModule';
+import ImportModule from '@/components/dataimport/ImportModule';
 import NotificationBell from '@/components/common/NotificationBell';
 
 interface DashboardContentProps {
@@ -46,6 +47,7 @@ export default function DashboardContent({
     switch (menu) {
       case 'executive-analytics': return 'Analitik Margin & Profit / Loss (P&L)';
       case 'reports': return 'Laporan & Analitik';
+      case 'data-import': return 'Impor Data Excel';
       case 'wip-control-tower': return 'Master Control Tower — Live WIP Matrix';
       case 'ppic-so': return 'Fase 1: PPIC & Sales Order (SO)';
       case 'warehouse-fabric': return 'Fase 2: Gudang Bahan Baku & QC 4-Point';
@@ -88,6 +90,19 @@ export default function DashboardContent({
           }}
         />
       );
+    }
+
+    // Impor Data Excel (Owner / Admin / Developer)
+    if (activeMenu === 'data-import') {
+      if (!['DEVELOPER', 'OWNER', 'ADMIN'].includes(userRole)) {
+        return (
+          <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-2">
+            <p className="text-rose-400 font-bold text-sm">Akses Terbatas</p>
+            <p className="text-slate-400 text-xs">Impor Data hanya untuk Owner, Admin, dan Developer.</p>
+          </div>
+        );
+      }
+      return <ImportModule />;
     }
 
     // Laporan & Analitik (RBAC di dalam modul; laporan keuangan gated)

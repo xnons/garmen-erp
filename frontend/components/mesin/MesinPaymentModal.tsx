@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { CreditCard, X, Calendar, FileText, Banknote, Wallet } from 'lucide-react';
 import { MesinAsset, PaymentRecord } from './types';
 
@@ -33,7 +34,7 @@ export default function MesinPaymentModal({ machine, onClose, onAddPayment }: Me
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (nominal <= 0) return alert('Masukkan nominal pembayaran yang valid');
+        if (nominal <= 0) { toast.warning('Masukkan nominal pembayaran yang valid.'); return; }
 
         const newRecord: PaymentRecord = {
             id: Date.now().toString(),

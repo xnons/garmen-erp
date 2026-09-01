@@ -6,7 +6,11 @@ import {
   Layers, UserCheck, Calendar, FileText, User, Scissors, AlertTriangle,
   SlidersHorizontal, LayoutGrid, List, ChevronRight, X, Pencil, Trash2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { useConfirm, usePrompt } from '@/components/common/ConfirmDialog';
+import { errMsg } from '@/utils/format';
+import Pagination from '@/components/common/Pagination';
 
 const OPERATION_PRESETS: { id: string; label: string; defaultRate: number; category: string }[] = [
   { id: "JAHIT_SEWING", label: "🧵 Jahit Sewing Internal (Celana/Kemeja)", defaultRate: 2500, category: "SEWING" },
@@ -23,6 +27,10 @@ const OPERATION_PRESETS: { id: string; label: string; defaultRate: number; categ
 ];
 
 export default function FinishingWagesModule() {
+  const confirm = useConfirm();
+  const promptDialog = usePrompt();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [wages, setWages] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -118,12 +126,19 @@ export default function FinishingWagesModule() {
   };
 
   const handleDeleteWage = async (w: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus catatan upah borongan ini (${w.operation_type} - Rp ${w.total_wage?.toLocaleString('id-ID')})?`)) return;
+    const ok = await confirm({
+      title: "Hapus catatan upah?",
+      message: `${w.operation_type} — Rp ${w.total_wage?.toLocaleString('id-ID')} akan dihapus.`,
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/shipping/wages/${w.id}`);
+      toast.success("Catatan upah dihapus.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus upah borongan.");
+      toast.error(errMsg(err, "Gagal menghapus upah borongan."));
     }
   };
 
@@ -156,21 +171,25 @@ export default function FinishingWagesModule() {
     setFormData(prev => ({ ...prev, qty_completed: sumQty }));
   };
 
-  const handleAddSizeKey = () => {
-    const key = prompt("Masukkan ukuran baru (misal: 34, 36, XL, XXL):");
-    if (key && key.trim()) {
-      setSizeMatrix(prev => ({ ...prev, [key.trim().toUpperCase()]: 0 }));
+  const handleAddSizeKey = async () => {
+    const key = await promptDialog({
+      title: "Tambah ukuran",
+      label: "Nama ukuran",
+      placeholder: "mis. 34, 36, XL, XXL",
+    });
+    if (key) {
+      setSizeMatrix(prev => ({ ...prev, [key.toUpperCase()]: 0 }));
     }
   };
 
   const handleCreateWage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.operator_id) {
-      alert("Silakan pilih nama pekerja terlebih dahulu.");
+      toast.warning("Silakan pilih nama pekerja terlebih dahulu.");
       return;
     }
     if (!formData.so_id) {
-      alert("Silakan pilih Sales Order target.");
+      toast.warning("Silakan pilih Sales Order target.");
       return;
     }
 
@@ -196,9 +215,10 @@ export default function FinishingWagesModule() {
 
       setIsModalOpen(false);
       setEditingWage(null);
+      toast.success(editingWage ? "Data upah diperbarui." : "Data upah disimpan.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menyimpan data upah.");
+      toast.error(errMsg(err, "Gagal menyimpan data upah."));
     } finally {
       setSubmitting(false);
     }
@@ -217,6 +237,9 @@ export default function FinishingWagesModule() {
   const totalPcsFinished = filteredWages.reduce((acc, w) => acc + (w.qty_completed || 0), 0);
   const totalFinishingPaid = filteredWages.reduce((acc, w) => acc + (w.total_wage || 0), 0);
   const totalRejects = filteredWages.reduce((acc, w) => acc + (w.qty_reject || 0), 0);
+
+  useEffect(() => { setPage(1); }, [searchQuery, filterOp, pageSize]);
+  const pagedWages = filteredWages.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="space-y-6">
@@ -359,7 +382,7 @@ export default function FinishingWagesModule() {
       ) : viewMode === 'CARDS' ? (
         /* 🎴 VIEW MODE: CARDS GRID */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredWages.map((w) => (
+          {pagedWages.map((w) => (
             <div key={w.id} className="bg-slate-900/80 border border-slate-800 hover:border-cyan-500/40 p-5 rounded-2xl transition-all shadow-md flex flex-col justify-between">
               <div>
                 <div className="flex items-start justify-between gap-2 mb-3">
@@ -444,7 +467,7 @@ export default function FinishingWagesModule() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-medium">
-                {filteredWages.map((w) => (
+                {pagedWages.map((w) => (
                   <tr key={w.id} className="hover:bg-slate-800/40 transition-colors">
                     <td className={`${viewMode === 'COMPACT' ? 'py-2 px-3' : 'py-3.5 px-4'} text-slate-400 font-mono`}>
                       {w.work_date}
@@ -501,6 +524,16 @@ export default function FinishingWagesModule() {
             </table>
           </div>
         </div>
+      )}
+
+      {filteredWages.length > 0 && (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={filteredWages.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       )}
 
       {/* 🟢 MODAL INPUT HASIL BORONGAN PEKERJA LENGKAP */}

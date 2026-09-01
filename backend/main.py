@@ -12,7 +12,7 @@ from core.security import get_password_hash
 from routers import auth, karyawan, mesin, inventaris, dashboard, audit, payroll
 from routers import produksi_master, produksi_output
 from routers import ppic_so, warehouse_fabric, cutting_prep, wip_subcon, finishing_shipping
-from routers import ai_copilot, email_reports, reports, notifications
+from routers import ai_copilot, email_reports, reports, notifications, data_import
 
 def init_db():
     try:
@@ -367,7 +367,10 @@ from fastapi import Request
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
     error_id = _uuid.uuid4().hex[:12]
-    print(f"🔥 [SERVER ERROR {error_id} on {request.method} {request.url.path}]: {exc}")
+    try:
+        print(f"[SERVER ERROR {error_id} on {request.method} {request.url.path}]: {exc}")
+    except UnicodeEncodeError:
+        print(f"[SERVER ERROR {error_id} on {request.method} {request.url.path}]")
     traceback.print_exc()
     # Jangan bocorkan detail exception ke klien di produksi — cukup error_id
     # yang bisa dicocokkan dengan log server. Di DEV_MODE detail ditampilkan.
@@ -421,6 +424,7 @@ app.include_router(reports.router)
 
 # 🟢 Router Notifikasi & Alert
 app.include_router(notifications.router)
+app.include_router(data_import.router)
 
 @app.get("/")
 def root_check():

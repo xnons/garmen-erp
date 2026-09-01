@@ -5,7 +5,9 @@ import {
   Sparkles, X, Send, Bot, User, ShieldAlert, TrendingUp, Cpu, Factory,
   FileText, Camera, Upload, CheckCircle2, AlertTriangle, RefreshCw, Copy, Check
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { errMsg } from '@/utils/format';
 
 // Panggilan AI bisa lama (OpenRouter mencoba beberapa model, timeout 45s masing-masing).
 const AI_TIMEOUT_MS = 90000;
@@ -112,7 +114,7 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
       );
       setParsedResult(res.data?.parsed_data);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Gagal memproses parsing AI.');
+      toast.error(errMsg(err, 'Gagal memproses parsing AI.'));
     } finally {
       setIsAutoFillLoading(false);
     }
@@ -146,7 +148,7 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
       );
       setVisionAnalysis(res.data);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Gagal memproses scan AI Vision.');
+      toast.error(errMsg(err, 'Gagal memproses scan AI Vision.'));
     } finally {
       setIsVisionLoading(false);
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Warehouse, Plus, Loader2, RefreshCw, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { ItemBahanBaku, LogTransaksiStok, ViewMode } from './types';
 import { useInventaris } from './useInventaris';
+import { useConfirm } from '@/components/common/ConfirmDialog';
 
 // Import Sub-Komponen & Modal
 import StokMutasiModal from './StokMutasiModal';
@@ -21,6 +22,7 @@ interface InventarisPageProps {
 }
 
 export default function InventarisModule({ activeUser }: InventarisPageProps) {
+    const confirm = useConfirm();
     // 🟢 1. STATE USER & ACCESS CONTROL
     const [currentUser, setCurrentUser] = useState<any>(activeUser || null);
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -192,13 +194,18 @@ export default function InventarisModule({ activeUser }: InventarisPageProps) {
     };
 
     const handleTriggerDelete = async (itemId: string) => {
-        if (confirm('Apakah Anda yakin ingin menghapus bahan baku ini secara permanen?')) {
-            const res = await deleteBahanBaku(itemId);
-            if (!res.success) {
-                showToastError(res.message || 'Gagal menghapus bahan baku.');
-            } else {
-                showToastSuccess('Bahan baku berhasil dihapus secara permanen.');
-            }
+        const ok = await confirm({
+            title: 'Hapus bahan baku permanen?',
+            message: 'Data bahan baku ini akan dihapus permanen dan tidak bisa dikembalikan.',
+            confirmText: 'Hapus',
+            tone: 'danger',
+        });
+        if (!ok) return;
+        const res = await deleteBahanBaku(itemId);
+        if (!res.success) {
+            showToastError(res.message || 'Gagal menghapus bahan baku.');
+        } else {
+            showToastSuccess('Bahan baku berhasil dihapus secara permanen.');
         }
     };
 

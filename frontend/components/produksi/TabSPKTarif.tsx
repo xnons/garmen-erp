@@ -20,8 +20,11 @@ import {
     Clock,
     Download
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { produksiService, SPK, StatusSPK, PrioritasSPK } from '@/services/produksiService';
 import { exportToExcel } from '@/utils/exportUtils';
+import { useConfirm } from '@/components/common/ConfirmDialog';
+import { errMsg } from '@/utils/format';
 
 interface TabSPKTarifProps {
     spkList: SPK[];
@@ -44,6 +47,7 @@ export default function TabSPKTarif({
     currentUser,
     onRefresh
 }: TabSPKTarifProps) {
+    const confirm = useConfirm();
     // 🛡️ Deteksi Role Pintar: Prop -> LocalStorage -> Fallback Developer
     const activeRole = useMemo(() => {
         if (currentUser?.role) {
@@ -163,7 +167,7 @@ export default function TabSPKTarif({
     // 🟢 Handler Ekspor Data ke Excel (.xlsx)
     const handleExportExcel = () => {
         if (filteredAndSortedSPK.length === 0) {
-            alert("Tidak ada data SPK untuk diekspor!");
+            toast.warning("Tidak ada data SPK untuk diekspor.");
             return;
         }
 
@@ -194,14 +198,20 @@ export default function TabSPKTarif({
         const nextStatus = currentStatus === 'ARCHIVED' ? 'ON_PROGRESS' : 'ARCHIVED';
         const actionName = nextStatus === 'ARCHIVED' ? 'mengarsipkan' : 'mengembalikan';
 
-        if (!confirm(`Apakah Anda yakin ingin ${actionName} SPK ${spkId}?`)) return;
+        const ok = await confirm({
+            title: `Konfirmasi ${actionName} SPK`,
+            message: `SPK ${spkId} akan di-${actionName === 'mengarsipkan' ? 'arsipkan' : 'kembalikan ke progress'}.`,
+            confirmText: 'Ya, lanjutkan',
+        });
+        if (!ok) return;
 
         try {
             setActionLoading(true);
             await produksiService.updateSPK(spkId, { status: nextStatus as any });
+            toast.success(`SPK ${spkId} berhasil di-${actionName === 'mengarsipkan' ? 'arsipkan' : 'kembalikan'}.`);
             if (onRefresh) onRefresh();
         } catch (err: any) {
-            alert(err.response?.data?.detail || 'Gagal mengubah status arsip SPK.');
+            toast.error(errMsg(err, 'Gagal mengubah status arsip SPK.'));
         } finally {
             setActionLoading(false);
         }
@@ -210,14 +220,21 @@ export default function TabSPKTarif({
     // 🔒 Handler Selesai SPK Paksa Khusus Owner / Dev
     const handleOwnerFinishSPK = async (e: React.MouseEvent, spkId: string) => {
         e.stopPropagation();
-        if (!confirm(`Selesaikan SPK '${spkId}' secara paksa (Owner Lock)?`)) return;
+        const ok = await confirm({
+            title: 'Selesaikan SPK secara paksa?',
+            message: `SPK '${spkId}' akan ditutup paksa (Owner Lock), melewati validasi normal.`,
+            confirmText: 'Selesaikan Paksa',
+            tone: 'danger',
+        });
+        if (!ok) return;
 
         try {
             setActionLoading(true);
             await produksiService.ownerFinishSPK(spkId);
+            toast.success(`SPK ${spkId} ditutup paksa.`);
             if (onRefresh) onRefresh();
         } catch (err: any) {
-            alert(err.response?.data?.detail || 'Gagal menyelesaikan SPK.');
+            toast.error(errMsg(err, 'Gagal menyelesaikan SPK.'));
         } finally {
             setActionLoading(false);
         }

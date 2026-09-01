@@ -6,11 +6,18 @@ import {
   BarChart2, Layers, CheckCircle2, FileText, Pencil, Trash2,
   LayoutGrid, List, Gauge, DollarSign
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { useConfirm } from '@/components/common/ConfirmDialog';
+import { errMsg } from '@/utils/format';
 import CuttingModal from './CuttingModal';
 import PrepWagesModal from './PrepWagesModal';
+import Pagination from '@/components/common/Pagination';
 
 export default function CuttingPrepModule() {
+  const confirm = useConfirm();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [activeTab, setActiveTab] = useState<'CUTTING' | 'PREP'>('CUTTING');
   const [cuttingRecords, setCuttingRecords] = useState<any[]>([]);
   const [prepTasks, setPrepTasks] = useState<any[]>([]);
@@ -62,12 +69,19 @@ export default function CuttingPrepModule() {
   };
 
   const handleDeleteCutting = async (cr: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus data potong ini (${cr.qty_cut} pcs)? Aksi ini akan dicatat di Log Audit.`)) return;
+    const ok = await confirm({
+      title: "Hapus data potong?",
+      message: `Data potong ${cr.qty_cut} pcs akan dihapus. Dicatat di Log Audit.`,
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/cutting/records/${cr.id}`);
+      toast.success("Data potong dihapus.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus data potong.");
+      toast.error(errMsg(err, "Gagal menghapus data potong."));
     }
   };
 
@@ -82,12 +96,19 @@ export default function CuttingPrepModule() {
   };
 
   const handleDeletePrep = async (t: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus upah borongan persiapan ini (${t.task_type} - Rp ${t.total_wage?.toLocaleString('id-ID')})?`)) return;
+    const ok = await confirm({
+      title: "Hapus upah persiapan?",
+      message: `${t.task_type} — Rp ${t.total_wage?.toLocaleString('id-ID')} akan dihapus.`,
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/cutting/prep-tasks/${t.id}`);
+      toast.success("Upah persiapan dihapus.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus upah borongan persiapan.");
+      toast.error(errMsg(err, "Gagal menghapus upah borongan persiapan."));
     }
   };
 
@@ -111,6 +132,12 @@ export default function CuttingPrepModule() {
       );
     });
   }, [cuttingRecords, searchQuery]);
+
+  useEffect(() => { setPage(1); }, [searchQuery, pageSize]);
+  const pagedCutting = useMemo(
+    () => filteredCutting.slice((page - 1) * pageSize, page * pageSize),
+    [filteredCutting, page, pageSize],
+  );
 
   return (
     <div className="space-y-6">
@@ -271,7 +298,7 @@ export default function CuttingPrepModule() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-medium">
-                  {filteredCutting.map((cr) => (
+                  {pagedCutting.map((cr) => (
                     <tr key={cr.id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="py-3 px-4 font-mono text-slate-300">{cr.cutting_date}</td>
                       <td className="py-3 px-3 font-semibold text-white">{cr.operator_name || "Bu Nani"}</td>
@@ -304,7 +331,7 @@ export default function CuttingPrepModule() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCutting.map((cr) => {
+              {pagedCutting.map((cr) => {
                 const breakdown = cr.size_breakdown_cut || {};
                 return (
                   <div key={cr.id} className="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl space-y-3 flex flex-col justify-between hover:border-slate-700 transition-all">
@@ -376,6 +403,14 @@ export default function CuttingPrepModule() {
               })}
             </div>
           )}
+
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={filteredCutting.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

@@ -6,11 +6,18 @@ import {
   CheckCircle2, DollarSign, ArrowUpRight, CheckCheck, Eye,
   Pencil, Trash2, X, LayoutGrid, List, Layers, ShieldCheck
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { useConfirm } from '@/components/common/ConfirmDialog';
+import { errMsg } from '@/utils/format';
 import PrintSuratJalanModal from '../common/PrintSuratJalanModal';
 import FormWIModal from './FormWIModal';
+import Pagination from '@/components/common/Pagination';
 
 export default function ShippingBillingModule() {
+  const confirm = useConfirm();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [activeTab, setActiveTab] = useState<'SHIPMENTS' | 'FORM_WI'>('SHIPMENTS');
   const [shipments, setShipments] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
@@ -112,12 +119,19 @@ export default function ShippingBillingModule() {
   };
 
   const handleDeleteShipment = async (s: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus SJP '${s.surat_jalan_no}' (${s.total_qty_shipped} pcs)? Aksi ini akan dicatat di Log Audit.`)) return;
+    const ok = await confirm({
+      title: "Hapus Surat Jalan Pengiriman?",
+      message: `SJP '${s.surat_jalan_no}' (${s.total_qty_shipped} pcs) dihapus. Dicatat di Log Audit.`,
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/shipping/shipments/${s.id}`);
+      toast.success("Data pengiriman dihapus.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus data pengiriman.");
+      toast.error(errMsg(err, "Gagal menghapus data pengiriman."));
     }
   };
 
@@ -155,9 +169,10 @@ export default function ShippingBillingModule() {
 
       setIsNewSJPOpen(false);
       setEditingShipment(null);
+      toast.success(editingShipment ? "SJP diperbarui." : "SJP disimpan.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menyimpan SJP.");
+      toast.error(errMsg(err, "Gagal menyimpan SJP."));
     } finally {
       setSubmitting(false);
     }
@@ -196,6 +211,12 @@ export default function ShippingBillingModule() {
       );
     });
   }, [shipments, searchQuery]);
+
+  useEffect(() => { setPage(1); }, [searchQuery, pageSize, activeTab]);
+  const pagedShipments = useMemo(
+    () => filteredShipments.slice((page - 1) * pageSize, page * pageSize),
+    [filteredShipments, page, pageSize],
+  );
 
   const shippingMetrics = useMemo(() => {
     const totalSJP = shipments.length;
@@ -366,7 +387,7 @@ export default function ShippingBillingModule() {
                     </td>
                   </tr>
                 ) : (
-                  filteredShipments.map((s) => {
+                  pagedShipments.map((s) => {
                     const billVal = s.total_billing_amount || ((s.total_qty_shipped || 0) * (s.unit_price || 0));
                     return (
                       <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
@@ -430,7 +451,7 @@ export default function ShippingBillingModule() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredShipments.map((s) => {
+            {pagedShipments.map((s) => {
               const billVal = s.total_billing_amount || ((s.total_qty_shipped || 0) * (s.unit_price || 0));
               return (
                 <div key={s.id} className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-3 flex flex-col justify-between hover:border-slate-700 transition-all">
@@ -486,6 +507,16 @@ export default function ShippingBillingModule() {
             })}
           </div>
         )
+      )}
+
+      {activeTab === 'SHIPMENTS' && (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={filteredShipments.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       )}
 
       {/* TAB 2: FORM WI SETTLEMENT LIST */}

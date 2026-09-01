@@ -6,7 +6,11 @@ import {
   Clock, Scissors, Sparkles, Shirt, Droplets, CheckCheck, 
   Truck, AlertOctagon, TrendingUp, BarChart3, Eye, Printer, Filter
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { useConfirm } from '@/components/common/ConfirmDialog';
+import { errMsg } from '@/utils/format';
+import Pagination from '@/components/common/Pagination';
 
 export interface WIPMatrixRow {
   so_id: string;
@@ -33,6 +37,9 @@ interface MasterControlTowerProps {
 }
 
 export default function MasterControlTower({ onSelectSO }: MasterControlTowerProps) {
+  const confirm = useConfirm();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [matrixData, setMatrixData] = useState<WIPMatrixRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -53,14 +60,19 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
   };
 
   const handleReseed = async () => {
-    if (!confirm("Apakah Anda ingin menginjeksi 20 Master Sales Orders dan seluruh data pipeline produksi 6 fase?")) return;
+    const ok = await confirm({
+      title: "Injeksi ulang data pipeline?",
+      message: "20 Master Sales Order + seluruh data pipeline produksi 6 fase akan disuntikkan ke database.",
+      confirmText: "Ya, injeksi",
+    });
+    if (!ok) return;
     setReseeding(true);
     try {
       const res = await api.post('/api/dashboard/reseed-production-pipeline');
-      alert(res.data?.message || "Berhasil seeding data produksi!");
+      toast.success(res.data?.message || "Berhasil seeding data produksi!");
       await fetchMatrix();
     } catch (err: any) {
-      alert("Gagal seeding: " + (err.response?.data?.error || err.message));
+      toast.error(errMsg(err, "Gagal seeding data produksi."));
     } finally {
       setReseeding(false);
     }
@@ -82,6 +94,9 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
     if (statusFilter === "REGISTERED") return matchQuery && (row.status_wip === "REGISTERED" || row.status_wip === "DRAFT");
     return matchQuery && row.status_wip === statusFilter;
   });
+
+  useEffect(() => { setPage(1); }, [searchQuery, statusFilter, pageSize]);
+  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
 
   // Telemetry Aggregates
   const totalOrders = matrixData.length;
@@ -266,7 +281,7 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((row) => {
+                pagedRows.map((row) => {
                   const isCuttingUnder = row.qty_cutting > 0 && row.qty_cutting < row.order_qty;
                   const hasDiscrepancy = row.balance_discrepancy_total > 0;
 
@@ -380,6 +395,15 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={filteredRows.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[25, 50, 100, 200]}
+        />
       </div>
 
     </div>

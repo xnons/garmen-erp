@@ -35,6 +35,73 @@ def _emit(db: Session, *, type_: str, severity: str, title: str, body: str,
     return True
 
 
+def scan_readonly(db: Session, *, limit_per_group: int = 8) -> dict:
+    """
+    Versi baca-saja dari pemindai risiko — TIDAK membuat notifikasi, TIDAK commit.
+    Dipakai kartu "Perlu Perhatian" di dashboard.
+    """
+    today = date.today()
+    out: dict = {
+        "deadline": [], "low_stock": [], "vendor_discrepancy": [],
+        "counts": {}, "scanned_at": datetime.utcnow().isoformat(),
+    }
+
+    open_sos = (
+        db.query(models.SalesOrder)
+        .filter(models.SalesOrder.status.notin_(["SHIPPED", "CLOSED"]),
+                models.SalesOrder.deadline.isnot(None))
+        .all()
+    )
+    dl = []
+    for so in open_sos:
+        days_left = (so.deadline - today).days
+        if days_left <= 7:
+            dl.append({
+                "so_number": so.so_number, "style_name": so.style_name,
+                "status": so.status, "deadline": so.deadline.isoformat(),
+                "days_left": days_left,
+                "severity": "CRITICAL" if days_left <= 3 else "WARNING",
+            })
+    dl.sort(key=lambda x: x["days_left"])
+    out["deadline"] = dl[:limit_per_group]
+
+    low = (
+        db.query(models.InventoryItem)
+        .filter(models.InventoryItem.current_stock <= models.InventoryItem.min_stock_alert)
+        .order_by((models.InventoryItem.current_stock - models.InventoryItem.min_stock_alert).asc())
+        .all()
+    )
+    out["low_stock"] = [{
+        "item_code": it.item_code, "description": it.description,
+        "current_stock": it.current_stock, "min_stock_alert": it.min_stock_alert,
+        "unit": it.unit, "rack_location": it.rack_location,
+    } for it in low[:limit_per_group]]
+
+    disc = (
+        db.query(models.WIPMovement)
+        .filter((models.WIPMovement.balance_discrepancy > 0) |
+                (models.WIPMovement.status == "DISCREPANCY_FLAG"))
+        .order_by(models.WIPMovement.balance_discrepancy.desc())
+        .all()
+    )
+    out["vendor_discrepancy"] = [{
+        "id": str(m.id),
+        "so_number": m.sales_order.so_number if m.sales_order else m.so_id,
+        "vendor": m.partner.name if m.partner else "Internal",
+        "stage_name": m.stage_name,
+        "qty_dispatched": m.qty_dispatched, "qty_received": m.qty_received,
+        "qty_reject": m.qty_reject, "balance_discrepancy": m.balance_discrepancy,
+    } for m in disc[:limit_per_group]]
+
+    out["counts"] = {
+        "deadline": len(dl),
+        "low_stock": len(low),
+        "vendor_discrepancy": len(disc),
+        "total": len(dl) + len(low) + len(disc),
+    }
+    return out
+
+
 def run_scan(db: Session) -> dict:
     """Jalankan semua pemindai. Mengembalikan ringkasan jumlah alert per jenis."""
     today = date.today()

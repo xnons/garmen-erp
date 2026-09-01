@@ -20,6 +20,8 @@ import {
     FileText
 } from 'lucide-react';
 import api from '@/services/api';
+import { useConfirm } from '@/components/common/ConfirmDialog';
+import { formatRp } from '@/utils/format';
 
 interface DetailKaryawan {
     id_karyawan: string;
@@ -49,6 +51,7 @@ interface HistoryLog {
 }
 
 export default function PayrollModule() {
+    const confirm = useConfirm();
     const [activeTab, setActiveTab] = useState<'rekap' | 'history'>('rekap');
 
     // Filter Controls
@@ -120,9 +123,12 @@ export default function PayrollModule() {
         e.preventDefault();
         const totalNominal = payrollData?.total_tagihan_gaji || 0;
 
-        if (!confirm(`Apakah Anda yakin ingin mencairkan total gaji Rp ${totalNominal.toLocaleString('id-ID')} untuk periode ${selectedPeriode}?`)) {
-            return;
-        }
+        const ok = await confirm({
+            title: "Cairkan gaji periode ini?",
+            message: `Total ${formatRp(totalNominal)} akan dicairkan untuk periode ${selectedPeriode}. Aksi ini tercatat permanen.`,
+            confirmText: "Cairkan",
+        });
+        if (!ok) return;
 
         setActionLoading(true);
         setSuccessMsg('');

@@ -9,8 +9,25 @@ from typing import Dict, Any, List
 from database import get_db
 import models
 from core.security import get_current_user, require_role
+from core.alert_engine import scan_readonly
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+
+
+@router.get("/attention")
+def get_attention_panel(
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(get_current_user),
+):
+    """Ringkasan kondisi yang perlu perhatian (baca-saja, tidak buat notifikasi)."""
+    try:
+        return scan_readonly(db)
+    except Exception as e:
+        return {
+            "deadline": [], "low_stock": [], "vendor_discrepancy": [],
+            "counts": {"deadline": 0, "low_stock": 0, "vendor_discrepancy": 0, "total": 0},
+            "error": str(e),
+        }
 
 
 @router.get("/overview-stats")

@@ -6,7 +6,10 @@ import {
   FileText, Camera, Upload, CheckCircle2, AlertTriangle, RefreshCw, Copy, Check,
   Minimize2, Maximize2, MessageSquare, ChevronUp, ChevronDown, Zap, Trash2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { useConfirm } from '@/components/common/ConfirmDialog';
+import { errMsg } from '@/utils/format';
 
 // Panggilan AI bisa lama (OpenRouter mencoba beberapa model, timeout 45s masing-masing).
 const AI_TIMEOUT_MS = 90000;
@@ -24,6 +27,7 @@ interface FloatingAICopilotProps {
 const STORAGE_KEY = 'garment_enterprise_ai_chat_v2';
 
 export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps) {
+  const confirm = useConfirm();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -66,16 +70,21 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
     }
   }, [messages]);
 
-  const handleClearHistory = () => {
-    if (confirm("Hapus seluruh riwayat percakapan AI Co-Pilot?")) {
-      const initMsg: Message = {
-        role: 'assistant',
-        content: `Halo ${activeUser?.nama || 'Owner'}! Riwayat percakapan telah dibersihkan. Apa yang ingin Anda analisis hari ini?`
-      };
-      setMessages([initMsg]);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(STORAGE_KEY);
-      }
+  const handleClearHistory = async () => {
+    const ok = await confirm({
+      title: "Hapus riwayat AI Co-Pilot?",
+      message: "Seluruh riwayat percakapan akan dihapus dari perangkat ini.",
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
+    const initMsg: Message = {
+      role: 'assistant',
+      content: `Halo ${activeUser?.nama || 'Owner'}! Riwayat percakapan telah dibersihkan. Apa yang ingin Anda analisis hari ini?`
+    };
+    setMessages([initMsg]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
     }
   };
 
@@ -154,10 +163,10 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
       if (res.data?.parsed_data) {
         setParsedResult(res.data.parsed_data);
       } else {
-        alert(res.data?.message || 'Gagal mengekstrak teks form.');
+        toast.error(res.data?.message || 'Gagal mengekstrak teks form.');
       }
     } catch (err: any) {
-      alert(err.response?.data?.detail || err.message || 'Gagal memproses data dengan AI.');
+      toast.error(errMsg(err, 'Gagal memproses data dengan AI.'));
     } finally {
       setIsAutoFillLoading(false);
     }
@@ -189,10 +198,10 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
       if (res.data?.analysis) {
         setVisionAnalysis(res.data.analysis);
       } else {
-        alert(res.data?.message || 'Gagal menganalisis visual.');
+        toast.error(res.data?.message || 'Gagal menganalisis visual.');
       }
     } catch (err: any) {
-      alert(err.response?.data?.detail || err.message || 'Gagal memeriksa cacat kain.');
+      toast.error(errMsg(err, 'Gagal memeriksa cacat kain.'));
     } finally {
       setIsVisionLoading(false);
     }

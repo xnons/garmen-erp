@@ -6,13 +6,20 @@ import {
   Printer, AlertOctagon, CheckCircle2, FileText, ArrowDownLeft, ArrowUpRight,
   Pencil, Trash2, LayoutGrid, List, Filter, AlertTriangle, Layers, DollarSign
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { useConfirm } from '@/components/common/ConfirmDialog';
+import { errMsg, formatRp, formatQty } from '@/utils/format';
+import Pagination from '@/components/common/Pagination';
 import FabricInspectionModal from './FabricInspectionModal';
 import FabricAllocationModal from './FabricAllocationModal';
 import PrintSuratJalanModal from '../common/PrintSuratJalanModal';
 
 export default function WarehouseFabricModule() {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'STOCK' | 'RECEIPTS' | 'INSPECTION' | 'ALLOCATIONS'>('STOCK');
+  const [stockPage, setStockPage] = useState(1);
+  const [stockPageSize, setStockPageSize] = useState(24);
   const [items, setItems] = useState<any[]>([]);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [inspections, setInspections] = useState<any[]>([]);
@@ -108,6 +115,14 @@ export default function WarehouseFabricModule() {
     });
   }, [items, searchQuery, categoryFilter, showLowStockOnly]);
 
+  // Reset ke halaman 1 saat filter berubah
+  useEffect(() => { setStockPage(1); }, [searchQuery, categoryFilter, showLowStockOnly, stockPageSize]);
+
+  const pagedItems = useMemo(() => {
+    const start = (stockPage - 1) * stockPageSize;
+    return filteredItems.slice(start, start + stockPageSize);
+  }, [filteredItems, stockPage, stockPageSize]);
+
   // Summary Metrics
   const metrics = useMemo(() => {
     const totalSKU = items.length;
@@ -163,19 +178,27 @@ export default function WarehouseFabricModule() {
         await api.post('/api/warehouse/items', itemForm);
       }
       setIsAddItemOpen(false);
+      toast.success(editingItem ? "Item bahan diperbarui." : "Item bahan ditambahkan.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menyimpan item bahan.");
+      toast.error(errMsg(err, "Gagal menyimpan item bahan."));
     }
   };
 
   const handleDeleteItem = async (item: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus item '${item.description}' (${item.item_code})?`)) return;
+    const ok = await confirm({
+      title: "Hapus item bahan?",
+      message: `${item.description} (${item.item_code}) akan dihapus permanen.`,
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/warehouse/items/${item.id}`);
+      toast.success("Item bahan dihapus.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus item bahan.");
+      toast.error(errMsg(err, "Gagal menghapus item bahan."));
     }
   };
 
@@ -217,29 +240,44 @@ export default function WarehouseFabricModule() {
         await api.post('/api/warehouse/receipts', receiptForm);
       }
       setIsAddReceiptOpen(false);
+      toast.success(editingReceipt ? "Log roll diperbarui." : "Log roll masuk dicatat.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal mencatat log roll masuk.");
+      toast.error(errMsg(err, "Gagal mencatat log roll masuk."));
     }
   };
 
   const handleDeleteReceipt = async (rec: any) => {
-    if (!confirm(`Hapus pencatatan roll masuk #${rec.roll_number}?`)) return;
+    const ok = await confirm({
+      title: "Hapus roll masuk?",
+      message: `Pencatatan roll #${rec.roll_number} akan dihapus.`,
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/warehouse/receipts/${rec.id}`);
+      toast.success("Roll masuk dihapus.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus roll masuk.");
+      toast.error(errMsg(err, "Gagal menghapus roll masuk."));
     }
   };
 
   const handleDeleteAllocation = async (alloc: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus Surat Jalan Penyerahan '${alloc.surat_jalan_no}' (${alloc.qty_issued} Yard)? Stok bahan akan dikembalikan ke gudang.`)) return;
+    const ok = await confirm({
+      title: "Batalkan penyerahan bahan?",
+      message: `Surat Jalan '${alloc.surat_jalan_no}' (${formatQty(alloc.qty_issued, " yd")}) dibatalkan — stok bahan dikembalikan ke gudang.`,
+      confirmText: "Batalkan",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/warehouse/allocations/${alloc.id}`);
+      toast.success("Alokasi bahan dibatalkan, stok dikembalikan.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal membatalkan alokasi bahan.");
+      toast.error(errMsg(err, "Gagal membatalkan alokasi bahan."));
     }
   };
 
@@ -376,7 +414,7 @@ export default function WarehouseFabricModule() {
                 <Layers className="w-3.5 h-3.5 text-emerald-400" />
                 Total Stok Fisik
               </span>
-              <p className="text-xl font-black text-emerald-400 mt-1">{metrics.totalYardage.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-normal">Yard</span></p>
+              <p className="text-xl font-black text-emerald-400 mt-1">{formatQty(metrics.totalYardage)} <span className="text-xs text-slate-400 font-normal">Yard</span></p>
             </div>
 
             <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
@@ -384,7 +422,7 @@ export default function WarehouseFabricModule() {
                 <DollarSign className="w-3.5 h-3.5 text-amber-400" />
                 Estimasi Nilai Aset
               </span>
-              <p className="text-xl font-black text-amber-300 mt-1">Rp {metrics.totalValuation.toLocaleString('id-ID')}</p>
+              <p className="text-xl font-black text-amber-300 mt-1">{formatRp(metrics.totalValuation)}</p>
             </div>
 
             <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
@@ -487,7 +525,7 @@ export default function WarehouseFabricModule() {
           {/* 📦 CONTENT VIEW: GRID CARDS OR SPREADSHEET TABLE */}
           {viewMode === 'GRID' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredItems.map((i) => {
+              {pagedItems.map((i) => {
                 const isLow = Number(i.current_stock || 0) <= Number(i.min_stock_alert || 50);
                 return (
                   <div 
@@ -578,7 +616,7 @@ export default function WarehouseFabricModule() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-medium">
-                  {filteredItems.map((i) => {
+                  {pagedItems.map((i) => {
                     const isLow = Number(i.current_stock || 0) <= Number(i.min_stock_alert || 50);
                     return (
                       <tr key={i.id} className="hover:bg-slate-800/40 transition-colors">
@@ -645,6 +683,15 @@ export default function WarehouseFabricModule() {
               <p className="text-sm font-semibold">Tidak ada data item bahan yang cocok dengan filter pencarian.</p>
             </div>
           )}
+
+          <Pagination
+            page={stockPage}
+            pageSize={stockPageSize}
+            total={filteredItems.length}
+            onPageChange={setStockPage}
+            onPageSizeChange={setStockPageSize}
+            pageSizeOptions={[12, 24, 48, 96]}
+          />
         </div>
       )}
 

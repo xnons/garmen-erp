@@ -35,6 +35,7 @@ import {
 import api from '@/services/api';
 import { produksiService, SPK } from '@/services/produksiService';
 import DeadlineAlertBanner from '@/components/dashboard/DeadlineAlertBanner';
+import AttentionPanel from '@/components/dashboard/AttentionPanel';
 import { AICopilotModal } from '@/components/ai/AICopilotModal';
 
 interface DashboardOverviewProps {
@@ -259,6 +260,9 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                     </button>
                 </div>
             </div>
+
+            {/* 🚨 KARTU "PERLU PERHATIAN" — deadline mepet, stok kritis, selisih vendor */}
+            <AttentionPanel onNavigate={onNavigate} />
 
             {/* Email Status Notification Banner */}
             {emailStatusMsg && (

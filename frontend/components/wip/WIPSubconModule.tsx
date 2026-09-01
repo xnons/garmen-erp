@@ -6,12 +6,19 @@ import {
   CheckCircle2, Printer, Layers, Filter, ShieldAlert, CheckCheck,
   Pencil, Trash2, X, LayoutGrid, List, Activity, DollarSign
 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '@/services/api';
+import { useConfirm } from '@/components/common/ConfirmDialog';
+import { errMsg } from '@/utils/format';
 import SubconDispatcherModal from './SubconDispatcherModal';
 import WIPReceiveModal from './WIPReceiveModal';
 import PrintSuratJalanModal from '../common/PrintSuratJalanModal';
+import Pagination from '@/components/common/Pagination';
 
 export default function WIPSubconModule() {
+  const confirm = useConfirm();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [movements, setMovements] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [partners, setPartners] = useState<any[]>([]);
@@ -79,19 +86,27 @@ export default function WIPSubconModule() {
     try {
       await api.put(`/api/wip/movements/${editingMovement.id}`, editForm);
       setEditingMovement(null);
+      toast.success("Surat Jalan dikoreksi.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal mengoreksi Surat Jalan.");
+      toast.error(errMsg(err, "Gagal mengoreksi Surat Jalan."));
     }
   };
 
   const handleDeleteMovement = async (m: any) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus Surat Jalan '${m.surat_jalan_no}' (${m.qty_dispatched} pcs)? Aksi ini akan dicatat di Audit Log.`)) return;
+    const ok = await confirm({
+      title: "Hapus Surat Jalan WIP?",
+      message: `SJ '${m.surat_jalan_no}' (${m.qty_dispatched} pcs) dihapus. Dicatat di Audit Log.`,
+      confirmText: "Hapus",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/wip/movements/${m.id}`);
+      toast.success("Surat Jalan dihapus.");
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Gagal menghapus Surat Jalan.");
+      toast.error(errMsg(err, "Gagal menghapus Surat Jalan."));
     }
   };
 
@@ -107,6 +122,12 @@ export default function WIPSubconModule() {
       return matchSearch && matchStatus;
     });
   }, [movements, searchQuery, statusFilter]);
+
+  useEffect(() => { setPage(1); }, [searchQuery, statusFilter, pageSize]);
+  const pagedMovements = useMemo(
+    () => filteredMovements.slice((page - 1) * pageSize, page * pageSize),
+    [filteredMovements, page, pageSize],
+  );
 
   const wipMetrics = useMemo(() => {
     const totalKirim = movements.reduce((acc, m) => acc + (Number(m.qty_dispatched) || 0), 0);
@@ -301,7 +322,7 @@ export default function WIPSubconModule() {
                   </td>
                 </tr>
               ) : (
-                filteredMovements.map((m) => {
+                pagedMovements.map((m) => {
                   const isCompleted = m.status === 'COMPLETED';
                   const hasDisc = m.balance_discrepancy > 0;
                   return (
@@ -406,7 +427,7 @@ export default function WIPSubconModule() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredMovements.map((m) => {
+          {pagedMovements.map((m) => {
             const isCompleted = m.status === 'COMPLETED';
             const hasDisc = m.balance_discrepancy > 0;
             return (
@@ -481,6 +502,14 @@ export default function WIPSubconModule() {
           })}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={filteredMovements.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       {/* Modal Edit / Koreksi Surat Jalan */}
       {editingMovement && (
