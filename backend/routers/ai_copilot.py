@@ -34,13 +34,19 @@ class AIForensicSnapshotRequest(BaseModel):
 
 
 @router.get("/test")
-def ai_test_endpoint(db: Session = Depends(get_db)):
+def ai_test_endpoint(
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(require_role(["DEVELOPER"])),
+):
+    """Diagnostik koneksi AI. Dibatasi DEVELOPER; detail error hanya ke log server."""
     import traceback
     try:
         reply = chat_with_persona("Test prompt", "EXECUTIVE", db)
         return {"status": "OK", "reply": reply[:200]}
     except Exception as e:
-        return {"status": "ERROR", "error": str(e), "traceback": traceback.format_exc()}
+        print(f"[ai/test] ERROR: {e}")
+        traceback.print_exc()
+        return {"status": "ERROR", "error": "Gagal menghubungi layanan AI. Cek log server."}
 
 @router.post("/chat")
 def ai_chat_endpoint(

@@ -1,9 +1,10 @@
 # backend/routers/dashboard.py
-from fastapi import APIRouter, Depends
+import os
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Date
 from datetime import date, timedelta
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any, List
 
 from database import get_db
 import models
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 @router.get("/overview-stats")
 def get_overview_stats(
     db: Session = Depends(get_db),
-    current_user: Optional[models.Karyawan] = Depends(get_current_user)
+    current_user: models.Karyawan = Depends(get_current_user)
 ):
     today = date.today()
     user_role = (current_user.role if current_user else "KARYAWAN").upper()
@@ -231,7 +232,10 @@ def get_owner_executive_analytics(
 
 
 @router.get("/chart-brand-material")
-def get_chart_brand_material(db: Session = Depends(get_db)):
+def get_chart_brand_material(
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(get_current_user),
+):
     """
     Mengagregasi alokasi material kain & aksesoris berdasarkan Brand / Buyer.
     """
@@ -288,7 +292,10 @@ def get_chart_brand_material(db: Session = Depends(get_db)):
 
 
 @router.get("/chart-produksi")
-def get_chart_produksi(db: Session = Depends(get_db)):
+def get_chart_produksi(
+    db: Session = Depends(get_db),
+    current_user: models.Karyawan = Depends(get_current_user),
+):
     try:
         nama_hari_map = {
             'Monday': 'Senin', 'Tuesday': 'Selasa', 'Wednesday': 'Rabu',
@@ -690,11 +697,17 @@ def get_advanced_pnl_analytics(
 @router.post("/reseed-production-pipeline")
 def trigger_reseed_pipeline(
     db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(get_current_user)
+    current_user: models.Karyawan = Depends(require_role(["DEVELOPER"]))
 ):
     """
     On-demand endpoint untuk menginjeksi dataset produksi lengkap 6 fase PT. Chikal Jaya Makmur.
+    Destruktif: hanya DEVELOPER, dan hanya saat DEV_MODE=true.
     """
+    if os.getenv("DEV_MODE", "false").strip().lower() != "true":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Endpoint reseed dinonaktifkan di produksi (DEV_MODE != true)."
+        )
     try:
         from scripts.seed_production_sql import seed_production_database
         seed_production_database()

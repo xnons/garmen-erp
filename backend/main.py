@@ -346,7 +346,7 @@ async def lifespan(app: FastAPI):
                 tipe_pay="BULANAN",
                 gaji_pokok=15000000,
                 tarif_borongan_pcs=0,
-                pin="6767",
+                pin=get_password_hash("6767"),
                 total_hadir=30, 
                 total_terlambat=0, 
                 total_izin=0, 
@@ -387,11 +387,29 @@ app = FastAPI(
 )
 
 import os
+import uuid as _uuid
 
-# --- CORS MIDDLEWARE (FLEXIBLE PRODUCTION SUPPORT) ---
+_DEV_MODE = os.getenv("DEV_MODE", "false").strip().lower() == "true"
+
+# --- CORS MIDDLEWARE ---
+# Allowlist eksplisit dari env ALLOWED_ORIGINS (dipisah koma). Origin bawaan
+# menutup kebutuhan dev + deployment Render. Regex "izinkan semua" dihindari
+# karena dikombinasikan allow_credentials=True akan membuka celah CSRF.
+_DEFAULT_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://garmen-erp-1.onrender.com",
+]
+_env_origins = [o.strip().rstrip("/") for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+ALLOWED_ORIGINS = _env_origins or _DEFAULT_ORIGINS
+
+# Lokal saja: izinkan port dev apa pun di localhost tanpa perlu daftar manual.
+_dev_origin_regex = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$" if (_DEV_MODE and not _env_origins) else None
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https?://.*",
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=_dev_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -403,17 +421,24 @@ from fastapi import Request
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
-    print(f"🔥 [CRITICAL SERVER ERROR on {request.method} {request.url.path}]: {exc}")
+    error_id = _uuid.uuid4().hex[:12]
+    print(f"🔥 [SERVER ERROR {error_id} on {request.method} {request.url.path}]: {exc}")
     traceback.print_exc()
-    response = JSONResponse(
-        status_code=500,
-        content={"detail": str(exc), "path": request.url.path}
-    )
-    origin = request.headers.get("origin") or "*"
-    response.headers["Access-Control-Allow-Origin"] = origin
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
+    # Jangan bocorkan detail exception ke klien di produksi — cukup error_id
+    # yang bisa dicocokkan dengan log server. Di DEV_MODE detail ditampilkan.
+    content = {
+        "detail": "Terjadi kesalahan internal pada server. Hubungi administrator dengan menyertakan kode error di bawah.",
+        "error_id": error_id,
+    }
+    if _DEV_MODE:
+        content["debug"] = str(exc)
+        content["path"] = request.url.path
+    response = JSONResponse(status_code=500, content=content)
+    # Pertahankan header CORS agar frontend tetap bisa membaca body error.
+    origin = request.headers.get("origin")
+    if origin and origin.rstrip("/") in ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
 

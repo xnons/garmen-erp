@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import Depends, HTTPException, status
@@ -11,7 +12,23 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 
-SECRET_KEY = os.getenv("SECRET_KEY", "NEXORA_ENTERPRISE_SECRET_KEY_PROD_REPLACE_ME")
+# --- KONFIGURASI JWT ---
+# Terima SECRET_KEY atau alias JWT_SECRET_KEY. Di produksi (DEV_MODE != true)
+# secret WAJIB diisi — jika kosong server sengaja gagal start (fail fast) agar
+# token tidak bisa dipalsukan memakai secret default yang diketahui publik.
+_DEV_MODE = os.getenv("DEV_MODE", "false").strip().lower() == "true"
+SECRET_KEY = (os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET_KEY") or "").strip()
+
+if not SECRET_KEY:
+    if _DEV_MODE:
+        SECRET_KEY = "DEV_ONLY_INSECURE_SECRET_" + secrets.token_hex(8)
+        print("[security] WARNING: SECRET_KEY kosong - memakai secret dev sementara (DEV_MODE=true).")
+    else:
+        raise RuntimeError(
+            "CRITICAL: SECRET_KEY (atau JWT_SECRET_KEY) belum diisi di environment. "
+            "Set nilai acak panjang di produksi, atau set DEV_MODE=true untuk lokal."
+        )
+
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
 
