@@ -57,6 +57,7 @@ def get_payroll_summary(
     items = []
     total_output_pcs_all = 0
     total_pengeluaran_gaji_all = 0.0
+    total_borongan_dibayar_all = 0.0
 
     for k in karyawan_list:
         tipe = (k.tipe_pay or "BULANAN").upper()
@@ -141,6 +142,7 @@ def get_payroll_summary(
 
         total_output_pcs_all += total_pcs
         total_pengeluaran_gaji_all += gaji_kalkulasi
+        total_borongan_dibayar_all += float(paid_stats)
 
         items.append({
             "id_karyawan": k.id_karyawan,
@@ -158,7 +160,8 @@ def get_payroll_summary(
         "periode": periode,
         "total_karyawan": len(karyawan_list),
         "total_output_pcs": total_output_pcs_all,
-        "total_tagihan_gaji": total_pengeluaran_gaji_all,
+        "total_tagihan_gaji": total_pengeluaran_gaji_all,   # = OUTSTANDING (belum dicairkan)
+        "total_borongan_sudah_dibayar": total_borongan_dibayar_all,
         "detail_karyawan": items
     }
 

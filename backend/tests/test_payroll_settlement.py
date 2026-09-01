@@ -67,9 +67,11 @@ def test_summary_shows_outstanding_zero_after_settlement(client, auth, db):
 
     client.post("/api/payroll/mark-paid", json={"periode_gaji": "2026-08"}, headers=auth("finance"))
 
-    row = _row(_summary(client, auth), kid)
+    summary = _summary(client, auth)
+    row = _row(summary, kid)
     assert row["total_gaji"] == 0                        # tak ada lagi yang terutang
     assert row["borongan_sudah_dibayar"] == 100 * 550    # tercatat sudah dibayar
+    assert summary["total_borongan_sudah_dibayar"] == 100 * 550   # rollup untuk kartu ringkasan
 
 
 def test_mark_paid_is_idempotent(client, auth, db):

@@ -31,14 +31,16 @@ interface DetailKaryawan {
     gaji_pokok: number;
     tarif_borongan_pcs: number;
     total_pcs_bulan_ini: number;
-    total_gaji: number;
+    total_gaji: number;                 // = OUTSTANDING (belum dicairkan)
+    borongan_sudah_dibayar?: number;    // upah borongan blueprint yg sudah di-mark-paid periode ini
 }
 
 interface PayrollSummaryResponse {
     periode: string;
     total_karyawan: number;
     total_output_pcs: number;
-    total_tagihan_gaji: number;
+    total_tagihan_gaji: number;                 // = OUTSTANDING total (belum dicairkan)
+    total_borongan_sudah_dibayar?: number;
     detail_karyawan: DetailKaryawan[];
 }
 
@@ -125,7 +127,7 @@ export default function PayrollModule() {
 
         const ok = await confirm({
             title: "Cairkan gaji periode ini?",
-            message: `Total ${formatRp(totalNominal)} akan dicairkan untuk periode ${selectedPeriode}. Aksi ini tercatat permanen.`,
+            message: `Sisa gaji yang belum dibayar sebesar ${formatRp(totalNominal)} akan dicairkan untuk periode ${selectedPeriode}. Upah borongan pada periode ini ditandai lunas dan tidak akan muncul lagi di rekap. Aksi ini tercatat permanen.`,
             confirmText: "Cairkan",
         });
         if (!ok) return;
@@ -314,13 +316,18 @@ export default function PayrollModule() {
                         </div>
 
                         <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl bg-gradient-to-br from-slate-900 to-indigo-950/40">
-                            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Total Akumulasi Gaji</p>
+                            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Gaji Belum Dicairkan (Outstanding)</p>
                             <div className="flex items-end gap-2 mt-2">
                                 <Banknote className="w-6 h-6 text-amber-400" />
                                 <span className="text-2xl font-black text-amber-400">
                                     {loading ? '...' : `Rp ${(payrollData?.total_tagihan_gaji || 0).toLocaleString('id-ID')}`}
                                 </span>
                             </div>
+                            <p className="text-[10px] text-slate-500 mt-1.5">
+                                {loading
+                                    ? ' '
+                                    : `Borongan sudah dibayar periode ini: Rp ${(payrollData?.total_borongan_sudah_dibayar || 0).toLocaleString('id-ID')}`}
+                            </p>
                         </div>
                     </div>
 
@@ -433,11 +440,21 @@ export default function PayrollModule() {
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
-                                                <span className="text-[10px] text-slate-400 font-semibold">Total Gaji:</span>
-                                                <span className="text-sm font-black text-emerald-400 font-mono">
-                                                    Rp {k.total_gaji.toLocaleString('id-ID')}
-                                                </span>
+                                            <div className="space-y-1 pt-1 border-t border-slate-800/80">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] text-slate-400 font-semibold">Belum Dibayar:</span>
+                                                    <span className="text-sm font-black text-emerald-400 font-mono">
+                                                        Rp {k.total_gaji.toLocaleString('id-ID')}
+                                                    </span>
+                                                </div>
+                                                {(k.borongan_sudah_dibayar || 0) > 0 && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] text-slate-500 font-semibold">Sudah dibayar:</span>
+                                                        <span className="text-[11px] font-bold text-slate-400 font-mono">
+                                                            Rp {(k.borongan_sudah_dibayar || 0).toLocaleString('id-ID')}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))
@@ -456,13 +473,14 @@ export default function PayrollModule() {
                                             <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'}`}>Skema Pay</th>
                                             <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'}`}>Rate / Gaji Pokok</th>
                                             <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'}`}>Setoran Bulan Ini</th>
-                                            <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'} text-right`}>Total Akumulasi Gaji</th>
+                                            <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'} text-right`}>Sudah Dibayar</th>
+                                            <th className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3 px-3.5'} text-right`}>Belum Dibayar</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800/60 font-mono">
                                         {loading ? (
                                             <tr>
-                                                <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
+                                                <td colSpan={7} className="py-12 text-center text-slate-500 font-sans">
                                                     <div className="flex flex-col items-center justify-center gap-2">
                                                         <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
                                                         <span>Mengkalkulasi setoran dan skema gaji...</span>
@@ -471,7 +489,7 @@ export default function PayrollModule() {
                                             </tr>
                                         ) : payrollData?.detail_karyawan.length === 0 ? (
                                             <tr>
-                                                <td colSpan={6} className="py-12 text-center text-slate-500 font-sans">
+                                                <td colSpan={7} className="py-12 text-center text-slate-500 font-sans">
                                                     Tidak ada data karyawan sesuai filter.
                                                 </td>
                                             </tr>
@@ -500,6 +518,9 @@ export default function PayrollModule() {
                                                     </td>
                                                     <td className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3.5 px-3.5'} text-slate-200 font-bold`}>
                                                         {k.tipe_pay === 'BORONGAN' ? `${k.total_pcs_bulan_ini.toLocaleString('id-ID')} pcs` : '-'}
+                                                    </td>
+                                                    <td className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3.5 px-3.5'} text-right text-slate-400`}>
+                                                        {(k.borongan_sudah_dibayar || 0) > 0 ? `Rp ${(k.borongan_sudah_dibayar || 0).toLocaleString('id-ID')}` : '-'}
                                                     </td>
                                                     <td className={`${viewMode === 'COMPACT' ? 'py-2 px-2.5' : 'py-3.5 px-3.5'} text-right font-bold text-emerald-400 ${viewMode === 'COMPACT' ? 'text-xs' : 'text-sm'}`}>
                                                         Rp {k.total_gaji.toLocaleString('id-ID')}
