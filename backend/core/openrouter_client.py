@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import models
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 OPENROUTER_SITE_NAME = os.getenv("OPENROUTER_SITE_NAME", "Master Garment ERP")
 
@@ -143,6 +143,7 @@ def build_factory_grounded_context(db: Session, user_role: str = "OWNER") -> str
 def call_openrouter_api(messages: List[Dict[str, Any]], model: Optional[str] = None, max_tokens: int = 1500) -> str:
     """
     Eksekusi panggilan HTTP request ke OpenRouter API dengan multi-model fallback error handling yang aman.
+    Prioritas Utama: Anthropic Claude 3.5 Sonnet / Claude 3.7 Sonnet.
     """
     api_key = OPENROUTER_API_KEY
     if not api_key:
@@ -151,11 +152,18 @@ def call_openrouter_api(messages: List[Dict[str, Any]], model: Optional[str] = N
             "Panduan Pengaktifan:\n"
             "1. Buka Render Dashboard -> Web Service 'garmen-erp' -> Environment.\n"
             "2. Tambahkan variable `OPENROUTER_API_KEY=sk-or-v1-...`.\n"
-            "3. Pastikan `OPENROUTER_MODEL=google/gemini-2.5-flash`.\n"
-            "4. Klik Save Changes dan AI Co-Pilot akan langsung aktif!"
+            "3. Pastikan `OPENROUTER_MODEL=anthropic/claude-3.5-sonnet`.\n"
+            "4. Klik Save Changes dan AI Co-Pilot Claude 3.5 Sonnet akan langsung aktif!"
         )
 
-    candidate_models = [model or OPENROUTER_MODEL, "google/gemini-2.5-flash", "anthropic/claude-3.5-sonnet", "deepseek/deepseek-chat"]
+    candidate_models = [
+        model or OPENROUTER_MODEL,
+        "anthropic/claude-3.5-sonnet",
+        "anthropic/claude-3.7-sonnet",
+        "anthropic/claude-3-5-sonnet-20241022",
+        "google/gemini-2.5-flash",
+        "deepseek/deepseek-chat"
+    ]
     # Remove duplicates while preserving order
     models_to_try = []
     for m in candidate_models:
@@ -170,7 +178,7 @@ def call_openrouter_api(messages: List[Dict[str, Any]], model: Optional[str] = N
             "model": target_model,
             "messages": messages,
             "max_tokens": max_tokens,
-            "temperature": 0.3 # Low temperature for accurate, non-hallucinatory ERP reasoning
+            "temperature": 0.2 # Ultra-low temperature for highest precision and zero hallucination
         }
 
         headers = {

@@ -31,7 +31,7 @@ export const AICopilotModal: React.FC<AICopilotModalProps> = ({
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: `Halo ${activeUser?.nama || 'Owner'}! Saya adalah **Master Garment Enterprise AI Co-Pilot** bertenaga Gemini Large-Context. Saya memiliki akses ke data live Sales Order, pergerakan subkon, stok gudang, dan upah borongan pabrik. Apa yang ingin Anda analisis hari ini?`
+      content: `Halo ${activeUser?.nama || 'Owner'}! Saya adalah **Master Garment Enterprise AI Co-Pilot** bertenaga **Claude 3.5 Sonnet**. Saya memiliki akses ke data live Sales Order, pergerakan subkon, stok gudang, dan upah borongan pabrik. Apa yang ingin Anda analisis hari ini?`
     }
   ]);
   const [inputPrompt, setInputPrompt] = useState('');
