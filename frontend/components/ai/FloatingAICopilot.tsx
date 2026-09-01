@@ -43,7 +43,7 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
     return [
       {
         role: 'assistant',
-        content: `Halo ${activeUser?.nama || 'Owner'}! Saya **Master Garment Enterprise AI Co-Pilot** bertenaga **Claude 3.5 Sonnet (High-Accuracy Engine)**. Saya terhubung langsung dengan live data Sales Order, pergerakan subkon, stok kain, dan upah borongan pabrik. Apa yang ingin Anda analisis hari ini?`
+        content: `Halo ${activeUser?.nama || 'Owner'}! Saya **Master Garment Enterprise AI Co-Pilot** bertenaga **Claude Sonnet 5 (Next-Gen High-Accuracy Reasoning Engine)**. Saya terhubung langsung dengan live data Sales Order, pergerakan subkon, stok kain, dan upah borongan pabrik. Apa yang ingin Anda analisis hari ini?`
       }
     ];
   });
@@ -338,7 +338,7 @@ export default function FloatingAICopilot({ activeUser }: FloatingAICopilotProps
                 <div className="flex items-center gap-2">
                   <h3 className="text-xs font-black text-white tracking-wide">AI CO-PILOT</h3>
                   <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[9px] font-mono font-bold">
-                    CLAUDE 3.5 SONNET
+                    CLAUDE SONNET 5
                   </span>
                 </div>
                 {!isMinimized && (
