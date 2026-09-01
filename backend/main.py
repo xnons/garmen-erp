@@ -1,8 +1,7 @@
 from contextlib import asynccontextmanager
-# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
-# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from database import engine, SessionLocal
 import models
 
