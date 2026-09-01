@@ -156,15 +156,14 @@ def call_openrouter_api(messages: List[Dict[str, Any]], model: Optional[str] = N
             "4. Klik Save Changes dan AI Co-Pilot Claude Sonnet 5 akan langsung aktif!"
         )
 
+    # Model utama dari env, lalu rantai fallback dgn slug OpenRouter yang valid:
+    # Claude (kualitas) -> Gemini (murah & cepat) -> DeepSeek (cadangan terakhir).
     candidate_models = [
         model or OPENROUTER_MODEL,
         "anthropic/claude-sonnet-5",
-        "anthropic/claude-5-sonnet",
         "anthropic/claude-3.7-sonnet",
-        "anthropic/claude-3.5-sonnet",
-        "anthropic/claude-3-5-sonnet-20241022",
         "google/gemini-2.5-flash",
-        "deepseek/deepseek-chat"
+        "deepseek/deepseek-chat",
     ]
     # Remove duplicates while preserving order
     models_to_try = []
