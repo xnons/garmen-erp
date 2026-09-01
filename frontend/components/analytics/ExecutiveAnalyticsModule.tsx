@@ -100,7 +100,7 @@ export default function ExecutiveAnalyticsModule() {
             Executive Financial & Profit/Loss Telemetry (Dev & Owner)
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            Analitik Margin & Profit / Loss Pabrik
+            Margin & Profit / Loss Pabrik
             <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               LIVE HPP
             </span>
