@@ -83,9 +83,7 @@ export default function CuttingModal({ isOpen, onClose, onSuccess, orders, initi
       const res = await api.get('/api/karyawan/list');
       const list = res.data?.data || res.data || [];
       setEmployees(list);
-      if (list.length > 0 && !formData.operator_id && !initialData) {
-        setFormData(prev => ({ ...prev, operator_id: list[0].id_karyawan }));
-      }
+      // Operator dipilih manual oleh user — jangan auto-pilih karyawan pertama.
     } catch (err) {
       console.error("Gagal mengambil daftar karyawan:", err);
     }

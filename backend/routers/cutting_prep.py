@@ -12,8 +12,15 @@ from schemas.garment_blueprint import (
 )
 from core.security import get_current_user, require_role
 from core.audit_helper import record_audit
+from core.person_ref import resolve_worker, person_name as _person_name
 
 router = APIRouter(prefix="/api/cutting", tags=["Cutting, Consumption & Preparation"])
+
+# Role yang boleh mencatat tugas persiapan (upah borongan numbering/press).
+_PREP_WRITER_ROLES = [
+    "OWNER", "ADMIN", "DEVELOPER",
+    "PRODUKSI", "CUTTING", "CUTTING_OPERATOR", "PRESS_OPERATOR", "LINE_SUPERVISOR",
+]
 
 def parse_json_safely(val, default):
     if val is None:
@@ -28,8 +35,8 @@ def parse_json_safely(val, default):
             return default
     return default
 
-def format_cutting_record_response(cr: models.CuttingRecord, default_op_name: Optional[str] = None) -> CuttingRecordResponse:
-    op_name = cr.operator.nama if (hasattr(cr, "operator") and cr.operator) else default_op_name
+def format_cutting_record_response(cr: models.CuttingRecord) -> CuttingRecordResponse:
+    op_name = _person_name(cr.operator, cr.operator_id)
     return CuttingRecordResponse(
         id=str(cr.id),
         so_id=cr.so_id,
@@ -50,8 +57,8 @@ def format_cutting_record_response(cr: models.CuttingRecord, default_op_name: Op
         created_at=cr.created_at
     )
 
-def format_prep_task_response(t: models.CuttingPrepTask, default_op_name: Optional[str] = None) -> CuttingPrepTaskResponse:
-    op_name = t.operator.nama if (hasattr(t, "operator") and t.operator) else default_op_name
+def format_prep_task_response(t: models.CuttingPrepTask) -> CuttingPrepTaskResponse:
+    op_name = _person_name(t.operator, t.operator_id)
     return CuttingPrepTaskResponse(
         id=str(t.id),
         so_id=t.so_id,
@@ -86,7 +93,7 @@ def get_cutting_records(
         result = []
         for cr in records:
             try:
-                result.append(format_cutting_record_response(cr, current_user.nama))
+                result.append(format_cutting_record_response(cr))
             except Exception as row_err:
                 print(f"⚠️ Error formatting cutting record row {getattr(cr, 'id', 'unknown')}: {row_err}")
                 continue
@@ -112,9 +119,11 @@ def create_cutting_record(
     main_rate = round(payload.main_fabric_used / payload.qty_cut, 4)
     puring_rate = round((payload.puring_used or 0.0) / payload.qty_cut, 4) if (payload.puring_used and payload.puring_used > 0) else 0.0
 
-    assigned_operator_id = payload.operator_id or current_user.id_karyawan
-    operator_obj = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == assigned_operator_id).first()
-    operator_name = operator_obj.nama if operator_obj else current_user.nama
+    # Operator potong bersifat informasional -> boleh kosong, tapi jika diisi
+    # harus karyawan aktif & bukan akun sistem. Tidak pernah memakai akun login.
+    operator_obj = resolve_worker(db, payload.operator_id, field="Operator potong", required=False)
+    assigned_operator_id = operator_obj.id_karyawan if operator_obj else None
+    operator_name = operator_obj.nama if operator_obj else "(tanpa operator)"
 
     cutting = models.CuttingRecord(
         so_id=payload.so_id,
@@ -144,7 +153,7 @@ def create_cutting_record(
         catatan=f"Potong {payload.qty_cut} pcs oleh '{operator_name}' untuk SO '{so.so_number}'. Konsumsi Utama: {main_rate} Yd/Pcs, Puring: {puring_rate} Yd/Pcs."
     )
 
-    return format_cutting_record_response(cutting, operator_name)
+    return format_cutting_record_response(cutting)
 
 @router.put("/records/{record_id}", response_model=CuttingRecordResponse)
 def update_cutting_record(
@@ -161,6 +170,10 @@ def update_cutting_record(
 
     old_qty = cutting.qty_cut
     update_data = payload.model_dump(exclude_unset=True)
+
+    if update_data.get("operator_id"):
+        resolve_worker(db, update_data["operator_id"], field="Operator potong", required=True)
+
     for k, v in update_data.items():
         if v is not None:
             setattr(cutting, k, v)
@@ -182,7 +195,7 @@ def update_cutting_record(
         catatan=f"Koreksi log potong #{record_id} oleh {current_user.nama} (Qty: {old_qty}->{cutting.qty_cut} pcs, Konsumsi: {cutting.main_consumption_rate} Yd/Pcs)."
     )
 
-    return format_cutting_record_response(cutting, current_user.nama)
+    return format_cutting_record_response(cutting)
 
 @router.delete("/records/{record_id}")
 def delete_cutting_record(
@@ -231,7 +244,7 @@ def get_prep_tasks(
         result = []
         for t in tasks:
             try:
-                result.append(format_prep_task_response(t, current_user.nama))
+                result.append(format_prep_task_response(t))
             except Exception as row_err:
                 print(f"⚠️ Error formatting prep task row {getattr(t, 'id', 'unknown')}: {row_err}")
                 continue
@@ -244,15 +257,17 @@ def get_prep_tasks(
 def create_prep_task(
     payload: CuttingPrepTaskCreate,
     db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(get_current_user)
+    current_user: models.Karyawan = Depends(require_role(_PREP_WRITER_ROLES))
 ):
     so = db.query(models.SalesOrder).filter(models.SalesOrder.id == payload.so_id).first()
     if not so:
         raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
 
-    assigned_operator_id = payload.operator_id or current_user.id_karyawan
-    operator_obj = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == assigned_operator_id).first()
-    operator_name = operator_obj.nama if operator_obj else current_user.nama
+    # Tugas persiapan = upah borongan -> operator WAJIB, aktif, & bukan akun sistem.
+    operator_obj = resolve_worker(db, payload.operator_id, field="Nama pekerja")
+    assert operator_obj is not None
+    assigned_operator_id = operator_obj.id_karyawan
+    operator_name = operator_obj.nama
 
     rate = payload.piece_rate or (150.0 if payload.task_type.upper() == "NUMBERING" else 250.0)
     total_gaji = round(payload.qty_done * rate, 2)
@@ -279,7 +294,7 @@ def create_prep_task(
         catatan=f"Tugas persiapan {payload.task_type} ({payload.qty_done} pcs) oleh {operator_name} didaftarkan."
     )
 
-    return format_prep_task_response(task, operator_name)
+    return format_prep_task_response(task)
 
 @router.put("/prep-tasks/{task_id}", response_model=CuttingPrepTaskResponse)
 def update_prep_task(
@@ -296,6 +311,10 @@ def update_prep_task(
 
     old_qty = task.qty_done
     update_data = payload.model_dump(exclude_unset=True)
+
+    if update_data.get("operator_id"):
+        resolve_worker(db, update_data["operator_id"], field="Pekerja", required=True)
+
     for k, v in update_data.items():
         if v is not None:
             if k == "task_type":
@@ -310,7 +329,6 @@ def update_prep_task(
     db.commit()
     db.refresh(task)
 
-    op_name = task.operator.nama if task.operator else current_user.nama
     record_audit(
         db=db,
         actor_id=current_user.id_karyawan,
@@ -319,7 +337,7 @@ def update_prep_task(
         catatan=f"Tugas persiapan #{task_id} ({task.task_type}) dikoreksi oleh {current_user.nama} (Qty: {old_qty} -> {task.qty_done} pcs, Total Upah: Rp {task.total_wage:,.0f})."
     )
 
-    return format_prep_task_response(task, op_name)
+    return format_prep_task_response(task)
 
 @router.delete("/prep-tasks/{task_id}")
 def delete_prep_task(

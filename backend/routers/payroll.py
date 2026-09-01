@@ -9,6 +9,7 @@ from database import get_db
 import models
 from core.deps import require_roles
 from core.audit_helper import record_audit
+from core.person_ref import exclude_non_workers
 
 router = APIRouter(prefix="/api/payroll", tags=["Payroll & Gaji"])
 
@@ -33,7 +34,12 @@ def get_payroll_summary(
     except ValueError:
         raise HTTPException(status_code=400, detail="Format periode harus YYYY-MM")
 
-    query = db.query(models.Karyawan).filter(models.Karyawan.is_active == True)
+    # Akun sistem/manajerial (DEVELOPER/OWNER/ADMIN/FINANCE) tidak pernah masuk
+    # rekap gaji borongan — walau ada baris upah nyasar yang mereferensikan
+    # id_karyawan mereka (kasus "developer jadi pekerja").
+    query = exclude_non_workers(
+        db.query(models.Karyawan).filter(models.Karyawan.is_active == True)
+    )
 
     if tipe_pay and tipe_pay.upper() != "ALL":
         query = query.filter(func.upper(models.Karyawan.tipe_pay) == tipe_pay.upper())
@@ -201,7 +207,9 @@ def mark_payroll_paid(
         log.paid_at = func.now()
 
     # 2. Rekap dan simpan ke LogPayrollProduksi per pekerja
-    karyawan_active = db.query(models.Karyawan).filter(models.Karyawan.is_active == True).all()
+    karyawan_active = exclude_non_workers(
+        db.query(models.Karyawan).filter(models.Karyawan.is_active == True)
+    ).all()
     for k in karyawan_active:
         user_logs = [l for l in logs_to_update if l.karyawan_id == k.id_karyawan]
         pcs_pass = sum((l.qty_pass or 0) for l in user_logs)

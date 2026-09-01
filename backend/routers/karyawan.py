@@ -13,6 +13,7 @@ from schemas.karyawan import (
 )
 from core.security import get_current_user, get_password_hash
 from core.audit_helper import record_audit
+from core.person_ref import exclude_non_workers
 
 router = APIRouter(prefix="/api", tags=["Karyawan & Pelanggaran"])
 
@@ -140,18 +141,19 @@ async def get_karyawan_dropdown_list(
     Endpoint ringan untuk dropdown selector pekerja di form Meja Potong, Borongan Finishing, dll.
     Dapat diakses oleh semua pengguna terotentikasi.
     """
-    pekerja = db.query(models.Karyawan).filter(models.Karyawan.is_active == True).order_by(models.Karyawan.nama.asc()).all()
+    q = db.query(models.Karyawan).filter(models.Karyawan.is_active == True)
+    q = exclude_non_workers(q)  # buang akun DEVELOPER/OWNER/ADMIN/FINANCE
+    pekerja = q.order_by(models.Karyawan.nama.asc()).all()
+    # Payload sengaja ramping: dipakai lintas semua role terotentikasi untuk
+    # dropdown. Jangan bocorkan username / role akun ke pengguna non-manajerial.
     return [
         {
             "id_karyawan": p.id_karyawan,
             "nama": p.nama,
-            "username": p.username,
-            "role": p.role,
             "jabatan": p.jabatan or "Operator Pabrik",
             "tipe_pay": p.tipe_pay or "BORONGAN",
             "gaji_pokok": float(p.gaji_pokok or 0.0),
             "tarif_borongan_pcs": float(p.tarif_borongan_pcs or 0.0),
-            "is_active": p.is_active
         }
         for p in pekerja
     ]

@@ -146,8 +146,14 @@ def format_material_receipt_response(r: models.MaterialReceipt) -> MaterialRecei
     )
 
 
-def format_inspection_response(fi: models.FabricInspection, current_user_name: Optional[str] = None) -> FabricInspectionResponse:
-    insp_name = fi.inspector.nama if (hasattr(fi, "inspector") and fi.inspector) else current_user_name
+def format_inspection_response(fi: models.FabricInspection) -> FabricInspectionResponse:
+    # Nama inspektur apa adanya; jangan fallback ke user yang membuka halaman.
+    if fi.inspector:
+        insp_name = fi.inspector.nama
+    elif fi.inspector_id:
+        insp_name = "(karyawan tidak terdaftar)"
+    else:
+        insp_name = None
     return FabricInspectionResponse(
         id=str(fi.id),
         receipt_id=fi.receipt_id,
@@ -318,7 +324,7 @@ def get_fabric_inspections(
         joinedload(models.FabricInspection.inspector)
     ).order_by(models.FabricInspection.inspection_date.desc()).all()
 
-    return [format_inspection_response(fi, current_user.nama) for fi in inspections]
+    return [format_inspection_response(fi) for fi in inspections]
 
 @router.post("/inspections", response_model=FabricInspectionResponse, status_code=status.HTTP_201_CREATED)
 def create_fabric_inspection(
@@ -377,7 +383,7 @@ def create_fabric_inspection(
         catatan=f"Uji kain roll {receipt.roll_number or receipt.id} menghasilkan Score: {summary_pt} ({grade} - {receipt_status})."
     )
 
-    return format_inspection_response(inspection, current_user.nama)
+    return format_inspection_response(inspection)
 
 @router.put("/inspections/{inspection_id}", response_model=FabricInspectionResponse)
 def update_fabric_inspection(
@@ -420,7 +426,7 @@ def update_fabric_inspection(
         catatan=f"Koreksi hasil uji kain roll #{inspection.receipt_id} oleh {current_user.nama} (Grade: {inspection.grade}, Score: {inspection.summary_point})."
     )
 
-    return format_inspection_response(inspection, current_user.nama)
+    return format_inspection_response(inspection)
 
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,6 @@ import { KaryawanModule } from '@/components/karyawan/KaryawanModule';
 import SettingModule from '@/components/setting/SettingModule';
 import MesinModule from '@/components/mesin/MesinModule';
 import InventarisModule from '@/components/inventaris/InventarisModule';
-import ProduksiPage from '@/components/produksi/ProduksiPage';
 import TabAuditLog from '@/components/audit/TabAuditLog';
 import PayrollModule from '@/components/payroll/PayrollModule';
 
@@ -59,7 +58,6 @@ export default function DashboardContent({
       case 'karyawan': return 'Kelola Karyawan';
       case 'inventaris': return 'Inventaris & Stok';
       case 'mesin': return 'Inventaris Mesin';
-      case 'produksi': return 'Produksi Borongan';
       case 'payroll': return 'Payroll & Gaji';
       case 'audit-log': return 'Log Audit Keamanan';
       case 'setting': return 'Akun Saya';
@@ -160,10 +158,11 @@ export default function DashboardContent({
       );
     }
 
-    // 2. Produksi & Borongan
-    if (activeMenu === 'produksi') {
-      return <ProduksiPage currentUser={activeUser} />;
-    }
+    // Modul lama "Produksi Borongan" (spk_produksi / log_output_borongan) sudah
+    // digantikan alur 6-fase (Fase 3 Cutting + Fase 5 Finishing Borongan).
+    // Rute & entry-point-nya ditutup agar tidak ada dua sistem borongan paralel.
+    // Kode di components/produksi/* & router /api/produksi/* sengaja dibiarkan
+    // (arsip) — lihat docs/ANALISIS-MODUL-PRODUKSI.md.
 
     // 3. Kelola Karyawan
     if (activeMenu === 'karyawan') {

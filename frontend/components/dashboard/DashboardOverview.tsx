@@ -210,12 +210,9 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
             />
 
             {/* 🟢 BANNER PERINGATAN DEADLINE OTOMATIS */}
-            <DeadlineAlertBanner
-                spkList={spkList}
-                onNavigateToSPK={() => {
-                    if (onNavigate) onNavigate('produksi');
-                }}
-            />
+            {/* Modul lama "Produksi Borongan" sudah ditutup; banner tetap memberi
+                peringatan tenggat tapi tanpa tombol navigasi ke modul lama. */}
+            <DeadlineAlertBanner spkList={spkList} />
 
             {/* HEADER DASHBOARD */}
             <div className="bg-slate-900/90 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
@@ -291,25 +288,25 @@ export default function DashboardOverview({ activeUser, onNavigate }: DashboardO
                 </span>
                 <div className="flex items-center gap-2 shrink-0">
                     <button
-                        onClick={() => onNavigate && onNavigate('ppic')}
+                        onClick={() => onNavigate && onNavigate('ppic-so')}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                     >
                         <Package className="w-3.5 h-3.5" /> + Register SO Baru
                     </button>
                     <button
-                        onClick={() => onNavigate && onNavigate('warehouse')}
+                        onClick={() => onNavigate && onNavigate('warehouse-fabric')}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                     >
                         <Package className="w-3.5 h-3.5" /> + Log Roll Kain
                     </button>
                     <button
-                        onClick={() => onNavigate && onNavigate('cutting')}
+                        onClick={() => onNavigate && onNavigate('cutting-prep')}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600/10 hover:bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                     >
                         <Scissors className="w-3.5 h-3.5" /> + Log Meja Potong
                     </button>
                     <button
-                        onClick={() => onNavigate && onNavigate('shipping')}
+                        onClick={() => onNavigate && onNavigate('shipping-billing')}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600/10 hover:bg-sky-600/20 text-sky-300 border border-sky-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                     >
                         <TrendingUp className="w-3.5 h-3.5" /> + Terbitkan SJP

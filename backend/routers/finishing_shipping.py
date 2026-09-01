@@ -12,6 +12,14 @@ from schemas.garment_blueprint import (
 )
 from core.security import get_current_user, require_role
 from core.audit_helper import record_audit
+from core.person_ref import resolve_worker
+
+# Role yang boleh mencatat upah borongan finishing (mirror visibilitas menu Fase 5
+# + role edit di PUT). GUDANG / PPIC / QC / EXPEDITION_DRIVER sengaja tidak masuk.
+_WAGE_WRITER_ROLES = [
+    "OWNER", "ADMIN", "DEVELOPER", "FINANCE",
+    "PRODUKSI", "FINISHING_OPERATOR", "LINE_SUPERVISOR",
+]
 
 router = APIRouter(prefix="/api/shipping", tags=["Finishing Borongan, Expedisi & Billing Form WI"])
 
@@ -28,8 +36,16 @@ def parse_json_safely(val, default):
             return default
     return default
 
-def format_piece_rate_wage_response(w: models.PieceRateWage, default_op_name: Optional[str] = None) -> PieceRateWageResponse:
-    op_name = w.operator.nama if (hasattr(w, "operator") and w.operator) else default_op_name
+def format_piece_rate_wage_response(w: models.PieceRateWage) -> PieceRateWageResponse:
+    # JANGAN pernah fallback ke nama user yang sedang login: itu membuat baris
+    # yatim (operator_id kosong / karyawan terhapus) tampil sebagai "pekerja"
+    # yang berbeda-beda tergantung siapa yang membuka halaman.
+    if w.operator:
+        op_name = w.operator.nama
+    elif w.operator_id:
+        op_name = "(pekerja tidak terdaftar)"
+    else:
+        op_name = None
     return PieceRateWageResponse(
         id=str(w.id),
         so_id=w.so_id,
@@ -46,8 +62,10 @@ def format_piece_rate_wage_response(w: models.PieceRateWage, default_op_name: Op
         created_at=w.created_at
     )
 
-def format_shipment_response(s: models.Shipment, default_driver_name: Optional[str] = None) -> ShipmentResponse:
-    drv_name = s.driver.nama if (hasattr(s, "driver") and s.driver) else (s.driver_name or default_driver_name)
+def format_shipment_response(s: models.Shipment) -> ShipmentResponse:
+    # driver_name kolom teks bebas (sopir ekspedisi luar) dipakai apa adanya;
+    # tidak pernah fallback ke nama user yang sedang login.
+    drv_name = s.driver.nama if s.driver else s.driver_name
     return ShipmentResponse(
         id=str(s.id),
         so_id=s.so_id,
@@ -91,7 +109,7 @@ def get_piece_rate_wages(
         result = []
         for w in wages:
             try:
-                result.append(format_piece_rate_wage_response(w, current_user.nama))
+                result.append(format_piece_rate_wage_response(w))
             except Exception as row_err:
                 print(f"⚠️ Error formatting wage row {getattr(w, 'id', 'unknown')}: {row_err}")
                 continue
@@ -104,15 +122,19 @@ def get_piece_rate_wages(
 def create_piece_rate_wage(
     payload: PieceRateWageCreate,
     db: Session = Depends(get_db),
-    current_user: models.Karyawan = Depends(get_current_user)
+    current_user: models.Karyawan = Depends(require_role(_WAGE_WRITER_ROLES))
 ):
     so = db.query(models.SalesOrder).filter(models.SalesOrder.id == payload.so_id).first()
     if not so:
         raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
 
-    assigned_operator_id = payload.operator_id or current_user.id_karyawan
-    operator_obj = db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == assigned_operator_id).first()
-    operator_name = operator_obj.nama if operator_obj else current_user.nama
+    # Operator WAJIB, harus karyawan AKTIF, dan BUKAN akun sistem/manajerial.
+    # Tanpa ini akun dev/owner bisa tercatat sebagai buruh borongan & upahnya
+    # mengalir ke Payroll (bug "Muhammad tegar jadi pekerja").
+    operator_obj = resolve_worker(db, payload.operator_id, field="Nama pekerja / operator")
+    assert operator_obj is not None  # resolve_worker(required=True) sudah raise kalau invalid
+    assigned_operator_id = operator_obj.id_karyawan
+    operator_name = operator_obj.nama
 
     total_wage = round(payload.qty_completed * payload.wage_per_piece, 2)
 
@@ -140,7 +162,7 @@ def create_piece_rate_wage(
         catatan=f"Entri upah {payload.operation_type} ({payload.qty_completed} pcs @ Rp {payload.wage_per_piece}) untuk {operator_name} (Total: Rp {total_wage:,.0f})."
     )
 
-    return format_piece_rate_wage_response(wage, operator_name)
+    return format_piece_rate_wage_response(wage)
 
 @router.put("/wages/{wage_id}", response_model=PieceRateWageResponse)
 def update_piece_rate_wage(
@@ -157,6 +179,11 @@ def update_piece_rate_wage(
 
     old_total = wage.total_wage
     update_data = payload.model_dump(exclude_unset=True)
+
+    # Kalau operator_id diganti, harus karyawan aktif & bukan akun sistem.
+    if "operator_id" in update_data:
+        resolve_worker(db, update_data.get("operator_id"), field="Pekerja", required=True)
+
     for k, v in update_data.items():
         if v is not None:
             if k == "operation_type":
@@ -170,7 +197,7 @@ def update_piece_rate_wage(
     db.commit()
     db.refresh(wage)
 
-    op_name = wage.operator.nama if wage.operator else current_user.nama
+    op_name = wage.operator.nama if wage.operator else "(pekerja tidak terdaftar)"
     record_audit(
         db=db,
         actor_id=current_user.id_karyawan,
@@ -179,7 +206,7 @@ def update_piece_rate_wage(
         catatan=f"Upah borongan #{wage_id} ({wage.operation_type} - {op_name}) dikoreksi oleh {current_user.nama} (Rp {old_total:,.0f} -> Rp {wage.total_wage:,.0f})."
     )
 
-    return format_piece_rate_wage_response(wage, op_name)
+    return format_piece_rate_wage_response(wage)
 
 @router.delete("/wages/{wage_id}")
 def delete_piece_rate_wage(
@@ -226,7 +253,7 @@ def get_shipments(
         result = []
         for s in shipments:
             try:
-                result.append(format_shipment_response(s, current_user.nama))
+                result.append(format_shipment_response(s))
             except Exception as row_err:
                 print(f"⚠️ Error formatting shipment row {getattr(s, 'id', 'unknown')}: {row_err}")
                 continue
@@ -249,14 +276,19 @@ def create_shipment(
     if existing_sjp:
         raise HTTPException(status_code=400, detail=f"Nomor SJP '{payload.surat_jalan_no}' sudah terdaftar!")
 
+    # Sopir opsional. Jika driver_id diisi harus karyawan aktif (bukan akun
+    # sistem); jika tidak, simpan apa adanya (driver_name teks bebas / kosong)
+    # — JANGAN cap user yang login sebagai sopir.
+    resolve_worker(db, payload.driver_id, field="Sopir", required=False)
+
     total_invoice = round(payload.total_qty_shipped * payload.unit_price, 2)
 
     shipment = models.Shipment(
         so_id=payload.so_id,
         shipment_date=payload.shipment_date,
         surat_jalan_no=payload.surat_jalan_no.upper(),
-        driver_id=payload.driver_id or current_user.id_karyawan,
-        driver_name=payload.driver_name or (current_user.nama if not payload.driver_id else None),
+        driver_id=payload.driver_id or None,
+        driver_name=(payload.driver_name.strip() if payload.driver_name and payload.driver_name.strip() else None),
         vehicle_plate_no=payload.vehicle_plate_no,
         carton_box_count=payload.carton_box_count or 0,
         destination_address=payload.destination_address,
@@ -284,7 +316,7 @@ def create_shipment(
         catatan=f"Pengiriman SJP '{shipment.surat_jalan_no}' sejumlah {payload.total_qty_shipped} pcs untuk SO '{so.so_number}'."
     )
 
-    return format_shipment_response(shipment, current_user.nama)
+    return format_shipment_response(shipment)
 
 @router.put("/shipments/{shipment_id}", response_model=ShipmentResponse)
 def update_shipment(
@@ -325,9 +357,7 @@ def update_shipment(
         catatan=f"SJP '{shipment.surat_jalan_no}' dikoreksi oleh {current_user.nama} (Qty: {old_qty}->{shipment.total_qty_shipped} pcs, Tagihan: Rp {old_inv:,.0f} -> Rp {shipment.total_invoice_amount:,.0f})."
     )
 
-    resp = ShipmentResponse.from_orm(shipment)
-    resp.driver_name = getattr(shipment.driver, "nama", current_user.nama)
-    return resp
+    return format_shipment_response(shipment)
 
 @router.delete("/shipments/{shipment_id}")
 def delete_shipment(

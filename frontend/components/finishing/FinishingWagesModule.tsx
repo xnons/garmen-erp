@@ -91,7 +91,7 @@ export default function FinishingWagesModule() {
   const handleOpenCreateWage = () => {
     setEditingWage(null);
     setFormData({
-      operator_id: employees.length > 0 ? employees[0].id_karyawan : "",
+      operator_id: "", // wajib dipilih manual — jangan auto-pilih karyawan pertama
       so_id: orders.length > 0 ? orders[0].id : "",
       operation_type: "STIM",
       work_date: new Date().toISOString().split('T')[0],

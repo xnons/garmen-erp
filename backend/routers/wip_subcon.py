@@ -27,11 +27,17 @@ def parse_json_safely(val, default):
             return default
     return default
 
-def format_wip_movement_response(m: models.WIPMovement, current_user_name: Optional[str] = None) -> WIPMovementResponse:
+def format_wip_movement_response(m: models.WIPMovement) -> WIPMovementResponse:
     so_num = m.sales_order.so_number if m.sales_order else None
     style_nm = m.sales_order.style_name if m.sales_order else None
     ptr_nm = m.partner.name if m.partner else None
-    spv_nm = m.supervisor.nama if (hasattr(m, "supervisor") and m.supervisor) else current_user_name
+    # Nama supervisor internal apa adanya; jangan fallback ke user yang membuka halaman.
+    if m.supervisor:
+        spv_nm = m.supervisor.nama
+    elif m.internal_supervisor_id:
+        spv_nm = "(karyawan tidak terdaftar)"
+    else:
+        spv_nm = None
 
     return WIPMovementResponse(
         id=str(m.id),
@@ -99,7 +105,7 @@ def get_wip_movements(
         result = []
         for m in movements:
             try:
-                result.append(format_wip_movement_response(m, current_user.nama))
+                result.append(format_wip_movement_response(m))
             except Exception as row_err:
                 print(f"⚠️ Error formatting movement row {getattr(m, 'id', 'unknown')}: {row_err}")
                 continue
@@ -167,7 +173,7 @@ def create_wip_dispatch(
         catatan=f"Surat Jalan Kirim {payload.qty_dispatched} pcs ke {payload.stage_name} (SJ: {sj_num}) untuk SO '{so.so_number}'."
     )
 
-    return format_wip_movement_response(movement, current_user.nama)
+    return format_wip_movement_response(movement)
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +242,7 @@ def receive_wip_movement(
         catatan=f"Terima {qty_rec} pcs (Rijek: {qty_rej}, Selisih: {discrepancy}) dari {movement.stage_name} untuk SO '{movement.sales_order.so_number if movement.sales_order else 'N/A'}'."
     )
 
-    return format_wip_movement_response(movement, current_user.nama)
+    return format_wip_movement_response(movement)
 
 @router.put("/movements/{movement_id}", response_model=WIPMovementResponse)
 def update_wip_movement(
@@ -282,7 +288,7 @@ def update_wip_movement(
         catatan=f"Surat Jalan #{movement.surat_jalan_no or movement_id} (SO: {so_num}) dikoreksi oleh {current_user.nama} (Kirim: {old_dispatch}->{movement.qty_dispatched}, Terima: {old_rec}->{movement.qty_received})."
     )
 
-    return format_wip_movement_response(movement, current_user.nama)
+    return format_wip_movement_response(movement)
 
 @router.delete("/movements/{movement_id}")
 def delete_wip_movement(
