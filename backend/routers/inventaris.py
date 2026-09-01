@@ -18,24 +18,7 @@ from schemas.inventaris import (
     StatusPembayaran
 )
 from core.security import get_current_user
-
-
-# ---------------------------------------------------------------------------
-# RBAC DEPENDENCY CHECKER
-# ---------------------------------------------------------------------------
-def require_roles(allowed_roles: List[str]):
-    """Dependency untuk membatasi endpoint berdasarkan role JWT user."""
-    def role_checker(current_user: models.Karyawan = Depends(get_current_user)):
-        user_role = getattr(current_user, "role", "").upper()
-        allowed_uppercase = [r.upper() for r in allowed_roles]
-        
-        if user_role not in allowed_uppercase:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Akses ditolak! Fitur ini membutuhkan role: {', '.join(allowed_uppercase)}"
-            )
-        return current_user
-    return role_checker
+from core.deps import require_roles
 
 
 # 🔒 Inisialisasi APIRouter dengan Proteksi Kunci (OWNER, DEVELOPER, ADMIN, GUDANG)

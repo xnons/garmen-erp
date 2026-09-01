@@ -95,22 +95,12 @@ def get_current_user_role(token: str = Depends(oauth2_scheme)) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Sesi masuk telah berakhir, silakan login ulang."
         )
-    # --- RBAC ROLE GUARD DEPENDENCY ---
+# --- RBAC ROLE GUARD DEPENDENCY ---
+# Implementasi kanonik ada di core.deps.require_roles. `require_role` dipertahankan
+# sebagai alias tipis demi kompatibilitas import lama (8 router memakainya).
+# Import lokal di dalam fungsi untuk menghindari circular import
+# (core.deps mengimpor get_current_user dari modul ini).
 def require_role(allowed_roles: list[str]):
-    """
-    Dependency builder untuk membatasi akses endpoint berdasarkan Role Karyawan.
-    Contoh Penggunaan di Router:
-    current_user: models.Karyawan = Depends(require_role(["OWNER", "DEVELOPER"]))
-    """
-    def role_checker(current_user: models.Karyawan = Depends(get_current_user)):
-        # Ambil role dari objek user (pastikan atribut kolom di models.Karyawan sesuai, misal: role)
-        user_role = str(getattr(current_user, "role", "")).upper()
-        
-        if user_role not in [r.upper() for r in allowed_roles]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Akses ditolak! Peran '{user_role}' tidak memiliki izin untuk melakukan aksi ini."
-            )
-        return current_user
-        
-    return role_checker
+    """Alias ke core.deps.require_roles. Gunakan require_roles untuk kode baru."""
+    from core.deps import require_roles
+    return require_roles(allowed_roles)
