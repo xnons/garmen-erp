@@ -145,6 +145,42 @@ def format_material_receipt_response(r: models.MaterialReceipt) -> MaterialRecei
         created_at=r.created_at
     )
 
+
+def format_inspection_response(fi: models.FabricInspection, current_user_name: Optional[str] = None) -> FabricInspectionResponse:
+    insp_name = fi.inspector.nama if (hasattr(fi, "inspector") and fi.inspector) else current_user_name
+    return FabricInspectionResponse(
+        id=str(fi.id),
+        receipt_id=fi.receipt_id,
+        inspector_id=fi.inspector_id,
+        inspector_name=insp_name,
+        inspection_date=fi.inspection_date,
+        lot_number=fi.lot_number,
+        length_before=fi.length_before or 0.0,
+        length_after=fi.length_after or 0.0,
+        width_inch=fi.width_inch or 0.0,
+        total_defect_points=fi.total_defect_points or 0,
+        summary_point=fi.summary_point or 0.0,
+        grade=fi.grade or "GRADE_A",
+        defect_remarks=fi.defect_remarks,
+        created_at=fi.created_at,
+    )
+
+
+def format_allocation_response(a: models.MaterialAllocation) -> MaterialAllocationResponse:
+    so_num = a.sales_order.so_number if (hasattr(a, "sales_order") and a.sales_order) else None
+    item_desc = a.item.description if (hasattr(a, "item") and a.item) else None
+    return MaterialAllocationResponse(
+        id=str(a.id),
+        so_id=a.so_id,
+        item_id=a.item_id,
+        dispatch_date=a.dispatch_date,
+        qty_issued=a.qty_issued or 0.0,
+        surat_jalan_no=a.surat_jalan_no,
+        so_number=so_num,
+        item_description=item_desc,
+        created_at=a.created_at,
+    )
+
 # ---------------------------------------------------------------------------
 # 2. GOODS RECEIPT NOTE (BARANG MASUK)
 # ---------------------------------------------------------------------------

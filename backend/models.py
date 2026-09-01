@@ -480,6 +480,7 @@ class MaterialReceipt(Base):
     unit = Column(String(20), default="YARD")
     contract_type = Column(String(20), default="FOB")                      # 'FOB' / 'CMT'
     inspection_status = Column(String(30), default="PENDING")              # 'PENDING', 'PASSED', 'REJECTED'
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     item = relationship("InventoryItem", foreign_keys=[item_id])
     supplier = relationship("Partner", foreign_keys=[supplier_id])
@@ -513,6 +514,7 @@ class MaterialAllocation(Base):
     dispatch_date = Column(Date, nullable=False)
     qty_issued = Column(Float, nullable=False)
     surat_jalan_no = Column(String(100), nullable=True)                    # 'CJM-2608.100' (Sheet25)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
     item = relationship("InventoryItem", foreign_keys=[item_id])
@@ -555,6 +557,7 @@ class CuttingPrepTask(Base):
     size_breakdown = Column(JSON, default={})
     piece_rate = Column(Float, default=0.0)
     total_wage = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
     operator = relationship("Karyawan", foreign_keys=[operator_id])
@@ -580,6 +583,7 @@ class WIPMovement(Base):
     balance_discrepancy = Column(Integer, default=0)                       # qty_dispatched - (qty_received + qty_reject)
     status = Column(String(30), default="IN_PROCESS")                      # 'IN_PROCESS', 'PARTIAL_RECEIVED', 'COMPLETED', 'DISCREPANCY_FLAG'
     remarks = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
     partner = relationship("Partner", foreign_keys=[partner_id])
@@ -614,6 +618,7 @@ class PieceRateWage(Base):
     wage_per_piece = Column(Float, nullable=False)                         # misal Rp500 atau Rp600
     total_wage = Column(Float, default=0.0)
     notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
     operator = relationship("Karyawan", foreign_keys=[operator_id])
@@ -639,6 +644,7 @@ class Shipment(Base):
     vehicle_plate_no = Column(String(50), nullable=True)                   # Nomor Polisi Truk / Mobil
     carton_box_count = Column(Integer, default=0)                          # Jumlah Koli / Dus Karton
     destination_address = Column(Text, nullable=True)                      # Alamat Gudang Tujuan Buyer
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
     driver = relationship("Karyawan", foreign_keys=[driver_id])
