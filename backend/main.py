@@ -12,7 +12,7 @@ from core.security import get_password_hash
 from routers import auth, karyawan, mesin, inventaris, dashboard, audit, payroll
 from routers import produksi_master, produksi_output
 from routers import ppic_so, warehouse_fabric, cutting_prep, wip_subcon, finishing_shipping
-from routers import ai_copilot, email_reports, reports
+from routers import ai_copilot, email_reports, reports, notifications
 
 def init_db():
     try:
@@ -306,6 +306,18 @@ async def lifespan(app: FastAPI):
             db.close()
         except Exception:
             pass
+
+    # Pindai kondisi risiko & buat notifikasi awal (deadline, stok, selisih vendor).
+    try:
+        from core.alert_engine import run_scan
+        scan_db = SessionLocal()
+        try:
+            res = run_scan(scan_db)
+            print(f"🔔 Alert scan: {res['total_created']} notifikasi baru.")
+        finally:
+            scan_db.close()
+    except Exception as alert_err:
+        print(f"⚠️ Alert scan gagal: {alert_err}")
     
     yield
     print("🔴 Engine Nexora ERP dimatikan.")
@@ -406,6 +418,9 @@ app.include_router(email_reports.router)
 
 # 🟢 Router Laporan Agregat (produksi / keuangan / vendor scorecard)
 app.include_router(reports.router)
+
+# 🟢 Router Notifikasi & Alert
+app.include_router(notifications.router)
 
 @app.get("/")
 def root_check():

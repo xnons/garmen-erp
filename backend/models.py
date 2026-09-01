@@ -647,4 +647,24 @@ class Shipment(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     sales_order = relationship("SalesOrder", foreign_keys=[so_id])
-    driver = relationship("Karyawan", foreign_keys=[driver_id])
+    driver = relationship("Karyawan", foreign_keys=[driver_id])
+
+
+# ===========================================================================
+# 9. NOTIFIKASI & ALERT (peringatan dini lintas-modul)
+# ===========================================================================
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    type = Column(String(40), nullable=False)          # DEADLINE_SOON, DEADLINE_OVERDUE, LOW_STOCK, VENDOR_DISCREPANCY, SECURITY_LOGIN
+    severity = Column(String(20), nullable=False, default="WARNING")  # INFO, WARNING, CRITICAL
+    title = Column(String(200), nullable=False)
+    body = Column(Text, nullable=True)
+    target_roles = Column(String(200), default="*")    # csv role, atau "*" untuk semua
+    ref_type = Column(String(40), nullable=True)       # SO, ITEM, WIP_MOVEMENT, LOGIN
+    ref_id = Column(String(100), nullable=True)
+    menu_hint = Column(String(60), nullable=True)      # id menu frontend untuk navigasi saat diklik
+    dedup_key = Column(String(160), index=True, nullable=True)  # cegah duplikat saat scan berulang
+    is_read = Column(Boolean, default=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
