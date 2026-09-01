@@ -121,6 +121,24 @@ def test_post_wages_forbidden_for_non_writer_role(client, auth, db, make_so):
     assert r.status_code == 403, r.text
 
 
+def test_post_wages_rejects_zero_qty(client, auth, db, make_so):
+    so_id = make_so()
+    _mk_worker(db)
+    r = client.post("/api/shipping/wages",
+                    json=_payload(so_id, operator_id="WRK-100", qty_completed=0),
+                    headers=auth("developer"))
+    assert r.status_code == 422, r.text
+
+
+def test_post_wages_rejects_negative_wage(client, auth, db, make_so):
+    so_id = make_so()
+    _mk_worker(db)
+    r = client.post("/api/shipping/wages",
+                    json=_payload(so_id, operator_id="WRK-100", wage_per_piece=-5),
+                    headers=auth("developer"))
+    assert r.status_code == 422, r.text
+
+
 def test_post_with_valid_operator_succeeds(client, auth, db, make_so):
     so_id = make_so()
     _mk_worker(db)

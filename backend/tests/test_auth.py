@@ -108,3 +108,25 @@ def test_register_duplicate_username_400(client, auth):
                     json={"nama": "Dup", "username": "produksi", "password": "pass12345", "role": "PRODUKSI"},
                     headers=auth("developer"))
     assert r.status_code == 400
+
+
+def test_register_managerial_role_not_defaulted_to_borongan(client, auth, db):
+    r = client.post("/api/auth/register",
+                    json={"nama": "Bu Fin", "username": "finance2", "password": "pass12345", "role": "FINANCE"},
+                    headers=auth("developer"))
+    assert r.status_code == 201, r.text
+    import models
+    k = db.query(models.Karyawan).filter(models.Karyawan.username == "finance2").first()
+    assert k.tipe_pay == "BULANAN"          # bukan BORONGAN
+    assert k.can_login is True
+
+
+def test_register_respects_can_login_false(client, auth, db):
+    r = client.post("/api/auth/register",
+                    json={"nama": "Offline", "username": "offline1", "password": "pass12345",
+                          "role": "PRODUKSI", "can_login": False},
+                    headers=auth("developer"))
+    assert r.status_code == 201, r.text
+    import models
+    k = db.query(models.Karyawan).filter(models.Karyawan.username == "offline1").first()
+    assert k.can_login is False

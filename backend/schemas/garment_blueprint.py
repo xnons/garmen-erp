@@ -287,12 +287,12 @@ class CuttingRecordResponse(BaseModel):
 
 class CuttingPrepTaskCreate(BaseModel):
     so_id: str
-    operator_id: Optional[str] = None
+    operator_id: str = Field(..., min_length=1)  # wajib — divalidasi lebih lanjut oleh resolve_worker()
     task_type: str # NUMBERING / PRESS_INTERLINING
     task_date: date
-    qty_done: int
+    qty_done: int = Field(..., gt=0)
     size_breakdown: Optional[Dict[str, int]] = {}
-    piece_rate: Optional[float] = 0.0
+    piece_rate: float = Field(0.0, ge=0)
 
 class CuttingPrepTaskUpdate(BaseModel):
     operator_id: Optional[str] = None
@@ -386,13 +386,13 @@ class WIPMovementResponse(BaseModel):
 # ===========================================================================
 class PieceRateWageCreate(BaseModel):
     so_id: str
-    operator_id: Optional[str] = None
+    operator_id: str = Field(..., min_length=1)  # wajib — divalidasi lebih lanjut oleh resolve_worker()
     operation_type: str # JAHIT_SEWING, OBRAS, STIM, LUBANG_KANCING, PASANG_KANCING, BUANG_BENANG, LIPAT, PACKING, PRESS_INTERLINING, POTONG_POLA
     work_date: date
-    qty_completed: int
-    qty_reject: Optional[int] = 0
+    qty_completed: int = Field(..., gt=0)
+    qty_reject: int = Field(0, ge=0)
     size_breakdown: Optional[dict] = {}
-    wage_per_piece: float # e.g. 550 or 2500
+    wage_per_piece: float = Field(..., ge=0)  # e.g. 550 or 2500
     notes: Optional[str] = None
 
 class PieceRateWageUpdate(BaseModel):
