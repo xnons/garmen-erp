@@ -10,8 +10,9 @@ import {
 import { toast } from 'sonner';
 import api from '@/services/api';
 import { useConfirm } from '@/components/common/ConfirmDialog';
-import { errMsg } from '@/utils/format';
+import { errMsg, formatRp } from '@/utils/format';
 import Pagination from '@/components/common/Pagination';
+import StatusBadge from '@/components/common/StatusBadge';
 import SalesOrderModal from './SalesOrderModal';
 import PartnerModal from './PartnerModal';
 
@@ -272,7 +273,7 @@ export default function PPICModule() {
                 <DollarSign className="w-3.5 h-3.5 text-amber-400" />
                 Total Nilai Kontrak
               </span>
-              <p className="text-xl font-black text-amber-300 mt-1">Rp {orderMetrics.totalValue.toLocaleString('id-ID')}</p>
+              <p className="text-xl font-black text-amber-300 mt-1">{formatRp(orderMetrics.totalValue)}</p>
             </div>
 
             <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
@@ -383,12 +384,10 @@ export default function PPICModule() {
                           </span>
                         </td>
                         <td className="py-3 px-3 text-right font-bold text-emerald-400 font-mono">{(so.order_qty || 0).toLocaleString('id-ID')} pcs</td>
-                        <td className="py-3 px-3 text-right font-mono text-slate-300">Rp {(so.unit_price || 0).toLocaleString('id-ID')}</td>
-                        <td className="py-3 px-3 text-right font-mono font-bold text-amber-300">Rp {totalVal.toLocaleString('id-ID')}</td>
+                        <td className="py-3 px-3 text-right font-mono text-slate-300">{formatRp(so.unit_price)}</td>
+                        <td className="py-3 px-3 text-right font-mono font-bold text-amber-300">{formatRp(totalVal)}</td>
                         <td className="py-3 px-3 text-center">
-                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[10px] font-bold uppercase">
-                            {so.status}
-                          </span>
+                          <StatusBadge status={so.status} />
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-1">
@@ -455,14 +454,15 @@ export default function PPICModule() {
                             {so.so_number}
                           </h3>
                           <p className="text-xs text-slate-300 font-bold">{so.style_name}</p>
+                          <div className="mt-1.5"><StatusBadge status={so.status} /></div>
                         </div>
-                        
+
                         <div className="text-right">
                           <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-slate-800 text-emerald-400 border border-slate-700 block font-mono">
                             {(so.order_qty || 0).toLocaleString('id-ID')} Pcs
                           </span>
                           <span className="text-[11px] font-bold text-emerald-400/90 font-mono block mt-1">
-                            Rp {totalVal.toLocaleString('id-ID')}
+                            {formatRp(totalVal)}
                           </span>
                         </div>
                       </div>

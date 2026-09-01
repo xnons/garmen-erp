@@ -14,6 +14,7 @@ import SubconDispatcherModal from './SubconDispatcherModal';
 import WIPReceiveModal from './WIPReceiveModal';
 import PrintSuratJalanModal from '../common/PrintSuratJalanModal';
 import Pagination from '@/components/common/Pagination';
+import StatusBadge from '@/components/common/StatusBadge';
 
 export default function WIPSubconModule() {
   const confirm = useConfirm();
@@ -323,7 +324,6 @@ export default function WIPSubconModule() {
                 </tr>
               ) : (
                 pagedMovements.map((m) => {
-                  const isCompleted = m.status === 'COMPLETED';
                   const hasDisc = m.balance_discrepancy > 0;
                   return (
                     <tr key={m.id} className="hover:bg-slate-800/30 transition-colors">
@@ -374,15 +374,7 @@ export default function WIPSubconModule() {
                       </td>
 
                       <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          isCompleted
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : hasDisc
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-slate-800 text-slate-300 border border-slate-700'
-                        }`}>
-                          {m.status}
-                        </span>
+                        <StatusBadge status={m.status} />
                       </td>
 
                       <td className="py-3 px-4 text-center">
@@ -428,7 +420,6 @@ export default function WIPSubconModule() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {pagedMovements.map((m) => {
-            const isCompleted = m.status === 'COMPLETED';
             const hasDisc = m.balance_discrepancy > 0;
             return (
               <div key={m.id} className="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-3 flex flex-col justify-between hover:border-slate-700 transition-all">
@@ -441,11 +432,7 @@ export default function WIPSubconModule() {
                       <h4 className="text-base font-black text-white mt-1">{m.surat_jalan_no}</h4>
                       <p className="text-xs text-slate-400 font-mono">Tgl: {m.dispatch_date}</p>
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      isCompleted ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    }`}>
-                      {m.status}
-                    </span>
+                    <StatusBadge status={m.status} />
                   </div>
 
                   <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs my-2 space-y-1">
