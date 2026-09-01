@@ -407,9 +407,13 @@ app.include_router(payroll.router)
 # 🟢 Router Dashboard
 app.include_router(dashboard.router)
 
-# 🟢 Router Produksi
-app.include_router(produksi_master.router)
-app.include_router(produksi_output.router)
+# 🟠 Router Produksi (LEGACY — modul "Produksi Borongan" lama, digantikan alur
+# 6-fase). Navigasi UI-nya sudah ditutup; endpoint /api/produksi/* hanya
+# di-mount di DEV_MODE agar tak jadi permukaan tak terpakai di produksi.
+# Kode & tabel spk_* dibiarkan sebagai arsip — lihat docs/ANALISIS-MODUL-PRODUKSI.md.
+if _DEV_MODE:
+    app.include_router(produksi_master.router)
+    app.include_router(produksi_output.router)
 
 # 🟢 Router Audit & Keamanan (Baru Ditambahkan)
 app.include_router(audit.router)
