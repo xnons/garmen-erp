@@ -340,6 +340,7 @@ class WIPReceiveCreate(BaseModel):
     size_breakdown_received: Optional[Dict[str, int]] = {}
     defect_reason: Optional[str] = None
     remarks: Optional[str] = None
+    is_partial: Optional[bool] = False  # True = sisa barang menyusul (bukan selisih hilang)
 
 class WIPMovementUpdate(BaseModel):
     surat_jalan_no: Optional[str] = None

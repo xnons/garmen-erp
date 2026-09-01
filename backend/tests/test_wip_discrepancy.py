@@ -2,7 +2,6 @@
 WIP subcon: rumus selisih  Kirim - (Terima + Rijek) = Selisih  dan status.
 """
 from datetime import date
-import pytest
 
 DISPATCH = "/api/wip/dispatch"
 
@@ -58,9 +57,8 @@ def test_missing_goods_produce_positive_discrepancy(client, auth, make_so):
     assert r.json()["balance_discrepancy"] == 4        # nilai inti yang dipakai AI/alert/dashboard
 
 
-@pytest.mark.xfail(reason="BUG diketahui: status DISCREPANCY_FLAG tak pernah di-set oleh /receive "
-                          "(cabang PARTIAL_RECEIVED menangkap semua selisih > 0). Fix menyusul.")
 def test_missing_goods_flag_status(client, auth, make_so):
+    """Selisih > 0 tanpa is_partial -> DISCREPANCY_FLAG (barang hilang, perlu klarifikasi)."""
     so = make_so()
     h = auth("developer")
     mv = _dispatch(client, h, so, qty=100).json()
@@ -68,6 +66,36 @@ def test_missing_goods_flag_status(client, auth, make_so):
         "received_date": date(2026, 3, 10).isoformat(),
         "qty_received": 96, "qty_reject": 0,
     }, headers=h)
+    assert r.status_code == 200
+    assert r.json()["balance_discrepancy"] == 4
+    assert r.json()["status"] == "DISCREPANCY_FLAG"
+
+
+def test_explicit_partial_receipt_not_flagged(client, auth, make_so):
+    """is_partial=True -> PARTIAL_RECEIVED, tidak memicu alarm selisih."""
+    so = make_so()
+    h = auth("developer")
+    mv = _dispatch(client, h, so, qty=100).json()
+    r = client.put(f"/api/wip/movements/{mv['id']}/receive", json={
+        "received_date": date(2026, 3, 10).isoformat(),
+        "qty_received": 60, "qty_reject": 0, "is_partial": True,
+    }, headers=h)
+    assert r.status_code == 200
+    assert r.json()["balance_discrepancy"] == 40
+    assert r.json()["status"] == "PARTIAL_RECEIVED"
+
+
+def test_over_receipt_is_flagged(client, auth, make_so):
+    """Terima > Kirim juga anomali -> DISCREPANCY_FLAG."""
+    so = make_so()
+    h = auth("developer")
+    mv = _dispatch(client, h, so, qty=100).json()
+    r = client.put(f"/api/wip/movements/{mv['id']}/receive", json={
+        "received_date": date(2026, 3, 10).isoformat(),
+        "qty_received": 105, "qty_reject": 0,
+    }, headers=h)
+    assert r.status_code == 200
+    assert r.json()["balance_discrepancy"] == -5
     assert r.json()["status"] == "DISCREPANCY_FLAG"
 
 
