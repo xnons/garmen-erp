@@ -240,7 +240,7 @@ export default function ShippingBillingModule() {
           </div>
           <h1 className="text-2xl font-black text-white tracking-wide">Shipping & Billing Form WI</h1>
           <p className="text-slate-400 text-sm mt-0.5">
-            Penerbitan Surat Jalan Pengiriman (SJP Sandi) ke Buyer dan Rekapitulasi Tagihan CMT Form WI.
+            Penerbitan Surat Jalan Pengiriman (SJP) ke Buyer dan Rekapitulasi Tagihan CMT Form WI.
           </p>
         </div>
 

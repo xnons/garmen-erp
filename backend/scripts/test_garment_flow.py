@@ -181,7 +181,7 @@ def test_full_garment_workflow():
         db.commit()
         print(f"✅ Upah Steam Johan: {wage.qty_completed} Pcs × Rp 550 = Rp {wage.total_wage:,.0f}")
 
-        print("\n🚀 [TEST 7/8] Surat Jalan Pengiriman (SJP Sandi)...")
+        print("\n🚀 [TEST 7/8] Surat Jalan Pengiriman (SJP)...")
         shipment = models.Shipment(
             so_id=so.id,
             shipment_date=date.today(),

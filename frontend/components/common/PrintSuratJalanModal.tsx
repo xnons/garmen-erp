@@ -34,7 +34,7 @@ export default function PrintSuratJalanModal({
   senderRole = "Pengirim",
   recipientName = "Subcon / Buyer",
   recipientCategory = "Penerima",
-  driverName = "Sandi (Driver Logistik)",
+  driverName = "—",
   soNumber,
   styleName,
   itemCategory = "Pakaian Jadi / Pola",

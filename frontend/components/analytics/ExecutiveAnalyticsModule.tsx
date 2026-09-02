@@ -360,12 +360,19 @@ export default function ExecutiveAnalyticsModule() {
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-indigo-400" />
-                Historis & Proyeksi Laba Bersih 6 Bulan
+                Historis Laba Bersih Bulanan
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Perbandingan Omset Penjualan, Beban HPP, dan Margin Keuntungan bersih bulanan.
+                Perbandingan Omset Penjualan, Beban HPP, dan Margin Keuntungan bersih bulanan
+                (dikelompokkan dari tanggal order Sales Order).
               </p>
             </div>
+
+            {monthlyTrend.length === 0 && (
+              <div className="bg-slate-950/70 border border-slate-800 p-8 rounded-2xl text-center text-sm text-slate-500">
+                Belum ada Sales Order dengan tanggal order untuk dijadikan tren bulanan.
+              </div>
+            )}
 
             {/* Visual Bar Chart */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
