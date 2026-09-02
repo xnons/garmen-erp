@@ -259,43 +259,61 @@ def seed_pipeline_data(db):
 async def lifespan(app: FastAPI):
     init_db()
     auto_migrate_db()
+    _dev_mode = os.getenv("DEV_MODE", "false").strip().lower() == "true"
     try:
         db = SessionLocal()
-        # Seeder Akun Developer Utama
+        # Seeder Akun Developer Utama.
+        # Password & PIN diambil dari env (DEV_SEED_PASSWORD / DEV_SEED_PIN).
+        # Kalau env kosong: di DEV_MODE dipakai nilai dev default (kemudahan lokal),
+        # di produksi pembuatan akun DILEWATI — supaya deploy fresh tidak pernah
+        # punya kredensial yang di-hardcode di source.
         dev_exist = db.query(models.Karyawan).filter(models.Karyawan.username == "developer").first()
         if not dev_exist:
-            user_dev = models.Karyawan(
-                id_karyawan="DEV-001",
-                nama="Developer Utama",
-                username="developer",
-                hashed_password=get_password_hash("DevSecret123!"),
-                role="DEVELOPER",
-                jabatan="System Developer",
-                tanggal_lahir="1995-01-01",
-                no_hp="081234567890",
-                alamat="Developer Center Nexora",
-                status_karyawan="TETAP",
-                tanggal_masuk="2026-01-01",
-                is_active=True,
-                tipe_pay="BULANAN",
-                gaji_pokok=15000000,
-                tarif_borongan_pcs=0,
-                pin=get_password_hash("6767"),
-                total_hadir=30, 
-                total_terlambat=0, 
-                total_izin=0, 
-                total_alpa=0, 
-                poin_pelanggaran=0
+            _seed_pw = os.getenv("DEV_SEED_PASSWORD", "").strip() or (
+                "DevSecret123!" if _dev_mode else ""
             )
-            db.add(user_dev)
-            db.commit()
-            print("🟢 Akun Developer 'developer' berhasil dipersiapkan!")
+            _seed_pin = os.getenv("DEV_SEED_PIN", "").strip() or (
+                "6767" if _dev_mode else ""
+            )
+            if not _seed_pw:
+                print(
+                    "⚠️ Akun 'developer' belum ada dan DEV_SEED_PASSWORD tidak diset — "
+                    "pembuatan akun dilewati. Set DEV_SEED_PASSWORD (dan opsional "
+                    "DEV_SEED_PIN) lalu restart, atau buat akun admin lewat jalur lain."
+                )
+            else:
+                user_dev = models.Karyawan(
+                    id_karyawan="DEV-001",
+                    nama="Developer Utama",
+                    username="developer",
+                    hashed_password=get_password_hash(_seed_pw),
+                    role="DEVELOPER",
+                    jabatan="System Developer",
+                    tanggal_lahir="1995-01-01",
+                    no_hp="081234567890",
+                    alamat="Developer Center Nexora",
+                    status_karyawan="TETAP",
+                    tanggal_masuk="2026-01-01",
+                    is_active=True,
+                    tipe_pay="BULANAN",
+                    gaji_pokok=15000000,
+                    tarif_borongan_pcs=0,
+                    pin=get_password_hash(_seed_pin or _seed_pw),
+                    total_hadir=30,
+                    total_terlambat=0,
+                    total_izin=0,
+                    total_alpa=0,
+                    poin_pelanggaran=0
+                )
+                db.add(user_dev)
+                db.commit()
+                print("🟢 Akun Developer 'developer' berhasil dipersiapkan dari env.")
 
         # Seed data dummy (SO, partner, upah, dll) HANYA di DEV_MODE.
         # Di produksi seeder ini bisa menanam baris upah operator_id NULL &
         # data palsu setiap boot — endpoint reseed manual pun sudah di-gate
         # DEV_MODE, jadi lifespan harus konsisten.
-        if os.getenv("DEV_MODE", "false").strip().lower() == "true":
+        if _dev_mode:
             from scripts.seed_production_sql import seed_production_database
             try:
                 seed_production_database()
