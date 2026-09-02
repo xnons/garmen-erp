@@ -471,6 +471,7 @@ def get_advanced_pnl_analytics(
         total_defect_losses_rp = 0.0
 
         subcon_loss_tracker = {}
+        monthly_tracker = {}  # 'YYYY-MM' -> {revenue, cogs, net_profit}
 
         for so in sos:
             so_id = so.id
@@ -576,6 +577,13 @@ def get_advanced_pnl_analytics(
             total_factory_cogs += total_cogs
             total_factory_net_profit += net_profit
 
+            if so.order_date:
+                mkey = so.order_date.strftime("%Y-%m")
+                mt = monthly_tracker.setdefault(mkey, {"revenue": 0.0, "cogs": 0.0, "net_profit": 0.0})
+                mt["revenue"] += revenue
+                mt["cogs"] += total_cogs
+                mt["net_profit"] += net_profit
+
             buyer_name = so.buyer.name if so.buyer else "Buyer Reguler"
 
             orders_pnl.append({
@@ -607,75 +615,7 @@ def get_advanced_pnl_analytics(
                 "deadline": str(so.deadline or "")
             })
 
-        # Fallback jika database SO masih kosong
-        if not orders_pnl:
-            orders_pnl = [
-                {
-                    "id": "sample-1",
-                    "so_number": "SO-MG260001",
-                    "buyer_name": "DELUSI FASHION",
-                    "buyer_po_number": "PO-DEL-991",
-                    "style_name": "WIND MILD BLACK",
-                    "item_category": "LONG JEANS",
-                    "contract_type": "CMT",
-                    "order_qty": 500,
-                    "unit_price": 35000,
-                    "cost_per_pcs": 24200,
-                    "revenue": 17500000,
-                    "material_cost": 1750000,
-                    "cutting_cost": 400000,
-                    "subcon_cost": 4850000,
-                    "finishing_cost": 750000,
-                    "overhead_cost": 1050000,
-                    "subcon_loss": 0,
-                    "waste_loss": 0,
-                    "total_cogs": 8800000,
-                    "net_profit": 8700000,
-                    "margin_pct": 49.7,
-                    "is_loss": False,
-                    "loss_reasons": [],
-                    "status_badge": "HIGH_PROFIT",
-                    "order_date": "2026-08-01",
-                    "deadline": "2026-08-25"
-                },
-                {
-                    "id": "sample-2",
-                    "so_number": "SO-MG260002",
-                    "buyer_name": "HAMMER JEANS",
-                    "buyer_po_number": "PO-HMR-883",
-                    "style_name": "CARGO VINTAGE WASH",
-                    "item_category": "CARGO",
-                    "contract_type": "CMT",
-                    "order_qty": 300,
-                    "unit_price": 28000,
-                    "cost_per_pcs": 29400,
-                    "revenue": 8400000,
-                    "material_cost": 1050000,
-                    "cutting_cost": 240000,
-                    "subcon_cost": 4500000,
-                    "finishing_cost": 450000,
-                    "overhead_cost": 504000,
-                    "subcon_loss": 600000,
-                    "waste_loss": 480000,
-                    "total_cogs": 7824000,
-                    "net_profit": 576000,
-                    "margin_pct": 6.85,
-                    "is_loss": False,
-                    "loss_reasons": [
-                        "Selisih hilang 4 pcs di Subcon Sewing (Rugi Rp 600,000)",
-                        "Pemborosan kain perca meja potong (Rugi Rp 480,000)",
-                        "Margin tipis di bawah 10%"
-                    ],
-                    "status_badge": "LOW_MARGIN",
-                    "order_date": "2026-08-10",
-                    "deadline": "2026-08-28"
-                }
-            ]
-            total_factory_revenue = sum(o["revenue"] for o in orders_pnl)
-            total_factory_cogs = sum(o["total_cogs"] for o in orders_pnl)
-            total_factory_net_profit = sum(o["net_profit"] for o in orders_pnl)
-            total_subcon_leakage_rp = 600000
-            total_fabric_waste_rp = 480000
+        # Tidak ada data contoh: kalau belum ada Sales Order, semua total = 0 (jujur apa adanya).
 
         overall_margin_pct = round((total_factory_net_profit / total_factory_revenue) * 100.0, 2) if total_factory_revenue > 0 else 0.0
         profitable_count = sum(1 for o in orders_pnl if not o["is_loss"] and o["margin_pct"] >= 10.0)
@@ -704,21 +644,21 @@ def get_advanced_pnl_analytics(
             key=lambda x: x["loss_amount"],
             reverse=True
         )[:5]
-        if not sorted_subcon_losses:
-            sorted_subcon_losses = [
-                {"name": "Anis Maklun Sewing", "loss_amount": 350000},
-                {"name": "Mas Kirno Print", "loss_amount": 150000}
-            ]
 
-        # Monthly P&L Trend (6 Months)
-        monthly_trend = [
-            {"month": "Mar 2026", "revenue": 45000000, "cogs": 28000000, "net_profit": 17000000, "margin_pct": 37.7},
-            {"month": "Apr 2026", "revenue": 52000000, "cogs": 33000000, "net_profit": 19000000, "margin_pct": 36.5},
-            {"month": "Mei 2026", "revenue": 48000000, "cogs": 31500000, "net_profit": 16500000, "margin_pct": 34.3},
-            {"month": "Jun 2026", "revenue": 65000000, "cogs": 41000000, "net_profit": 24000000, "margin_pct": 36.9},
-            {"month": "Jul 2026", "revenue": 72000000, "cogs": 48000000, "net_profit": 24000000, "margin_pct": 33.3},
-            {"month": "Agu 2026 (Live)", "revenue": round(total_factory_revenue, 0), "cogs": round(total_factory_cogs, 0), "net_profit": round(total_factory_net_profit, 0), "margin_pct": overall_margin_pct}
-        ]
+        # Monthly P&L Trend — nyata, dikelompokkan dari tanggal order Sales Order
+        _bulan_id = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+        monthly_trend = []
+        for mkey in sorted(monthly_tracker.keys()):
+            mv = monthly_tracker[mkey]
+            y, m = mkey.split("-")
+            m_rev = mv["revenue"]
+            monthly_trend.append({
+                "month": f"{_bulan_id[int(m) - 1]} {y}",
+                "revenue": round(m_rev, 0),
+                "cogs": round(mv["cogs"], 0),
+                "net_profit": round(mv["net_profit"], 0),
+                "margin_pct": round((mv["net_profit"] / m_rev) * 100.0, 2) if m_rev > 0 else 0.0,
+            })
 
         total_identified_leakage = total_subcon_leakage_rp + total_fabric_waste_rp + total_defect_losses_rp
 
