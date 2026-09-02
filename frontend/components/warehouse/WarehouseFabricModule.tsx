@@ -285,13 +285,20 @@ export default function WarehouseFabricModule() {
 
   const handlePrintSuratJalan = (alloc: any) => {
     setPrintDoc({
-      so_number: alloc.so_number || 'SO-UNASSIGNED',
-      buyer_name: 'PT. CHIKAL JAYA MAKMUR (INTERNAL POTONG)',
-      surat_jalan_no: alloc.surat_jalan_no || `SJ-MAT-${alloc.id.slice(0, 6)}`,
-      dispatch_date: alloc.dispatch_date,
-      destination_address: 'Meja Potong Bu Nani - Workshop Utama',
-      driver_name: 'Dewi (Gudang Bahan)',
-      notes: `Pengeluaran Kain: ${alloc.item_description || 'Kain Utama'} | Qty: ${alloc.qty_issued} ${alloc.unit || 'YARD'}`
+      title: "SURAT JALAN PENGELUARAN BAHAN BAKU (SJ-MATERIAL)",
+      suratJalanNo: alloc.surat_jalan_no || `SJ-MAT-${alloc.id.slice(0, 6)}`,
+      dateStr: alloc.dispatch_date,
+      senderName: "Gudang Bahan Baku CJM",
+      senderRole: "Petugas Gudang Kain",
+      recipientName: "Meja Potong - Workshop Utama",
+      recipientCategory: "Divisi Cutting",
+      driverName: "—",
+      soNumber: alloc.so_number || 'SO-UNASSIGNED',
+      styleName: alloc.item_description || 'Kain Utama',
+      itemCategory: "Bahan Baku / Kain",
+      totalQty: alloc.qty_issued || 0,
+      unit: "YARD",
+      remarks: "Pengeluaran kain dari gudang untuk kebutuhan produksi meja potong.",
     });
   };
 
