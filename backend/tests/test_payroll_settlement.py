@@ -88,6 +88,15 @@ def test_mark_paid_is_idempotent(client, auth, db):
     assert n_logs == 1                                   # merge by deterministic id, bukan dobel
 
 
+def test_payroll_summary_keeps_monthly_support_staff(client, auth, users):
+    """PPIC / QC_INSPECTOR / GUDANG bukan buruh borongan (tak muncul di picker,
+    tak bisa jadi operator upah) TAPI gaji bulanan mereka tetap di rekap payroll.
+    Akun sistem (DEVELOPER/OWNER/ADMIN/FINANCE) tetap tidak muncul."""
+    ids = {r["id_karyawan"] for r in _summary(client, auth)["detail_karyawan"]}
+    assert {"PPC-001", "GDG-001"} <= ids            # staf bulanan tetap ada
+    assert {"DEV-001", "OWN-001", "ADM-001", "FIN-001"}.isdisjoint(ids)
+
+
 def test_new_wage_after_settlement_is_outstanding_again(client, auth, db):
     kid = _worker(db, kid="KRY-BOR-4")
     so_id = _so(db, "SO-PAY-4")

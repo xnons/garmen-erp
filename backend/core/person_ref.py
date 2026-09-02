@@ -12,29 +12,44 @@ from sqlalchemy.orm import Session
 
 import models
 
-# Role akun sistem/manajerial/pendukung yang BUKAN buruh produksi borongan.
-# Akun ber-role ini tidak boleh: muncul di dropdown pemilih pekerja, dijadikan
-# operator entri upah borongan, atau ikut dihitung di rekap payroll borongan.
-# PPIC (planner), QC_INSPECTOR (inspektur mutu) dan GUDANG (staf gudang) tidak
-# pernah dibayar per-pcs — mereka staf bulanan, jadi diperlakukan sama seperti
-# ADMIN/FINANCE untuk modul ini.
-NON_WORKER_ROLES = [
-    "DEVELOPER", "OWNER", "ADMIN", "FINANCE",
-    "PPIC", "QC_INSPECTOR", "GUDANG",
-]
+# Akun sistem/manajerial — sama sekali di luar payroll pabrik.
+SYSTEM_ROLES = ["DEVELOPER", "OWNER", "ADMIN", "FINANCE"]
+
+# Staf pendukung bergaji BULANAN yang tidak pernah dibayar per-pcs. Mereka
+# TIDAK boleh jadi operator entri upah borongan / muncul di dropdown pemilih
+# pekerja borongan — TAPI gaji pokok mereka nyata, jadi tetap ikut di rekap &
+# pencairan payroll.
+NON_BORONGAN_ROLES = ["PPIC", "QC_INSPECTOR", "GUDANG"]
+
+# Siapa pun yang tidak boleh dicatat sebagai buruh borongan.
+_NOT_BORONGAN_WORKER = SYSTEM_ROLES + NON_BORONGAN_ROLES
+
+# Alias kompatibilitas (dulu satu daftar dipakai untuk semua hal).
+NON_WORKER_ROLES = _NOT_BORONGAN_WORKER
 
 
 def is_non_worker_role(role: Optional[str]) -> bool:
-    return bool(role) and role.strip().upper() in NON_WORKER_ROLES
+    """True kalau role tidak boleh dicatat sebagai operator upah borongan."""
+    return bool(role) and role.strip().upper() in _NOT_BORONGAN_WORKER
+
+
+def _exclude_roles(query, roles):
+    """Karyawan dengan role NULL tetap disertakan (buruh lama tanpa role)."""
+    return query.filter(or_(
+        models.Karyawan.role.is_(None),
+        func.upper(func.trim(models.Karyawan.role)).notin_(roles),
+    ))
+
+
+def exclude_worker_picker(query):
+    """Untuk dropdown pemilih pekerja borongan: buang akun sistem + staf non-borongan."""
+    return _exclude_roles(query, _NOT_BORONGAN_WORKER)
 
 
 def exclude_non_workers(query):
-    """Filter query atas models.Karyawan: buang akun sistem/manajerial.
-    Karyawan dengan role NULL tetap disertakan (buruh lama tanpa role)."""
-    return query.filter(or_(
-        models.Karyawan.role.is_(None),
-        func.upper(func.trim(models.Karyawan.role)).notin_(NON_WORKER_ROLES),
-    ))
+    """Untuk rekap & pencairan payroll: hanya buang akun sistem/manajerial.
+    Staf bulanan (PPIC/QC_INSPECTOR/GUDANG) TETAP disertakan."""
+    return _exclude_roles(query, SYSTEM_ROLES)
 
 
 def resolve_worker(

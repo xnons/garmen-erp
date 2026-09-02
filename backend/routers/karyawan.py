@@ -13,7 +13,7 @@ from schemas.karyawan import (
 )
 from core.security import get_current_user, get_password_hash
 from core.audit_helper import record_audit
-from core.person_ref import exclude_non_workers
+from core.person_ref import exclude_worker_picker
 
 router = APIRouter(prefix="/api", tags=["Karyawan & Pelanggaran"])
 
@@ -142,7 +142,7 @@ async def get_karyawan_dropdown_list(
     Dapat diakses oleh semua pengguna terotentikasi.
     """
     q = db.query(models.Karyawan).filter(models.Karyawan.is_active == True)
-    q = exclude_non_workers(q)  # buang akun DEVELOPER/OWNER/ADMIN/FINANCE
+    q = exclude_worker_picker(q)  # buang akun sistem + staf non-borongan (PPIC/QC/GUDANG)
     pekerja = q.order_by(models.Karyawan.nama.asc()).all()
     # Payload sengaja ramping: dipakai lintas semua role terotentikasi untuk
     # dropdown. Jangan bocorkan username / role akun ke pengguna non-manajerial.
