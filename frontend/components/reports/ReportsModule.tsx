@@ -72,7 +72,7 @@ export default function ReportsModule({ activeUser }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-black tracking-wide flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-emerald-400" /> Laporan & Analitik
+            <BarChart3 className="w-5 h-5 text-emerald-400" /> Laporan Operasional & Vendor
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">Ringkasan lintas modul — produksi, keuangan, dan performa vendor subkon.</p>
         </div>

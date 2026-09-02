@@ -13,6 +13,7 @@ import { errMsg } from '@/utils/format';
 import PrintSuratJalanModal from '../common/PrintSuratJalanModal';
 import FormWIModal from './FormWIModal';
 import Pagination from '@/components/common/Pagination';
+import { clampPage } from '@/utils/pagination';
 
 export default function ShippingBillingModule() {
   const confirm = useConfirm();
@@ -213,9 +214,10 @@ export default function ShippingBillingModule() {
   }, [shipments, searchQuery]);
 
   useEffect(() => { setPage(1); }, [searchQuery, pageSize, activeTab]);
+  const safePage = clampPage(page, filteredShipments.length, pageSize);
   const pagedShipments = useMemo(
-    () => filteredShipments.slice((page - 1) * pageSize, page * pageSize),
-    [filteredShipments, page, pageSize],
+    () => filteredShipments.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredShipments, safePage, pageSize],
   );
 
   const shippingMetrics = useMemo(() => {
@@ -511,7 +513,7 @@ export default function ShippingBillingModule() {
 
       {activeTab === 'SHIPMENTS' && (
         <Pagination
-          page={page}
+          page={safePage}
           pageSize={pageSize}
           total={filteredShipments.length}
           onPageChange={setPage}

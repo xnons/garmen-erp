@@ -1,7 +1,37 @@
 # backend/schemas/garment_blueprint.py
-from pydantic import BaseModel, Field
+from enum import Enum
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime
+
+
+# ---------------------------------------------------------------------------
+# Controlled vocabularies for piece-rate / prep wages.
+# Kept in sync with OPERATION_PRESETS (frontend FinishingWagesModule.tsx) and
+# the task_type options in PrepWagesModal.tsx. Values are stored upper-case.
+# ---------------------------------------------------------------------------
+class OperationType(str, Enum):
+    JAHIT_SEWING = "JAHIT_SEWING"
+    OBRAS = "OBRAS"
+    STIM = "STIM"
+    PASANG_KANCING = "PASANG_KANCING"
+    LUBANG_KANCING = "LUBANG_KANCING"
+    BUANG_BENANG = "BUANG_BENANG"
+    LIPAT = "LIPAT"
+    PACKING = "PACKING"
+    PRESS_INTERLINING = "PRESS_INTERLINING"
+    POTONG_POLA = "POTONG_POLA"
+    CUSTOM = "CUSTOM"
+
+
+class PrepTaskType(str, Enum):
+    NUMBERING = "NUMBERING"
+    PRESS_INTERLINING = "PRESS_INTERLINING"
+
+
+def _coerce_upper(v):
+    """Accept lower/mixed-case client input; the router used to .upper() anyway."""
+    return v.strip().upper() if isinstance(v, str) else v
 
 # ===========================================================================
 # 1. PARTNERS (BUYERS & SUBCON VENDORS)
@@ -286,21 +316,29 @@ class CuttingRecordResponse(BaseModel):
         from_attributes = True
 
 class CuttingPrepTaskCreate(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     so_id: str
-    operator_id: Optional[str] = None
-    task_type: str # NUMBERING / PRESS_INTERLINING
+    operator_id: str = Field(..., min_length=1)  # wajib — divalidasi lebih lanjut oleh resolve_worker()
+    task_type: PrepTaskType  # NUMBERING / PRESS_INTERLINING
     task_date: date
-    qty_done: int
+    qty_done: int = Field(..., gt=0)
     size_breakdown: Optional[Dict[str, int]] = {}
-    piece_rate: Optional[float] = 0.0
+    piece_rate: float = Field(0.0, ge=0)
+
+    _up_task_type = field_validator("task_type", mode="before")(_coerce_upper)
 
 class CuttingPrepTaskUpdate(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     operator_id: Optional[str] = None
-    task_type: Optional[str] = None
+    task_type: Optional[PrepTaskType] = None
     task_date: Optional[date] = None
     qty_done: Optional[int] = None
     size_breakdown: Optional[Dict[str, int]] = None
     piece_rate: Optional[float] = None
+
+    _up_task_type = field_validator("task_type", mode="before")(_coerce_upper)
 
 class CuttingPrepTaskResponse(BaseModel):
     id: str
@@ -385,25 +423,33 @@ class WIPMovementResponse(BaseModel):
 # 6. FINISHING BORONGAN, SHIPPING & BILLING FORM WI
 # ===========================================================================
 class PieceRateWageCreate(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     so_id: str
-    operator_id: Optional[str] = None
-    operation_type: str # JAHIT_SEWING, OBRAS, STIM, LUBANG_KANCING, PASANG_KANCING, BUANG_BENANG, LIPAT, PACKING, PRESS_INTERLINING, POTONG_POLA
+    operator_id: str = Field(..., min_length=1)  # wajib — divalidasi lebih lanjut oleh resolve_worker()
+    operation_type: OperationType
     work_date: date
-    qty_completed: int
-    qty_reject: Optional[int] = 0
+    qty_completed: int = Field(..., gt=0)
+    qty_reject: int = Field(0, ge=0)
     size_breakdown: Optional[dict] = {}
-    wage_per_piece: float # e.g. 550 or 2500
+    wage_per_piece: float = Field(..., ge=0)  # e.g. 550 or 2500
     notes: Optional[str] = None
 
+    _up_operation_type = field_validator("operation_type", mode="before")(_coerce_upper)
+
 class PieceRateWageUpdate(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     operator_id: Optional[str] = None
-    operation_type: Optional[str] = None
+    operation_type: Optional[OperationType] = None
     work_date: Optional[date] = None
     qty_completed: Optional[int] = None
     qty_reject: Optional[int] = None
     size_breakdown: Optional[dict] = None
     wage_per_piece: Optional[float] = None
     notes: Optional[str] = None
+
+    _up_operation_type = field_validator("operation_type", mode="before")(_coerce_upper)
 
 class PieceRateWageResponse(BaseModel):
     id: str

@@ -121,6 +121,24 @@ def test_post_wages_forbidden_for_non_writer_role(client, auth, db, make_so):
     assert r.status_code == 403, r.text
 
 
+def test_post_wages_rejects_zero_qty(client, auth, db, make_so):
+    so_id = make_so()
+    _mk_worker(db)
+    r = client.post("/api/shipping/wages",
+                    json=_payload(so_id, operator_id="WRK-100", qty_completed=0),
+                    headers=auth("developer"))
+    assert r.status_code == 422, r.text
+
+
+def test_post_wages_rejects_negative_wage(client, auth, db, make_so):
+    so_id = make_so()
+    _mk_worker(db)
+    r = client.post("/api/shipping/wages",
+                    json=_payload(so_id, operator_id="WRK-100", wage_per_piece=-5),
+                    headers=auth("developer"))
+    assert r.status_code == 422, r.text
+
+
 def test_post_with_valid_operator_succeeds(client, auth, db, make_so):
     so_id = make_so()
     _mk_worker(db)
@@ -161,6 +179,23 @@ def test_prep_task_without_operator_is_rejected(client, auth, db, make_so):
 # ---------------------------------------------------------------------------
 # Payroll: baris upah nyasar ke akun DEVELOPER tidak muncul di rekap gaji
 # ---------------------------------------------------------------------------
+def test_cannot_hard_delete_worker_with_wage_history(client, auth, db, make_so):
+    so_id = make_so()
+    _mk_worker(db, kid="WRK-DEL", nama="Punya Riwayat")
+    _mk_wage(db, so_id, operator_id="WRK-DEL")
+    r = client.delete("/api/karyawan/WRK-DEL", headers=auth("developer"))
+    assert r.status_code == 409, r.text
+    assert "riwayat" in r.json()["detail"].lower()
+    # akun masih ada
+    assert db.query(models.Karyawan).filter(models.Karyawan.id_karyawan == "WRK-DEL").first() is not None
+
+
+def test_can_hard_delete_worker_without_refs(client, auth, db):
+    _mk_worker(db, kid="WRK-FREE", nama="Tanpa Riwayat")
+    r = client.delete("/api/karyawan/WRK-FREE", headers=auth("developer"))
+    assert r.status_code == 200, r.text
+
+
 def test_payroll_summary_excludes_system_accounts(client, auth, db, users, make_so):
     so_id = make_so()
     dev_id = users["DEVELOPER"][0]

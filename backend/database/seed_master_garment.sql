@@ -577,7 +577,15 @@ FROM (VALUES
   ('SO-MG260025', 'KRY-FIN-01', 'STIM', '2026-05-04', 1163, 0, '{"28": 232, "30": 348, "32": 348, "34": 235}', 500.0, 581500.0, 'Steam Johan'),
   ('SO-MG260025', 'KRY-FIN-04', 'PACKING', '2026-05-05', 1160, 3, '{"28": 232, "30": 348, "32": 348, "34": 232}', 400.0, 464000.0, 'Packing Desti')
 ) AS v(so_number, operator_id, operation_type, work_date, qty_completed, qty_reject, sz, wage_per_piece, total_wage, notes)
-WHERE EXISTS (SELECT 1 FROM sales_orders WHERE sales_orders.so_number = v.so_number);
+WHERE EXISTS (SELECT 1 FROM sales_orders WHERE sales_orders.so_number = v.so_number)
+  -- Idempoten: jangan sisipkan ulang baris demo yang sama kalau seed dijalankan lagi.
+  AND NOT EXISTS (
+    SELECT 1 FROM piece_rate_wages w2
+    WHERE w2.so_id = (SELECT id FROM sales_orders WHERE so_number = v.so_number LIMIT 1)
+      AND w2.operator_id = v.operator_id
+      AND w2.operation_type = v.operation_type
+      AND w2.work_date = v.work_date::date
+  );
 
 INSERT INTO shipments (id, so_id, shipment_date, surat_jalan_no, driver_id, driver_name, vehicle_plate_no, carton_box_count, destination_address, total_qty_shipped, size_breakdown_shipped, unit_price, total_invoice_amount, invoice_number, is_invoiced, remarks)
 SELECT 

@@ -44,8 +44,8 @@ export default function DashboardContent({
 
   const getMenuTitle = (menu: string) => {
     switch (menu) {
-      case 'executive-analytics': return 'Analitik Margin & Profit / Loss (P&L)';
-      case 'reports': return 'Laporan & Analitik';
+      case 'executive-analytics': return 'Margin & Profit / Loss (P&L)';
+      case 'reports': return 'Laporan Operasional & Vendor';
       case 'data-import': return 'Impor Data Excel';
       case 'wip-control-tower': return 'Master Control Tower — Live WIP Matrix';
       case 'ppic-so': return 'Fase 1: PPIC & Sales Order (SO)';

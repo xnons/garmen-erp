@@ -57,6 +57,7 @@ def get_payroll_summary(
     items = []
     total_output_pcs_all = 0
     total_pengeluaran_gaji_all = 0.0
+    total_borongan_dibayar_all = 0.0
 
     for k in karyawan_list:
         tipe = (k.tipe_pay or "BULANAN").upper()
@@ -64,11 +65,14 @@ def get_payroll_summary(
         gaji_kalkulasi = 0.0
 
         # 1. Agregasi dari PieceRateWage (Garment Blueprint: Sewing, Obras, Steam, Kancing, Potong, Lipat, Packing, Press)
+        #    Hanya baris yang BELUM dibayar (is_paid != True) -> rekap = OUTSTANDING,
+        #    supaya periode yang sudah dicairkan tidak dihitung ulang.
         piece_stats = db.query(
             func.coalesce(func.sum(models.PieceRateWage.qty_completed), 0).label("total_pcs"),
             func.coalesce(func.sum(models.PieceRateWage.total_wage), 0.0).label("total_wage")
         ).filter(
             models.PieceRateWage.operator_id == k.id_karyawan,
+            models.PieceRateWage.is_paid.isnot(True),
             extract('year', models.PieceRateWage.work_date) == year,
             extract('month', models.PieceRateWage.work_date) == month
         ).first()
@@ -76,12 +80,13 @@ def get_payroll_summary(
         piece_pcs = int(piece_stats.total_pcs or 0) if piece_stats else 0
         piece_wage = float(piece_stats.total_wage or 0.0) if piece_stats else 0.0
 
-        # 2. Agregasi dari CuttingPrepTask (Numbering, Press Interlining Silma/Anzani)
+        # 2. Agregasi dari CuttingPrepTask (Numbering, Press Interlining Silma/Anzani) — juga hanya yang belum dibayar
         prep_stats = db.query(
             func.coalesce(func.sum(models.CuttingPrepTask.qty_done), 0).label("total_pcs"),
             func.coalesce(func.sum(models.CuttingPrepTask.total_wage), 0.0).label("total_wage")
         ).filter(
             models.CuttingPrepTask.operator_id == k.id_karyawan,
+            models.CuttingPrepTask.is_paid.isnot(True),
             extract('year', models.CuttingPrepTask.task_date) == year,
             extract('month', models.CuttingPrepTask.task_date) == month
         ).first()
@@ -125,8 +130,19 @@ def get_payroll_summary(
             tarif_harian = float(k.gaji_pokok or 0)
             gaji_kalkulasi = (total_hadir * tarif_harian) + total_borongan_wage
 
+        # Upah borongan blueprint yang SUDAH dibayar di periode ini (info tampilan).
+        paid_stats = db.query(
+            func.coalesce(func.sum(models.PieceRateWage.total_wage), 0.0)
+        ).filter(
+            models.PieceRateWage.operator_id == k.id_karyawan,
+            models.PieceRateWage.is_paid.is_(True),
+            extract('year', models.PieceRateWage.work_date) == year,
+            extract('month', models.PieceRateWage.work_date) == month,
+        ).scalar() or 0.0
+
         total_output_pcs_all += total_pcs
         total_pengeluaran_gaji_all += gaji_kalkulasi
+        total_borongan_dibayar_all += float(paid_stats)
 
         items.append({
             "id_karyawan": k.id_karyawan,
@@ -136,14 +152,16 @@ def get_payroll_summary(
             "gaji_pokok": float(k.gaji_pokok or 0),
             "tarif_borongan_pcs": float(k.tarif_borongan_pcs or 0),
             "total_pcs_bulan_ini": total_pcs,
-            "total_gaji": gaji_kalkulasi
+            "total_gaji": gaji_kalkulasi,               # = OUTSTANDING (belum termasuk yang sudah dibayar)
+            "borongan_sudah_dibayar": float(paid_stats),
         })
 
     return {
         "periode": periode,
         "total_karyawan": len(karyawan_list),
         "total_output_pcs": total_output_pcs_all,
-        "total_tagihan_gaji": total_pengeluaran_gaji_all,
+        "total_tagihan_gaji": total_pengeluaran_gaji_all,   # = OUTSTANDING (belum dicairkan)
+        "total_borongan_sudah_dibayar": total_borongan_dibayar_all,
         "detail_karyawan": items
     }
 
@@ -193,7 +211,7 @@ def mark_payroll_paid(
 
     payroll_batch_id = f"PAY-{data.periode_gaji}"
 
-    # 1. Update flag is_paid pada LogOutputBorongan yang approved dalam periode ini
+    # 1. Update flag is_paid pada LogOutputBorongan yang approved dalam periode ini (LEGACY)
     logs_to_update = db.query(models.LogOutputBorongan).filter(
         models.LogOutputBorongan.is_deleted == False,
         models.LogOutputBorongan.status_verifikasi == "APPROVED",
@@ -206,19 +224,47 @@ def mark_payroll_paid(
         log.payroll_id = payroll_batch_id
         log.paid_at = func.now()
 
+    # 1b. Settle upah borongan BLUEPRINT (Fase 3 & 5) yang belum dibayar di periode ini.
+    piece_to_pay = db.query(models.PieceRateWage).filter(
+        models.PieceRateWage.is_paid.isnot(True),
+        extract('year', models.PieceRateWage.work_date) == year,
+        extract('month', models.PieceRateWage.work_date) == month,
+    ).all()
+    prep_to_pay = db.query(models.CuttingPrepTask).filter(
+        models.CuttingPrepTask.is_paid.isnot(True),
+        extract('year', models.CuttingPrepTask.task_date) == year,
+        extract('month', models.CuttingPrepTask.task_date) == month,
+    ).all()
+    for row in (*piece_to_pay, *prep_to_pay):
+        row.is_paid = True
+        row.payroll_batch_id = payroll_batch_id
+        row.paid_at = func.now()
+
+    _piece_by_worker: dict = {}
+    for w in piece_to_pay:
+        agg = _piece_by_worker.setdefault(w.operator_id, {"pcs": 0, "rp": 0.0})
+        agg["pcs"] += int(w.qty_completed or 0)
+        agg["rp"] += float(w.total_wage or 0.0)
+    for t in prep_to_pay:
+        agg = _piece_by_worker.setdefault(t.operator_id, {"pcs": 0, "rp": 0.0})
+        agg["pcs"] += int(t.qty_done or 0)
+        agg["rp"] += float(t.total_wage or 0.0)
+
     # 2. Rekap dan simpan ke LogPayrollProduksi per pekerja
     karyawan_active = exclude_non_workers(
         db.query(models.Karyawan).filter(models.Karyawan.is_active == True)
     ).all()
     for k in karyawan_active:
         user_logs = [l for l in logs_to_update if l.karyawan_id == k.id_karyawan]
-        pcs_pass = sum((l.qty_pass or 0) for l in user_logs)
-        nominal_rp = sum((l.subtotal_rp or 0.0) for l in user_logs)
-        
+        bp = _piece_by_worker.get(k.id_karyawan, {"pcs": 0, "rp": 0.0})
+        pcs_pass = sum((l.qty_pass or 0) for l in user_logs) + bp["pcs"]
+        borongan_rp = sum((l.subtotal_rp or 0.0) for l in user_logs) + bp["rp"]
+        nominal_rp = borongan_rp
+
         if k.tipe_pay == "BULANAN":
-            nominal_rp = float(k.gaji_pokok or 0)
+            nominal_rp = float(k.gaji_pokok or 0) + borongan_rp
         elif k.tipe_pay == "HARIAN":
-            nominal_rp = float((k.total_hadir or 0) * (k.gaji_pokok or 0))
+            nominal_rp = float((k.total_hadir or 0) * (k.gaji_pokok or 0)) + borongan_rp
 
         if nominal_rp > 0 or pcs_pass > 0:
             log_payroll = models.LogPayrollProduksi(

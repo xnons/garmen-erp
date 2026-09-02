@@ -11,6 +11,7 @@ import api from '@/services/api';
 import { useConfirm } from '@/components/common/ConfirmDialog';
 import { errMsg } from '@/utils/format';
 import Pagination from '@/components/common/Pagination';
+import { clampPage } from '@/utils/pagination';
 
 export interface WIPMatrixRow {
   so_id: string;
@@ -96,7 +97,8 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
   });
 
   useEffect(() => { setPage(1); }, [searchQuery, statusFilter, pageSize]);
-  const pagedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
+  const safePage = clampPage(page, filteredRows.length, pageSize);
+  const pagedRows = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   // Telemetry Aggregates
   const totalOrders = matrixData.length;
@@ -397,7 +399,7 @@ export default function MasterControlTower({ onSelectSO }: MasterControlTowerPro
         </div>
 
         <Pagination
-          page={page}
+          page={safePage}
           pageSize={pageSize}
           total={filteredRows.length}
           onPageChange={setPage}

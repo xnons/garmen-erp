@@ -110,9 +110,11 @@ def get_wip_movements(
                 print(f"⚠️ Error formatting movement row {getattr(m, 'id', 'unknown')}: {row_err}")
                 continue
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"⚠️ Error get_wip_movements: {e}")
-        return []
+        print(f"⚠️ Error get_wip_movements: {e!r}")
+        raise HTTPException(status_code=500, detail="Gagal memuat data pergerakan WIP subcon.")
 
 @router.post("/dispatch", response_model=WIPMovementResponse, status_code=status.HTTP_201_CREATED)
 def create_wip_dispatch(

@@ -13,6 +13,7 @@ from schemas.garment_blueprint import (
 from core.security import get_current_user, require_role
 from core.audit_helper import record_audit
 from core.person_ref import resolve_worker, person_name as _person_name
+from core.payroll_period import assert_period_open
 
 router = APIRouter(prefix="/api/cutting", tags=["Cutting, Consumption & Preparation"])
 
@@ -98,9 +99,11 @@ def get_cutting_records(
                 print(f"⚠️ Error formatting cutting record row {getattr(cr, 'id', 'unknown')}: {row_err}")
                 continue
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"⚠️ Error get_cutting_records: {e}")
-        return []
+        print(f"⚠️ Error get_cutting_records: {e!r}")
+        raise HTTPException(status_code=500, detail="Gagal memuat data cutting.")
 
 @router.post("/records", response_model=CuttingRecordResponse, status_code=status.HTTP_201_CREATED)
 def create_cutting_record(
@@ -249,9 +252,11 @@ def get_prep_tasks(
                 print(f"⚠️ Error formatting prep task row {getattr(t, 'id', 'unknown')}: {row_err}")
                 continue
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"⚠️ Error get_prep_tasks: {e}")
-        return []
+        print(f"⚠️ Error get_prep_tasks: {e!r}")
+        raise HTTPException(status_code=500, detail="Gagal memuat data tugas persiapan.")
 
 @router.post("/prep-tasks", response_model=CuttingPrepTaskResponse, status_code=status.HTTP_201_CREATED)
 def create_prep_task(
@@ -262,6 +267,8 @@ def create_prep_task(
     so = db.query(models.SalesOrder).filter(models.SalesOrder.id == payload.so_id).first()
     if not so:
         raise HTTPException(status_code=404, detail="Sales Order tidak ditemukan.")
+
+    assert_period_open(db, payload.task_date, field="Tanggal tugas")
 
     # Tugas persiapan = upah borongan -> operator WAJIB, aktif, & bukan akun sistem.
     operator_obj = resolve_worker(db, payload.operator_id, field="Nama pekerja")
@@ -309,8 +316,18 @@ def update_prep_task(
     if not task:
         raise HTTPException(status_code=404, detail="Tugas persiapan cutting tidak ditemukan.")
 
+    if task.is_paid:
+        raise HTTPException(
+            status_code=409,
+            detail="Tugas ini sudah dicairkan lewat payroll; tidak bisa dikoreksi.",
+        )
+
     old_qty = task.qty_done
     update_data = payload.model_dump(exclude_unset=True)
+
+    assert_period_open(db, task.task_date, field="Tanggal tugas")
+    if update_data.get("task_date"):
+        assert_period_open(db, update_data["task_date"], field="Tanggal tugas baru")
 
     if update_data.get("operator_id"):
         resolve_worker(db, update_data["operator_id"], field="Pekerja", required=True)
@@ -348,7 +365,12 @@ def delete_prep_task(
     task = db.query(models.CuttingPrepTask).filter(models.CuttingPrepTask.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Tugas persiapan tidak ditemukan.")
-    
+    if task.is_paid:
+        raise HTTPException(
+            status_code=409,
+            detail="Tugas ini sudah dicairkan lewat payroll; tidak bisa dihapus.",
+        )
+
     t_type = task.task_type
     db.delete(task)
     db.commit()

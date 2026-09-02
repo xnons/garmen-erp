@@ -11,6 +11,7 @@ import api from '@/services/api';
 import { useConfirm, usePrompt } from '@/components/common/ConfirmDialog';
 import { errMsg } from '@/utils/format';
 import Pagination from '@/components/common/Pagination';
+import { clampPage } from '@/utils/pagination';
 
 const OPERATION_PRESETS: { id: string; label: string; defaultRate: number; category: string }[] = [
   { id: "JAHIT_SEWING", label: "🧵 Jahit Sewing Internal (Celana/Kemeja)", defaultRate: 2500, category: "SEWING" },
@@ -239,7 +240,8 @@ export default function FinishingWagesModule() {
   const totalRejects = filteredWages.reduce((acc, w) => acc + (w.qty_reject || 0), 0);
 
   useEffect(() => { setPage(1); }, [searchQuery, filterOp, pageSize]);
-  const pagedWages = filteredWages.slice((page - 1) * pageSize, page * pageSize);
+  const safePage = clampPage(page, filteredWages.length, pageSize);
+  const pagedWages = filteredWages.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <div className="space-y-6">
@@ -528,7 +530,7 @@ export default function FinishingWagesModule() {
 
       {filteredWages.length > 0 && (
         <Pagination
-          page={page}
+          page={safePage}
           pageSize={pageSize}
           total={filteredWages.length}
           onPageChange={setPage}

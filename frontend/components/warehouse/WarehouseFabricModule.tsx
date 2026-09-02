@@ -11,6 +11,7 @@ import api from '@/services/api';
 import { useConfirm } from '@/components/common/ConfirmDialog';
 import { errMsg, formatRp, formatQty } from '@/utils/format';
 import Pagination from '@/components/common/Pagination';
+import { clampPage } from '@/utils/pagination';
 import FabricInspectionModal from './FabricInspectionModal';
 import FabricAllocationModal from './FabricAllocationModal';
 import PrintSuratJalanModal from '../common/PrintSuratJalanModal';
@@ -118,10 +119,11 @@ export default function WarehouseFabricModule() {
   // Reset ke halaman 1 saat filter berubah
   useEffect(() => { setStockPage(1); }, [searchQuery, categoryFilter, showLowStockOnly, stockPageSize]);
 
+  const safeStockPage = clampPage(stockPage, filteredItems.length, stockPageSize);
   const pagedItems = useMemo(() => {
-    const start = (stockPage - 1) * stockPageSize;
+    const start = (safeStockPage - 1) * stockPageSize;
     return filteredItems.slice(start, start + stockPageSize);
-  }, [filteredItems, stockPage, stockPageSize]);
+  }, [filteredItems, safeStockPage, stockPageSize]);
 
   // Summary Metrics
   const metrics = useMemo(() => {
@@ -685,7 +687,7 @@ export default function WarehouseFabricModule() {
           )}
 
           <Pagination
-            page={stockPage}
+            page={safeStockPage}
             pageSize={stockPageSize}
             total={filteredItems.length}
             onPageChange={setStockPage}

@@ -138,7 +138,19 @@ async def register_karyawan(
     final_id = user_data.id_karyawan or generate_unique_id_karyawan(db)
     hashed_password = get_password_hash(user_data.password)
     hashed_pin = get_password_hash(raw_pin)  # 🔒 Hash PIN untuk disimpan di Database
-    
+
+    # Role sistem/manajerial tidak masuk akal ber-tipe_pay BORONGAN (dan bikin
+    # akun-nya seolah "pekerja"); default-kan ke BULANAN kalau tak diisi eksplisit.
+    # `model_fields_set` = field yang benar-benar dikirim klien (schema punya
+    # default "BORONGAN" sehingga `user_data.tipe_pay` selalu terisi).
+    _MANAGERIAL = {"DEVELOPER", "OWNER", "ADMIN", "FINANCE", "PPIC"}
+    if "tipe_pay" in user_data.model_fields_set and user_data.tipe_pay:
+        tipe_pay = user_data.tipe_pay.upper()
+    else:
+        tipe_pay = "BULANAN" if target_role in _MANAGERIAL else "BORONGAN"
+
+    can_login = user_data.can_login if user_data.can_login is not None else True
+
     karyawan_baru = models.Karyawan(
         id_karyawan=final_id,
         nama=user_data.nama,
@@ -147,18 +159,19 @@ async def register_karyawan(
         pin=hashed_pin,
         role=target_role,
         is_active=True,
-        
+        can_login=can_login,
+
         jabatan=user_data.jabatan,
         tanggal_lahir=user_data.tanggal_lahir,
         no_hp=user_data.no_hp,
         alamat=user_data.alamat,
         status_karyawan=(user_data.status_karyawan or "KONTRAK").upper(),
         tanggal_masuk=user_data.tanggal_masuk,
-        
-        tipe_pay=(user_data.tipe_pay or "BORONGAN").upper(),
+
+        tipe_pay=tipe_pay,
         gaji_pokok=user_data.gaji_pokok,
         tarif_borongan_pcs=user_data.tarif_borongan_pcs,
-        
+
         total_hadir=0, total_terlambat=0, total_izin=0, total_alpa=0, poin_pelanggaran=0
     )
     
