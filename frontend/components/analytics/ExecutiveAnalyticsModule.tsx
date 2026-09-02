@@ -13,6 +13,7 @@ import api from '@/services/api';
 export default function ExecutiveAnalyticsModule() {
   const [loading, setLoading] = useState<boolean>(true);
   const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL"); // ALL, PROFIT, LOW_MARGIN, LOSS
   const [contractFilter, setContractFilter] = useState<string>("ALL"); // ALL, CMT, FOB
@@ -32,11 +33,19 @@ export default function ExecutiveAnalyticsModule() {
 
   const fetchAnalytics = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await api.get('/api/dashboard/advanced-pnl-analytics');
-      setAnalyticsData(res.data);
-    } catch (err) {
+      if (res.data?.error) {
+        setAnalyticsData(null);
+        setError(res.data.error);
+      } else {
+        setAnalyticsData(res.data);
+      }
+    } catch (err: any) {
       console.error("Gagal mengambil data analitik P&L eksekutif:", err);
+      setAnalyticsData(null);
+      setError(err?.response?.data?.detail || "Gagal memuat analitik P&L. Coba sinkronisasi ulang.");
     } finally {
       setLoading(false);
     }
@@ -121,6 +130,31 @@ export default function ExecutiveAnalyticsModule() {
           </button>
         </div>
       </div>
+
+      {/* Error State: analytics endpoint failed — show this instead of silent Rp 0 */}
+      {error && (
+        <div className="flex items-start gap-3 bg-slate-900/80 border border-rose-500/30 p-6 rounded-3xl shadow-xl">
+          <div className="p-2 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20 shrink-0">
+            <AlertOctagon className="w-5 h-5" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-black text-rose-400 uppercase tracking-wider">
+              Gagal Memuat Data Finansial
+            </h3>
+            <p className="text-sm text-slate-300 max-w-3xl break-words">{error}</p>
+            <button
+              onClick={fetchAnalytics}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
+              Coba Lagi
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!error && (<>
 
       {/* 2. Top Executive Metric Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -728,6 +762,8 @@ export default function ExecutiveAnalyticsModule() {
           </div>
         </div>
       </div>
+
+      </>)}
 
       {/* 5. Costing Drilldown Modal for Single Sales Order */}
       {selectedSO && (

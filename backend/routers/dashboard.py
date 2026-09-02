@@ -3,7 +3,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Date
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, Any, List
 
 from database import get_db
@@ -747,12 +747,15 @@ def get_advanced_pnl_analytics(
             "userRole": (current_user.role or "DEVELOPER").upper(),
             "generatedAt": str(datetime.utcnow())
         }
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
-        return {
-            "error": f"Gagal menghasilkan analitik P&L: {str(e)}",
-            "traceback": traceback.format_exc()
-        }
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Gagal menghasilkan analitik P&L: {e}",
+        )
 
 
 @router.post("/reseed-production-pipeline")
