@@ -591,12 +591,12 @@ INSERT INTO shipments (id, so_id, shipment_date, surat_jalan_no, driver_id, driv
 SELECT 
   gen_random_uuid()::text,
   (SELECT id FROM sales_orders WHERE so_number = v.so_number LIMIT 1),
-  v.shipment_date::date, v.surat_jalan_no, 'KRY-EXP-01', 'Sandi (Ekspedisi)', 'D 8821 CJM',
+  v.shipment_date::date, v.surat_jalan_no, NULL, NULL, NULL,
   v.carton_box_count, v.destination_address, v.total_qty_shipped, v.sz::json,
   v.unit_price, v.total_invoice_amount, v.invoice_number, TRUE, v.remarks
 FROM (VALUES
   ('SO-MG260001', '2026-04-25', 'SJP-2604.0001', 15, 'Gudang Distribusi WILMER Jakarta', 495, '{"28": 100, "30": 150, "32": 150, "34": 95}', 35000.0, 17325000.0, 'INV-2604-0001', 'Pengiriman tuntas 495 pcs.'),
-  ('SO-MG260004', '2026-04-30', 'SJP-2604.0004', 35, 'Gudang Distribusi VOXFLY Jakarta Barat', 1055, '{"28": 212, "30": 318, "32": 318, "34": 207}', 35000.0, 36925000.0, 'INV-2604-0004', 'Pengiriman tuntas 1.055 pcs dengan SJP Resmi Sandi.'),
+  ('SO-MG260004', '2026-04-30', 'SJP-2604.0004', 35, 'Gudang Distribusi VOXFLY Jakarta Barat', 1055, '{"28": 212, "30": 318, "32": 318, "34": 207}', 35000.0, 36925000.0, 'INV-2604-0004', 'Pengiriman tuntas 1.055 pcs.'),
   ('SO-MG260025', '2026-05-06', 'SJP-2604.0025', 38, 'Gudang SMBU Jakarta Barat', 1160, '{"28": 232, "30": 348, "32": 348, "34": 232}', 32000.0, 37120000.0, 'INV-2604-0025', 'Pengiriman tuntas 1.160 pcs.'),
   ('SO-MG260028', '2026-05-08', 'SJP-2604.0028', 7, 'Gudang Never Surrender Bandung', 200, '{"28": 40, "30": 60, "32": 60, "34": 40}', 38000.0, 7600000.0, 'INV-2604-0028', 'Pengiriman tuntas 200 pcs.'),
   ('SO-MG260029', '2026-05-08', 'SJP-2604.0029', 7, 'Gudang Never Surrender Bandung', 200, '{"28": 40, "30": 60, "32": 60, "34": 40}', 38000.0, 7600000.0, 'INV-2604-0029', 'Pengiriman tuntas 200 pcs.'),

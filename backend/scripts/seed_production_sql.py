@@ -311,7 +311,6 @@ def seed_production_database():
         johan_id = emp_map.get("KRY-FIN-01")
         ica_id = emp_map.get("KRY-FIN-02")
         desti_id = emp_map.get("KRY-FIN-04")
-        sandi_driver_id = emp_map.get("KRY-EXP-01")
 
         for so_item in SALES_ORDERS_DATA:
             so_num = so_item["so_number"]
@@ -475,9 +474,9 @@ def seed_production_database():
                         so_id=so_id,
                         shipment_date=so_item["order_date"],
                         surat_jalan_no=f"SJP-2604.{so_num[-4:]}",
-                        driver_id=sandi_driver_id,
-                        driver_name="Sandi (Ekspedisi)",
-                        vehicle_plate_no="D 8821 CJM",
+                        driver_id=None,
+                        driver_name=None,
+                        vehicle_plate_no=None,
                         carton_box_count=max(5, order_qty // 30),
                         destination_address=f"Gudang Distribusi {so_item['buyer_name']}",
                         total_qty_shipped=order_qty,
@@ -486,7 +485,7 @@ def seed_production_database():
                         total_invoice_amount=so_item["total_order_value"],
                         invoice_number=f"INV-2604-{so_num[-4:]}",
                         is_invoiced=True,
-                        remarks=f"Pengiriman tuntas {order_qty} pcs dengan SJP Resmi Sandi."
+                        remarks=f"Pengiriman tuntas {order_qty} pcs."
                     )
                     db.add(shp)
 

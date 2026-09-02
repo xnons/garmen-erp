@@ -227,14 +227,13 @@ def seed_pipeline_data(db):
 
         # 6. Seed Shipment SJP
         if db.query(models.Shipment).count() == 0 and so1:
-            driver = db.query(models.Karyawan).filter(models.Karyawan.role == "EXPEDITION_DRIVER").first()
             sjp1 = models.Shipment(
                 so_id=so1.id,
                 shipment_date=date(2026, 8, 31),
                 surat_jalan_no="SJP-2608.0001",
-                driver_id=driver.id_karyawan if driver else None,
-                driver_name="Sandi (Ekspedisi)",
-                vehicle_plate_no="B 9821 CJM",
+                driver_id=None,
+                driver_name=None,
+                vehicle_plate_no=None,
                 carton_box_count=15,
                 destination_address="Gudang Distribusi Buyer Jakarta Barat",
                 total_qty_shipped=495,
