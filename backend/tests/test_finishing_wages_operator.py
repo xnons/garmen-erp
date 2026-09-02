@@ -156,9 +156,10 @@ def test_worker_picker_excludes_system_accounts(client, auth, db, users):
     _mk_worker(db, kid="WRK-200", nama="Desti Packing")
     rows = client.get("/api/karyawan/list", headers=auth("developer")).json()
     ids = {r["id_karyawan"] for r in rows}
-    # akun sistem dari fixture `users` (DEV-001/OWN-001/ADM-001/FIN-001) tidak muncul
-    assert {"DEV-001", "OWN-001", "ADM-001", "FIN-001"}.isdisjoint(ids)
-    # pekerja produksi + PPIC/GUDANG tetap muncul
+    # akun sistem/pendukung (DEV/OWN/ADM/FIN + PPIC/QC/GUDANG) tidak muncul —
+    # mereka tidak pernah jadi buruh borongan.
+    assert {"DEV-001", "OWN-001", "ADM-001", "FIN-001", "PPC-001", "GDG-001"}.isdisjoint(ids)
+    # pekerja produksi tetap muncul
     assert "WRK-200" in ids
     assert "PRD-001" in ids
     # payload ramping: tidak membocorkan username / role

@@ -12,10 +12,16 @@ from sqlalchemy.orm import Session
 
 import models
 
-# Role akun sistem/manajerial yang BUKAN buruh produksi. Akun ber-role ini
-# tidak boleh: muncul di dropdown pemilih pekerja, dijadikan operator entri
-# upah borongan, atau ikut dihitung di rekap payroll borongan.
-NON_WORKER_ROLES = ["DEVELOPER", "OWNER", "ADMIN", "FINANCE"]
+# Role akun sistem/manajerial/pendukung yang BUKAN buruh produksi borongan.
+# Akun ber-role ini tidak boleh: muncul di dropdown pemilih pekerja, dijadikan
+# operator entri upah borongan, atau ikut dihitung di rekap payroll borongan.
+# PPIC (planner), QC_INSPECTOR (inspektur mutu) dan GUDANG (staf gudang) tidak
+# pernah dibayar per-pcs — mereka staf bulanan, jadi diperlakukan sama seperti
+# ADMIN/FINANCE untuk modul ini.
+NON_WORKER_ROLES = [
+    "DEVELOPER", "OWNER", "ADMIN", "FINANCE",
+    "PPIC", "QC_INSPECTOR", "GUDANG",
+]
 
 
 def is_non_worker_role(role: Optional[str]) -> bool:
