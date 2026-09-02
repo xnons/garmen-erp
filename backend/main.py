@@ -126,24 +126,20 @@ def seed_pipeline_data(db):
                 models.CuttingRecord(
                     so_id=so1.id,
                     cutting_date=date(2026, 8, 3),
-                    marker_code="MRK-WIND-01",
-                    layer_count=50,
+                    gelaran_layers=50,
                     qty_cut=500,
                     size_breakdown_cut={"28": 100, "30": 150, "32": 150, "34": 100},
                     main_fabric_used=650.0,
-                    fabric_waste_yards=3.0,
-                    notes="Hasil potong rapi, presisi susut 3.5%"
+                    fabric_waste_yards=3.0
                 ),
                 models.CuttingRecord(
                     so_id=so2.id,
                     cutting_date=date(2026, 8, 12),
-                    marker_code="MRK-CARGO-01",
-                    layer_count=30,
+                    gelaran_layers=30,
                     qty_cut=300,
                     size_breakdown_cut={"28": 60, "30": 90, "32": 90, "34": 60},
                     main_fabric_used=420.0,
-                    fabric_waste_yards=15.0,
-                    notes="Pemborosan kain perca meja potong terdeteksi"
+                    fabric_waste_yards=15.0
                 )
             ])
             db.commit()
