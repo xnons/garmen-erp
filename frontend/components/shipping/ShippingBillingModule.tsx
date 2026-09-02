@@ -39,8 +39,8 @@ export default function ShippingBillingModule() {
     so_id: "",
     shipment_date: new Date().toISOString().split('T')[0],
     surat_jalan_no: `SJP-${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}.0001`,
-    driver_name: "Sandi (Ekspedisi)",
-    vehicle_plate_no: "B 9821 CJM",
+    driver_name: "",
+    vehicle_plate_no: "",
     carton_box_count: 15,
     destination_address: "Gudang Pusat Buyer (Jakarta Barat)",
     total_qty_shipped: 300,
@@ -85,8 +85,8 @@ export default function ShippingBillingModule() {
       so_id: orders.length > 0 ? orders[0].id : "",
       shipment_date: new Date().toISOString().split('T')[0],
       surat_jalan_no: `SJP-${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}.${Math.floor(Math.random() * 900 + 100)}`,
-      driver_name: "Sandi (Ekspedisi)",
-      vehicle_plate_no: "B 9821 CJM",
+      driver_name: "",
+      vehicle_plate_no: "",
       carton_box_count: 15,
       destination_address: "Gudang Pusat Buyer (Jakarta Barat)",
       total_qty_shipped: 300,
@@ -188,7 +188,7 @@ export default function ShippingBillingModule() {
       senderRole: "Gudang Pengiriman & Ekspedisi",
       recipientName: "Buyer / Distributor Utama",
       recipientCategory: "Customer",
-      driverName: s.driver_name || "Sandi (Driver Ekspedisi)",
+      driverName: s.driver_name || "—",
       soNumber: s.so_id || "-",
       styleName: "Pakaian Jadi (Selesai Finishing)",
       itemCategory: "Garment Ready for Market",
@@ -398,7 +398,7 @@ export default function ShippingBillingModule() {
                           <div className="text-[11px] text-slate-500 font-mono">{s.shipment_date}</div>
                         </td>
                         <td className="py-3 px-3">
-                          <div className="font-semibold text-slate-200">{s.driver_name || "Sandi (Ekspedisi)"}</div>
+                          <div className="font-semibold text-slate-200">{s.driver_name || "—"}</div>
                           <div className="text-[11px] text-slate-500 font-mono">{s.vehicle_plate_no || "-"}</div>
                         </td>
                         <td className="py-3 px-3 text-right font-bold text-emerald-400 font-mono">
@@ -477,7 +477,7 @@ export default function ShippingBillingModule() {
                     <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs my-2 space-y-1">
                       <div className="flex justify-between">
                         <span className="text-slate-500">Driver & Plat:</span>
-                        <span className="font-semibold text-slate-200">{s.driver_name || "Sandi"} ({s.vehicle_plate_no || "-"})</span>
+                        <span className="font-semibold text-slate-200">{s.driver_name || "—"} ({s.vehicle_plate_no || "-"})</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-500">Tujuan:</span>
