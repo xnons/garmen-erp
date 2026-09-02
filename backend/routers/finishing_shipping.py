@@ -115,9 +115,11 @@ def get_piece_rate_wages(
                 print(f"⚠️ Error formatting wage row {getattr(w, 'id', 'unknown')}: {row_err}")
                 continue
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"⚠️ Error get_piece_rate_wages: {e}")
-        return []
+        print(f"⚠️ Error get_piece_rate_wages: {e!r}")
+        raise HTTPException(status_code=500, detail="Gagal memuat data upah borongan.")
 
 @router.post("/wages", response_model=PieceRateWageResponse, status_code=status.HTTP_201_CREATED)
 def create_piece_rate_wage(
@@ -277,9 +279,11 @@ def get_shipments(
                 print(f"⚠️ Error formatting shipment row {getattr(s, 'id', 'unknown')}: {row_err}")
                 continue
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"⚠️ Error get_shipments: {e}")
-        return []
+        print(f"⚠️ Error get_shipments: {e!r}")
+        raise HTTPException(status_code=500, detail="Gagal memuat data pengiriman.")
 
 @router.post("/shipments", response_model=ShipmentResponse, status_code=status.HTTP_201_CREATED)
 def create_shipment(

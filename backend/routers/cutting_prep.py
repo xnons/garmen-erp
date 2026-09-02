@@ -99,9 +99,11 @@ def get_cutting_records(
                 print(f"⚠️ Error formatting cutting record row {getattr(cr, 'id', 'unknown')}: {row_err}")
                 continue
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"⚠️ Error get_cutting_records: {e}")
-        return []
+        print(f"⚠️ Error get_cutting_records: {e!r}")
+        raise HTTPException(status_code=500, detail="Gagal memuat data cutting.")
 
 @router.post("/records", response_model=CuttingRecordResponse, status_code=status.HTTP_201_CREATED)
 def create_cutting_record(
@@ -250,9 +252,11 @@ def get_prep_tasks(
                 print(f"⚠️ Error formatting prep task row {getattr(t, 'id', 'unknown')}: {row_err}")
                 continue
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"⚠️ Error get_prep_tasks: {e}")
-        return []
+        print(f"⚠️ Error get_prep_tasks: {e!r}")
+        raise HTTPException(status_code=500, detail="Gagal memuat data tugas persiapan.")
 
 @router.post("/prep-tasks", response_model=CuttingPrepTaskResponse, status_code=status.HTTP_201_CREATED)
 def create_prep_task(
